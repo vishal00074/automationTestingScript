@@ -1,7 +1,15 @@
 <?php
 
+use GmiChromeManager;
+
 class ClearCookies
 {
+    protected $exts;
+
+    public function __construct()
+    {
+        $this->exts = new GmiChromeManager();
+    }
 
     /**
      * Clears Chrome browser history, cookies, and cache.

@@ -1,7 +1,16 @@
 <?php
 
+use GmiChromeManager;
+
 class GoogleLogin
 {
+    protected $exts;
+
+    public function __construct()
+    {
+        $this->exts = new GmiChromeManager();
+    }
+
     // -------------------- GOOGLE login
     public $google_username_selector = 'input[name="identifier"]';
     public $google_submit_username_selector = '#identifierNext';

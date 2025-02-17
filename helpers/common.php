@@ -70,9 +70,16 @@
  * 
  * zip code in TotalCard ticket
  */
+use GmiChromeManager;
 
 Class Common {
 
+    protected $exts;
+
+    public function __construct()
+    {
+        $this->exts = new GmiChromeManager();
+    }
     /**
      * 
      * Captcha Code start here
