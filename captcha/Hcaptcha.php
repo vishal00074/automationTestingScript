@@ -14,12 +14,11 @@ class Hcaptcha
     }
 
     /**
-     * This function is not for any coding purpose 
-     * this will only provide you captcha image
+     * This function does not serve any coding logic.
+     * It simply returns the URL of the captcha image.
      */
     public function CaptchaImage()
     {
-        // Corrected Raw GitHub URL for the image
         return 'https://raw.githubusercontent.com/vishal00074/automationTestingScript/master/captcha/captcha_image.png';
     }
 
