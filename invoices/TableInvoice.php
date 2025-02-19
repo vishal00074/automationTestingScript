@@ -22,6 +22,7 @@ class TableInvoice
      */
     public function downloadInvoice()
     {
+        $this->exts->openUrl($this->invoicePageUrl);
         $this->exts->capture("4-invoices-page");
         $invoices = [];
 
