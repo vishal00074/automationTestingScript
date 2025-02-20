@@ -5,6 +5,8 @@ use GmiChromeManager;
 class ProcessInvoiceApi
 {
     public $exts;
+    public $isNoInvoice = true;
+    
 
     public function __construct()
     {
@@ -12,7 +14,9 @@ class ProcessInvoiceApi
     }
 
 
-
+    /**
+     * This function access the invoices by using Api 
+     */
     public function processInvoiceViaApi()
     {
         $customerId = trim(array_pop(explode(': ', $this->exts->extract('h2#kdnr', null, 'innerText'))));
