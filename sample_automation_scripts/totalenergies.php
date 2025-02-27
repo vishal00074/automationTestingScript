@@ -202,28 +202,31 @@ function extract_single_zip_save_pdf($zipfile)
             $zipPdfFile = $zip->statIndex($i);
             $fileName = basename($zipPdfFile['name']);
 
-            $this->exts->log(__FUNCTION__ . '::Extracted Pdf name ' . $fileName);
+            $this->exts->log(__FUNCTION__ . '::Extracted file name: ' . $fileName);
 
             $fileInfo = pathinfo($fileName);
 
-            $this->exts->log(__FUNCTION__ . '::pathinfo ' . $fileInfo);
+            $this->exts->log(__FUNCTION__ . '::Pathinfo: ' . print_r($fileInfo, true));
 
-            if ($fileInfo['extension'] === 'zip') {
-
-                $this->exts->log('extension verified');
+            if (isset($fileInfo['extension']) && strtolower($fileInfo['extension']) === 'pdf') {
+                $this->exts->log('PDF file verified');
 
                 $this->isNoInvoice = false;
-                $zip->extractTo($this->exts->config_array['download_folder'], array(basename($zipPdfFile['name'])));
-                $saved_file = $this->exts->config_array['download_folder'] . basename($zipPdfFile['name']);
+                
+                $zip->extractTo($this->exts->config_array['download_folder'], $fileName);
+                $saved_file = $this->exts->config_array['download_folder'] . $fileName;
+
                 $this->exts->new_invoice($fileInfo['filename'], "", "", $saved_file);
+
                 sleep(1);
             }
         }
         $zip->close();
-        unlink($zipfile);
+        unlink($zipfile); 
     } else {
         $this->exts->log(__FUNCTION__ . '::File extraction failed');
     }
 }
+
 
 
