@@ -1,4 +1,4 @@
-<?php // migrated udpate login and download code
+<?php // migrated udpate login and download code // updated loginfailure code
 // Server-Portal-ID: 9076 - Last modified: 16.07.2024 10:01:52 UTC - User: 1
 
 /*Define constants used in script*/
@@ -43,26 +43,20 @@ private function initPortal($count) {
 
 		$this->close_cookie_alert();
 		$this->checkFillLogin();
-        sleep(10);
-
-        $authenticateLogin = $this->exts->findTabMatchedUrl(['login']);
-        if ($authenticateLogin != null) {
-            $this->exts->type_key_by_xdotool('Tab');
-            sleep(1);
-            $this->exts->type_key_by_xdotool('Return');
-            sleep(10);
-        }
+        sleep(15);
 
 		
+        if($this->exts->getElement($this->check_login_success_selector) == null) {
+			if($this->exts->exists('dg-button[data-sentry-element="DgButton"]')){
+				$this->exts->log('Click on Login Button');
+				$this->exts->moveToElementAndClick('dg-button[data-sentry-element="DgButton"]');
+			}
+			sleep(10);
+        }
 
 		$this->close_cookie_alert();
 	}
 	
-	// then check user logged in or not
-	// for ($wait_count = 1; $wait_count <= 10 && $this->exts->getElement($this->check_login_success_selector) == null; $wait_count++) {
-	// 	$this->exts->log('Waiting for login...');
-	// 	sleep(5);
-	// }
 	if($this->exts->getElement($this->check_login_success_selector) != null) {
 		sleep(3);
 		$this->exts->log(__FUNCTION__.'::User logged in');
@@ -156,6 +150,7 @@ private function initPortal($count) {
 		$this->exts->success();
 	} else {
 		$this->exts->log(__FUNCTION__.'::Use login failed');
+		
 		if(strpos(strtolower($this->exts->extract($this->check_login_failed_selector, null, 'innerText')), 'passwor') !== false) {
 			$this->exts->loginFailure(1);
 		} else if(strpos(strtolower($this->exts->extract('div#id_username', null, 'innerText')), 'dieses feld wird ben') !== false) {
@@ -165,6 +160,12 @@ private function initPortal($count) {
 		} else if(strpos(strtolower($this->exts->extract('[id*=mat-error]', null, 'innerText')), 'die angegebenen zugangsdaten stimmen nicht') !== false || strpos(strtolower($this->exts->extract('[id*=mat-error]', null, 'innerText')), 'access data do not match') !== false) {
 			$this->exts->loginFailure(1);
 		} else if(strpos(strtolower($this->exts->extract('[id*=mat-mdc-error]', null, 'innerText')), 'geben sie eine gültige') !== false) {
+			$this->exts->loginFailure(1);
+		} else if (strpos($this->exts->extract('div[id*="toast-danger"] div.font-normal font ', null, 'innerText'), 'Die E-Mail-Adresse und/oder das Passwort ist falsch.') !== false) {
+			$this->exts->loginFailure(1);
+		} else if (strpos($this->exts->extract('div[id*="toast-danger"] div.font-normal', null, 'innerText'), 'Die E-Mail-Adresse und/oder das Passwort ist falsch.') !== false) {
+			$this->exts->loginFailure(1);
+		} else if (strpos(strtolower($this->exts->extract('div[id*="toast-danger"] div.font-normal', null, 'innerText')), 'The email address and/or password is incorrect.') !== false) {
 			$this->exts->loginFailure(1);
 		}
 		 elseif ($this->exts->exists('div.no-contracts')) {
@@ -236,47 +237,56 @@ private function checkFillLogin() {
 private function processMultiAccounts() {
 	
 	$account_len = count($this->exts->getElements('table > tbody > tr'));
+	$this->exts->log('No of account: '. $account_len);
 	for ($i = 0; $i < $account_len; $i++) {
-		$account_el = $this->exts->getElements('table > tbody > tr > td:nth-child(4)')[$i];
-		if ($account_el != null) {
-			try{
-				$this->exts->log('Click account_el button');
-				$this->exts->click_by_xdotool($account_el);
-			} catch(\Exception $exception){
-				$this->exts->log('Click account_el button by javascript');
-				$this->exts->executeSafeScript("arguments[0].click()", [$account_el]);
-			}
-			sleep(15);
 
-			$this->close_cookie_alert();
+		$getCurrentUrl = $this->exts->getUrl();
 
-			$this->exts->moveToElementAndClick('button[name="remind-me-later"]');
-			sleep(5);
-			$this->exts->moveToElementAndClick('a[href*="/home/rechnung"]');
-			sleep(15);
-
-			$this->close_cookie_alert();
-
-			if ($this->exts->getElement('.icon-billing-invoices') != null) {
-				$this->exts->moveToElementAndClick('.icon-billing-invoices');
-			} else {
-				$this->exts->moveToElementAndClick('a[href="#/home/rechnung/rechnungen"]');
-			}
-			sleep(15);
-
-			$this->close_cookie_alert();
-
-			$this->processInvoices();
-
-			$this->exts->moveToElementAndClick('[routerlink="/auth/login/vertrage"]');
-			sleep(15);
-			$this->close_cookie_alert();
+		$account_el = 'table > tbody > tr > td:nth-child(4) dg-button[data-testid="contract-table-row-'.$i.'-actions-select"]';
+		
+		try{
+			$this->exts->log('Click account_el button');
+			
+			$this->exts->click_by_xdotool($account_el);
+		} catch(\Exception $exception){
+			$this->exts->log('Click account_el button by javascript');
+			$this->exts->executeSafeScript("arguments[0].click()", [$account_el]);
 		}
+		sleep(15);
+
+		$this->close_cookie_alert();
+
+		$this->exts->moveToElementAndClick('button[name="remind-me-later"]');
+		sleep(5);
+		$this->exts->moveToElementAndClick('a[href*="/home/rechnung"]');
+		sleep(15);
+
+		$this->close_cookie_alert();
+
+		if ($this->exts->getElement('.icon-billing-invoices') != null) {
+			$this->exts->moveToElementAndClick('.icon-billing-invoices');
+		} else {
+			$this->exts->moveToElementAndClick('a[href="#/home/rechnung/rechnungen"]');
+		}
+		sleep(15);
+
+		$this->close_cookie_alert();
+
+		$this->processInvoices();
+
+		$this->exts->moveToElementAndClick('[routerlink="/auth/login/vertrage"]');
+		sleep(15);
+		$this->close_cookie_alert();
+
+		$this->exts->openUrl($getCurrentUrl);
+		$this->exts->waitTillPresent($this->check_login_success_selector, 25);
+		
+
 	}
 }
 
 private function processInvoices($pageCount=1) {
-    sleep(25);
+    sleep(20);
 
     $this->exts->capture("4-invoices-page");
     $invoices = [];
@@ -335,7 +345,8 @@ private function processInvoices($pageCount=1) {
     }
     // next page
     $restrictPages = isset($this->exts->config_array["restrictPages"]) ? (int)@$this->exts->config_array["restrictPages"] : 3;
-    if($restrictPages == 0 && $pageCount < 50 && $this->exts->getElement('div.sc-pagination button:nth-child(2):not(:disabled)') != null){
+	$this->exts->log('restrictPages' . $restrictPages);
+    if( $pageCount < $restrictPages && $this->exts->getElement('div.sc-pagination button:nth-child(2):not(:disabled)') != null){
         $pageCount++;
         $this->exts->moveToElementAndClick('div.sc-pagination button:nth-child(2):not(:disabled)');
         sleep(1);

@@ -1,5 +1,3 @@
-<?php // updated login code // updated login code 
-// Server-Portal-ID: 8674 - Last modified: 05.02.2025 07:02:00 UTC - User: 1
 public $loginUrl = 'https://www.huk24.de/login.do';
 public $invoicePageUrl = 'https://www.huk24.de/meine-huk24/startseite/?contractview=1';
 public $username_selector = 'input[name="username"], form#formZentralDataLogin input#TXT_B_KENNUNG ,#username-input';
@@ -48,14 +46,12 @@ private function initPortal($count)
     if ($this->checkLogin()) {
         $this->exts->log(">>>>>>>>>>>>>>>Login successful!!!!");
         $this->exts->capture("LoginSuccess");
-        sleep(2);
-        $this->exts->openUrl($this->invoicePageUrl);
-        $this->processInvoices();
-        // Final, check no invoice
-        if ($this->isNoInvoice) {
-            $this->exts->no_invoice();
+
+        if (!empty($this->exts->config_array['allow_login_success_request'])) {
+
+            $this->exts->triggerLoginSuccess();
         }
-        $this->exts->success();
+
     } else {
         if (stripos(strtolower($this->exts->extract($this->check_login_failed_selector)), 'die anmeldedaten') !== false) {
             $this->exts->log("Wrong credential !!!!");
@@ -226,103 +222,4 @@ function checkLogin()
     }
 
     return $isLoggedIn;
-}
-
-
-
-
-private function processInvoices()
-{
-    $this->exts->waitTillPresent('div[class="contractitem__inner"]');
-    $this->exts->capture("4-invoices-page");
-    $invoices = [];
-    $urls = [];
-    $contractRows = $this->exts->queryElementAll('div[class="contractitem__inner"]');
-
-
-    if (count($contractRows)) {
-        foreach ($contractRows as $cRow) {
-            $contractPageUrl = $this->exts->querySelector('a', $cRow)->getAttribute("href");
-            $urls[] = $contractPageUrl;
-        }
-        foreach ($urls as $url) {
-            $invoices = [];
-            $this->exts->openUrl($url);
-            $this->exts->waitTillPresent('button[data-label="Dokumente"]');
-            if ($this->exts->querySelector('button[data-label="Dokumente"]') != null) {
-                $this->exts->click_element('button[data-label="Dokumente"]');
-
-                $this->exts->waitTillPresent('huk-select[name="documents"]');
-                if ($this->exts->exists('huk-select[name="documents"]')) {
-                    $this->exts->click_element('huk-select[name="documents"]');
-                    sleep(2);
-
-                    $this->exts->click_element("//div[@class='select__option__label' and text()='Rechnung']");
-                }
-
-                $this->exts->waitTillPresent('huk-content-block[data-testid="belege"]  div[class="content-block__body"] > div button');
-                if ($this->exts->exists('huk-content-block[data-testid="belege"]  div[class="content-block__body"] > div button')) {
-                    // Keep clicking more but maximum upto 10 times
-                    $maxAttempts = 1;
-                    $attempt = 0;
-
-                    while ($attempt < $maxAttempts && $this->exts->exists('span[class="divider__clickarea"]')) {
-                        $this->exts->execute_javascript('
-                    var btn = document.querySelector("span[class=\'divider__clickarea\']");
-                    if(btn){
-                        btn.click();
-                    }
-                ');
-                        $attempt++;
-                        sleep(5);
-                    }
-                    $rows = $this->exts->querySelectorAll('huk-content-block[data-testid="belege"]  div[class="content-block__body"] > div');
-                    foreach ($rows as $row) {
-                        $invoiceDate = trim($this->exts->extract(' .text--size-2:nth-child(2)', $row));
-                        $invoiceName = '';
-                        $invoiceAmount = '';
-                        $invoiceUrl = '';
-                        $downloadBtn = $this->exts->querySelector('button', $row);
-                        array_push($invoices, array(
-                            'invoiceName' => $invoiceName,
-                            'invoiceDate' => $invoiceDate,
-                            'invoiceAmount' => $invoiceAmount,
-                            'invoiceUrl' => $invoiceUrl,
-                            'downloadBtn' => $downloadBtn
-                        ));
-                        $this->isNoInvoice = false;
-                    }
-
-                    // Download all invoices
-                    $this->exts->log('Invoices found: ' . count($invoices));
-                    foreach ($invoices as $invoice) {
-                        $this->exts->log('--------------------------');
-                        $this->exts->log('invoiceDate: ' . $invoice['invoiceDate']);
-                        $this->exts->log('invoiceAmount: ' . $invoice['invoiceAmount']);
-                        $this->exts->log('invoiceUrl: ' . $invoice['invoiceUrl']);
-
-                        $invoice['invoiceDate'] = $this->exts->parse_date($invoice['invoiceDate'], 'F j, Y"', 'Y-m-d');
-                        $this->exts->log('Date parsed: ' . $invoice['invoiceDate']);
-
-                        $this->exts->execute_javascript("arguments[0].click();", [$invoice['downloadBtn']]);
-                        $this->exts->wait_and_check_download('pdf');
-                        $downloaded_file = $this->exts->find_saved_file('pdf');
-                        $invoiceFileName = basename($downloaded_file);
-
-                        $invoice['invoiceName'] = substr($invoiceFileName, 0, strrpos($invoiceFileName, '.'));
-
-                        $this->exts->log('invoiceName: ' . $invoice['invoiceName']);
-
-
-                        if (trim($downloaded_file) != '' && file_exists($downloaded_file)) {
-                            $this->exts->new_invoice($invoice['invoiceName'], $invoice['invoiceDate'], $invoice['invoiceAmount'], $invoiceFileName);
-                            sleep(1);
-                        } else {
-                            $this->exts->log(__FUNCTION__ . '::No download ' . $invoiceFileName);
-                        }
-                    }
-                }
-            }
-        }
-    }
 }

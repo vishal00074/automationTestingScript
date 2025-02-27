@@ -1,6 +1,3 @@
-<?php // update download code  // updated login code // updated loginfailure code
-// Server-Portal-ID: 1854565 - Last modified: 29.01.2025 14:38:11 UTC - User: 1
-
 public $baseUrl = 'https://easyaccess.o2business.de/';
 public $loginUrl = 'https://easyaccess.o2business.de/eCare/s/Rechnungsubersicht';
 public $invoicePageUrl = 'https://easyaccess.o2business.de/eCare/s/Rechnungsubersicht';
@@ -48,41 +45,11 @@ private function initPortal($count)
         $this->exts->log(__FUNCTION__ . '::User logged in');
         $this->exts->capture("3-login-success");
 
-        $this->exts->type_key_by_xdotool("F5");
-        sleep(5);
-        $this->exts->type_text_by_xdotool($this->invoicePageUrl);
-       
-        sleep(5);
+        if (!empty($this->exts->config_array['allow_login_success_request'])) {
 
-        try {
-            $this->exts->moveToElementAndClick('[data-region-name="contentComponent"] select option[value="Alle"]');
-            sleep(2);
-        } catch (\Exception $exception) {
-            $this->exts->log('ERROR in slecting all customer ' . $exception->getMessage());
+            $this->exts->triggerLoginSuccess();
         }
-
-        for ($i = 0; $i < 20; $i++) {
-            $this->exts->type_key_by_xdotool("Tab");
-            sleep(1);
-        }
-        $this->exts->type_key_by_xdotool("Return");
-        sleep(10);
-        $this->exts->type_key_by_xdotool("Tab");
-        $this->exts->type_key_by_xdotool("Return");
-
-         for ($i = 0; $i < 6; $i++) {
-            $this->exts->type_key_by_xdotool("Tab");
-            sleep(1);
-        }
-        $this->exts->type_key_by_xdotool("Return");
-
-        $this->processBilling(1);
-
-        // Final, check no invoice
-        if ($this->isNoInvoice) {
-            $this->exts->no_invoice();
-        }
-        $this->exts->success();
+        
     } else {
         $isErrorMessage = $this->exts->execute_javascript('document.body.innerHTML.includes("Die E-Mail-Adresse oder das Kennwort sind falsch. Bitte prüfen Sie Ihre Eingaben. BOS Login Daten sind nicht mehr gültig, bitte registrieren Sie sich für BEA neu.")');
 
@@ -130,52 +97,4 @@ private function checkFillLoginUndetected()
     $this->exts->log("Submit Login Form");
     $this->exts->moveToElementAndClick($this->submit_login_selector);
     $this->exts->capture("submit-login");
-}
-
-
-private function processBilling($page = 1)
-{
-    $this->exts->waitTillPresent('table > tbody > tr', 30);
-
-    if(!$this->exts->exists('table > tbody > tr')){
-      $this->exts->moveToElementAndClick('div[class="slds-grid slds-wrap cECareOnlineInvoice"] > div:nth-child(3) > button:nth-of-type(1)');
-      $this->exts->waitTillPresent('table > tbody > tr', 30);
-    }
-
-    $this->exts->capture("4-billing-page");
-    $rows = $this->exts->getElements('table > tbody > tr');
-    $invoiceLog = "No Invoice downloaded";
-    $key = 1;
-    $totalInvoices = count($rows);
-    $this->exts->log('totalInvoices: '.$totalInvoices);
-    foreach ($rows as $index => $row) {
-
-        $this->exts->log('key: '. $index);
-        // create custom name becuase cannot  logged in on remote chrome
-        $invoiceNumber =  time(). $index;
-        $invoiceFileName = $invoiceNumber . '.pdf';
-        $invoiceLink = "table > tbody > tr:nth-of-type(".$key.") > td:nth-of-type(8) a";
-        $invoiceDate = '';
-        $invoiceAmount = '';
-        $this->exts->log('invoiceName: ' . '');
-        $this->exts->log('invoiceDate: ' . '');
-        $this->exts->log('invoiceAmount: ' . '');
-        $this->exts->log('invoiceUrl: ' . $invoiceLink);
-
-        $this->exts->log($invoiceLink);
-
-        if($this->exts->exists($invoiceLink)){
-            $downloaded_file = $this->exts->click_and_download($invoiceLink, 'pdf', $invoiceFileName);
-            if (trim($downloaded_file) != '' && file_exists($downloaded_file)) {
-                $this->exts->new_invoice($invoiceNumber, $invoiceDate, $invoiceAmount, $invoiceFileName);
-                sleep(1);
-                $this->isNoInvoice = false;
-            } else {
-                $this->exts->log(__FUNCTION__ . '::No download ' . $invoiceFileName);
-            }
-        }
-        $key++;
-    }
-   
-
 }

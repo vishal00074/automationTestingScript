@@ -1,4 +1,4 @@
-<?php //migrated and updated login code // updated login code
+<?php //migrated and updated login code // updated login code // optimize code // update login failure code
 // Server-Portal-ID: 3179 - Last modified: 27.01.2025 13:48:07 UTC - User: 1
 
 public $baseUrl = "https://login.sipgate.com/";
@@ -89,8 +89,11 @@ private function initPortal($count) {
 			sleep(10);
 		}
 
+		$isErrorMessage = $this->exts->execute_javascript('document.body.innerHTML.includes("Invalid username or email.")');
+
+		$this->exts->log('isErrorMessage:' . $isErrorMessage);
+
 		if($this->checkLogin()) {
-			// $this->exts->success();
 			$this->exts->capture("LoginSuccess-if");
 			
 			if(stripos($this->exts->getUrl(), "secure.live.sipgate.de/settings/products/change") !== FALSE) {
@@ -112,7 +115,12 @@ private function initPortal($count) {
 		} else if (strpos($this->exts->extract('div.login div.alert--error'), 'passwor') !== false){
 			$this->exts->capture("LoginFailed");
 			$this->exts->loginFailure(1);
+		} else if ($isErrorMessage) {
+			$this->exts->capture("LoginFailed");
+			$this->exts->log("Invalid username or email.");
+			$this->exts->loginFailure(1);
 		} else {
+			$this->exts->log('Login failed');
 			$this->exts->capture("LoginFailed");
 			$this->exts->loginFailure();
 		}
@@ -188,19 +196,33 @@ function fillForm($count){
 
 			if ($this->exts->exists($this->submit_button_selector)) {
 				$this->exts->click_by_xdotool($this->submit_button_selector);
+				sleep(7);
 			}
-            $this->findPasswordPage($this->password_selector, $this->submit_button_selector);
 
-			$this->exts->log("Enter Password");
-			$this->exts->moveToElementAndType($this->password_selector, $this->password);
-			sleep(2);
-			$this->exts->capture("1-login-page-filled");
-			sleep(5);
-			if ($this->exts->exists($this->submit_button_selector)) {
-				$this->exts->click_by_xdotool($this->submit_button_selector);
+			$isErrorMessage = $this->exts->execute_javascript('document.body.innerHTML.includes("Invalid username or email.")');
+
+			$this->exts->log('isErrorMessage:' . $isErrorMessage);
+
+			if(!$isErrorMessage){
+				$this->findPasswordPage($this->password_selector, $this->submit_button_selector);
+				$this->exts->log("Enter Password");
+				$this->exts->moveToElementAndType($this->password_selector, $this->password);
+				sleep(2);
+				$this->exts->capture("1-login-page-filled");
+				sleep(5);
+				if ($this->exts->exists($this->submit_button_selector)) {
+					$this->exts->click_by_xdotool($this->submit_button_selector);
+				}
+				sleep(5);
+				$isErrorPassMessage = $this->exts->execute_javascript('document.body.innerHTML.includes("Invalid password.")');
+				$this->exts->log('isErrorPassMessage:' . $isErrorPassMessage);
+				if (!$isErrorPassMessage) {
+					$this->findPasswordPage('input[name="emailCode"]');
+				}
+				
 			}
-            sleep(5);
-            $this->findPasswordPage('input[name="emailCode"]');
+			
+            
 		}
 	} catch (\Exception $exception) {
 

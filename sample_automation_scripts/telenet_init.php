@@ -1,6 +1,3 @@
-<?php // migrated and updated login code download code // updated download code // updated loginfailure code and download code
-// Server-Portal-ID: 109840 - Last modified: 22.01.2024 13:28:58 UTC - User: 1
-
 public $baseUrl = 'https://www2.telenet.be/';
 public $loginUrl = 'https://www2.telenet.be/residential/nl/mytelenet.html'; 
 public $invoicePageUrl = 'https://www2.telenet.be/content/www-telenet-be/nl/klantenservice/raadpleeg-je-aanrekening';
@@ -98,21 +95,10 @@ private function initPortal($count) {
 		$this->exts->log(__FUNCTION__.'::User logged in');
 		$this->exts->capture("3-login-success");
 
-		// Open invoices url and download invoice
-		$this->exts->openUrl($this->invoicePageUrl);
-		sleep(15);
-		if($this->exts->exists('div.MultipleAccounts.ng-scope')){
-			$this->processMultiAccount();
-		}else{
-			$this->processInvoices();
+		if (!empty($this->exts->config_array['allow_login_success_request'])) {
+
+			$this->exts->triggerLoginSuccess();
 		}
-		
-		
-		// Final, check no invoice
-		if($this->isNoInvoice){
-			$this->exts->no_invoice();
-		}
-		$this->exts->success();
 	} else {
 		$this->exts->log(__FUNCTION__.'::Use login failed');
 		if(strpos(strtolower($this->exts->extract($this->check_login_failed_selector, null, 'innerText')), 'passwor') !== false 
@@ -235,94 +221,4 @@ private function checkLoggedIn() {
 		$isLoggedIn = true;
 	}
 	return $isLoggedIn;
-}
-
-
-
-
-
-private function processMultiAccount(){
-	sleep(15);
-	$this->exts->moveToElementAndClick('div.MultipleAccounts.ng-scope');
-	sleep(5);
-
-	$account_len = count($this->exts->getElements('.MultipleAccounts span.selectOption'));
-	$this->exts->log('Accounts Found: '.$account_len);
-	$accounts = [];
-	if ($account_len > 0) {
-		for ($j = 0; $j < $account_len; $j++) {
-			$account_name = $this->exts->getElements('.MultipleAccounts span.selectOption')[$j]->getAttribute('innerText');
-			if(in_array($account_name, $accounts) == false){
-
-				$acc_row = $this->exts->getElements('.MultipleAccounts span.selectOption')[$j];
-				try{
-					$this->exts->log('Click Accounts button ' . $acc_row->getAttribute('innerText'));
-					$acc_row->click();
-				} catch(\Exception $exception){
-					$this->exts->log('Click Accounts button by javascript');
-					$this->exts->execute_javascript("arguments[0].click()", [$acc_row]);
-				}
-				$this->processInvoices();
-				sleep(2);
-				$this->exts->moveToElementAndClick('div.MultipleAccounts.ng-scope');
-				array_push($accounts, $account_name);
-				break;
-			}
-		}	
-	} else {
-		$this->processInvoices();
-	}
-}
-private function processInvoices() {
-	sleep(25);
-	
-	$this->exts->capture("4-invoices-page");
-	$rows = $this->exts->querySelectorAll('div[data-testid="billing-overview-paid-invoice"]');
-	// Download all invoices
-	$this->exts->log('Invoices found: ' . count($rows));
-	foreach ($rows as $key => $row) {
-		$action_button = $this->exts->getElements('div[class="display--flex justify-content--between"]')[$key];
-		$this->exts->waitTillPresent('div[data-testid="billing-overview-paid-invoice"]', 25);
-
-		$invoiceListing = $this->exts->getUrl();
-
-		
-		$invoiceAmount = $this->exts->extract('data-testid="billing-overview-amount-value"', $row, 'innerText');
-		$invoiceDate =  $this->exts->extract('span[data-testid="billing-overview-invoice-date"]', $row, 'innerText');
-		if($action_button == null){
-			continue;
-		}
-		$action_button->click();
-		sleep(7);
-
-		$this->exts->waitTillPresent('h3[data-testid="cost-breakdown-title"]');
-
-		
-		$invoiceUrl = $this->exts->getUrl();
-		parse_str(parse_url($invoiceUrl, PHP_URL_QUERY), $queryParams);
-		$invoiceName = $queryParams['invoiceNumber'] ?? time();
-
-		$this->isNoInvoice = false;
-		$invoiceFileName = $invoiceName. '.pdf';
-
-		$this->exts->log('invoiceName: ' . $invoiceName);
-		$this->exts->log('invoiceDate: ' . $invoiceDate);
-		$this->exts->log('invoiceAmount: ' . $invoiceAmount);
-		$this->exts->log('invoiceUrl: '. $this->exts->getUrl());
-
-		$downloadBtn = 'wink-button[data-testid="cost-breakdown-download-invoice"]';
-
-		$downloaded_file = $this->exts->click_and_download($downloadBtn, 'pdf', $invoiceFileName);
-		if (trim($downloaded_file) != '' && file_exists($downloaded_file)) {
-			$this->exts->new_invoice($invoiceName, $invoiceDate, $invoiceAmount, $invoiceFileName);
-			sleep(1);
-		} else {
-			$this->exts->log(__FUNCTION__ . '::No download ' . $invoiceFileName);
-		}
-		$this->exts->openUrl($invoiceListing);
-		sleep(5);
-	}
-
-
-		
 }

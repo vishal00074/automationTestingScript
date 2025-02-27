@@ -1,5 +1,3 @@
-<?php // updated login code
-// Server-Portal-ID: 38757 - Last modified: 17.02.2025 13:59:36 UTC - User: 1
 public $loginUrl = "https://auth.monday.com/login";
 public $baseUrl = "https://auth.monday.com/login";
 public $username_selector = 'input#user_email';
@@ -21,9 +19,7 @@ private function initPortal($count)
         $this->login_with_google = (int)$this->exts->config_array["login_with_google"];
     }
     $this->restrictPages = isset($this->exts->config_array["restrictPages"]) ? (int)@$this->exts->config_array["restrictPages"] : 3;
-    // $this->account_webaddress = isset($this->exts->config_array["account_webaddress"]) ? trim($this->exts->config_array["account_webaddress"]) : "";
-    // hardcoded assign account_webaddress for testing engine
-    $this->account_webaddress = 'correct-printing';
+    $this->account_webaddress = isset($this->exts->config_array["account_webaddress"]) ? trim($this->exts->config_array["account_webaddress"]) : "";
 
     $this->exts->log('Account Web Address - ' . $this->account_webaddress);
 
@@ -60,7 +56,7 @@ private function initPortal($count)
             $this->exts->execute_javascript('window.sessionStorage.clear(); window.localStorage.clear();');
             sleep(1);
             if ($this->exts->exists('#disabled-account-component')) {
-                $this->exts->account_not_ready();
+                $this->exts->loginFailure(1);
             }
             if (!empty($this->account_webaddress) && trim($this->account_webaddress) != "") {
                 $this->exts->openUrl($this->account_webaddress);
@@ -177,20 +173,17 @@ private function initPortal($count)
         if ($this->checkLogin()) {
             $this->exts->log(">>>>>>>>>>>>>>>Login successful!!!!");
             $this->exts->capture("LoginSuccess");
-          
-            $this->exts->moveToElementAndClick('.bz-close-btn[aria-label="Close Message"]');
-            $this->invoicePage();
 
-            if ($this->isNoInvoice) {
-                $this->exts->no_invoice();
+            if (!empty($this->exts->config_array['allow_login_success_request'])) {
+
+                $this->exts->triggerLoginSuccess();
             }
-            $this->exts->success();
 
         } else {
             $this->exts->capture("LoginFailed");
             $this->exts->log("LoginFailed " . $this->exts->getUrl());
             if ($this->exts->exists('#disabled-account-component') || strpos(strtolower($this->exts->extract('div.notice-component.warning', null, 'innerText')), 'user is inactive') !== false) {
-                $this->exts->account_not_ready();
+                $this->exts->loginFailure(1);
             } else if (strpos(strtolower($this->exts->extract('div.email-not-found-component', null, 'innerText')), 't find this email') !== false) {
                 $this->exts->loginFailure(1);
             } else if (strpos(strtolower($this->exts->extract('div.notice-component.warning', null, 'innerText')), 'incorrect email or password') !== false) {
@@ -209,22 +202,16 @@ private function initPortal($count)
             $this->exts->log(">>>>>>>>>>>>>>>Login successful!!!!");
             $this->exts->capture("LoginSuccess");
 
-            $this->exts->moveToElementAndClick('.bz-close-btn[aria-label="Close Message"]');
-            if ($this->exts->exists('.nps-modal-portal button[class*="npsModalCloseButton"]')) {
-                $this->exts->moveToElementAndClick('.nps-modal-portal button[class*="npsModalCloseButton"]');
-                sleep(2);
-            }
-            $this->invoicePage();
+            if (!empty($this->exts->config_array['allow_login_success_request'])) {
 
-            if ($this->isNoInvoice) {
-                $this->exts->no_invoice();
+                $this->exts->triggerLoginSuccess();
             }
-            $this->exts->success();
+            
         } else {
             $this->exts->capture("LoginFailed");
             $this->exts->log("LoginFailed " . $this->exts->getUrl());
             if ($this->exts->exists('#disabled-account-component') || strpos(strtolower($this->exts->extract('div.notice-component.warning', null, 'innerText')), 'user is inactive') !== false) {
-                $this->exts->account_not_ready();
+                $this->exts->loginFailure(1);
             } else if (strpos(strtolower($this->exts->extract('div.email-not-found-component', null, 'innerText')), 't find this email') !== false) {
                 $this->exts->loginFailure(1);
             } else if (strpos(strtolower($this->exts->extract('div.notice-component.warning', null, 'innerText')), 'incorrect email or password') !== false) {
@@ -1328,14 +1315,14 @@ function checkLogin()
             $isLoggedIn = true;
             if ($this->exts->getElement('div.reset-trial-component-inner') != null) {
                 $this->exts->log("LoginFailed " . $this->exts->getUrl());
-                $this->exts->account_not_ready();
+                $this->exts->loginFailure(1);
                 $isLoggedIn = false;
             }
            
             $trial_expired_selector = $this->exts->getElementByText('div.pricing-message', ['free trial has expired', 'Ihre kostenlose Testversion ist abgelaufen'], null, false);
             if ($trial_expired_selector != null) {
                 $this->exts->log("LoginFailed " . $this->exts->getUrl());
-                $this->exts->account_not_ready();
+                $this->exts->loginFailure(1);
                 $isLoggedIn = false;
             }
 
@@ -1354,227 +1341,4 @@ function checkLogin()
 function isValidEmail($email)
 {
     return filter_var($email, FILTER_VALIDATE_EMAIL) !== false;
-}
-function invoicePage()
-{
-    if ($this->exts->exists('a.fancybox-item.fancybox-close')) {
-        $this->exts->moveToElementAndClick('a.fancybox-item.fancybox-close');
-        sleep(5);
-    }
-    if ($this->exts->exists('.nps-modal-portal button[class*="npsModalCloseButton"]')) {
-        $this->exts->moveToElementAndClick('.nps-modal-portal button[class*="npsModalCloseButton"]');
-        sleep(2);
-    }
-    $this->exts->log("Invoice page");
-    if ($this->exts->exists('div.payments-dialog-header-component .icon-dapulse-x-slim')) {
-        $this->exts->moveToElementAndClick('div.payments-dialog-header-component .icon-dapulse-x-slim');
-        sleep(5);
-    }
-    if ($this->exts->exists('.trial-read-only-container .ds-btn-secondary')) {
-        $this->exts->moveToElementAndClick('.trial-read-only-container .ds-btn-secondary');
-        sleep(5);
-    }
-    if ($this->exts->exists('div.ReactModalPortal div.ReactModal__Overlay')) {
-        $this->exts->execute_javascript('document.querySelector("div.ReactModalPortal div.ReactModal__Overlay").style.display = "none";');
-    }
-
-    if ($this->exts->exists('.surface-avatar-menu-component .ds-menu-button-container')) {
-        $this->exts->moveToElementAndClick('.surface-avatar-menu-component .ds-menu-button-container');
-    } else {
-        $this->exts->moveToElementAndClick('.surface-avatar-menu-component');
-    }
-    sleep(5);
-    if ($this->exts->exists('a.fancybox-item.fancybox-close')) {
-        $this->exts->moveToElementAndClick('a.fancybox-item.fancybox-close');
-        sleep(5);
-    }
-    if ($this->exts->exists('.nps-modal-portal button[class*="npsModalCloseButton"]')) {
-        $this->exts->moveToElementAndClick('.nps-modal-portal button[class*="npsModalCloseButton"]');
-        sleep(2);
-    }
-
-    if (!$this->exts->exists('.ds-menu-section a[href*="/admin/general/profile"]')) {
-        $this->exts->moveToElementAndClick('.surface-avatar-menu-component img');
-        sleep(5);
-    }
-    $this->exts->moveToElementAndClick('.ds-menu-section a[href*="/admin/general/profile"] .ds-menu-item');
-    sleep(5);
-
-    if ($this->exts->exists('span[class*="admin-billing"], #admin_item_billing, div#billing')) {
-        $this->exts->moveToElementAndClick('span[class*="admin-billing"], #admin_item_billing, div#billing');
-        sleep(5);
-    } else {
-        $tab_buttons = $this->exts->getElements('div#new-admin div.left-nav ul > li > a');
-        $this->exts->log('Finding Invoice button...');
-        $noClickInvoiceButton = true;
-        foreach ($tab_buttons as $key => $tab_button) {
-            $tab_name = trim($tab_button->getAttribute('innerText'));
-            if (stripos($tab_name, 'Invoices') !== false || stripos($tab_name, 'Rechnungen') !== false) {
-                $this->exts->log('Completted trips button found');
-                try {
-                    $tab_button->click();
-                } catch (Exception $e) {
-                    $this->exts->execute_javascript('arguments[0].click()', [$tab_button]);
-                }
-                sleep(10);
-                $noClickInvoiceButton = false;
-                break;
-            }
-        }
-
-        if ($noClickInvoiceButton) {
-            $this->exts->moveToElementAndClick('div#new-admin div.left-nav ul > li:nth-child(6) > a, div#new-admin div.left-nav li#admin_item_billing, #admin_item_billing');
-            sleep(5);
-        }
-    }
-
-    // Click Completted trips tab
-    // We can not indentify Completted trips button by selector, the only way is by label
-    $tab_buttons = $this->exts->getElements('div#new-admin div.right-content ul > li > a');
-    $this->exts->log('Finding Completted trips button...');
-    $noClickTabButton = true;
-    foreach ($tab_buttons as $key => $tab_button) {
-        $tab_name = trim($tab_button->getAttribute('innerText'));
-        if (stripos($tab_name, 'Invoices') !== false || stripos($tab_name, 'Rechnungen') !== false) {
-            $this->exts->log('Completted trips button found');
-            try {
-                $tab_button->click();
-            } catch (Exception $e) {
-                $this->exts->execute_javascript('arguments[0].click()', [$tab_button]);
-            }
-            sleep(10);
-            $noClickTabButton = false;
-            break;
-        }
-    }
-    if ($noClickTabButton) {
-        $this->exts->moveToElementAndClick('div#new-admin div.right-content ul > li:nth-child(4) > a');
-        sleep(5);
-    }
-
-    if ($this->exts->exists('div#upgrade_promotion_dialog') != null) {
-        $this->exts->moveToElementAndClick('a.fancybox-close');
-        sleep(5);
-    }
-
-    $this->downloadInvoice();
-
-    if ($this->totalFiles == 0) {
-        $this->exts->log("No invoice !!! ");
-        $this->exts->no_invoice();
-    }
-    $this->exts->success();
-}
-public $totalFiles = 0;
-function downloadInvoice($count = 1, $pageCount = 1)
-{
-    $this->exts->log("Begin download invoice");
-
-    $this->exts->capture('4-List-invoice');
-
-    try {
-        if ($this->exts->getElement('div.invoices-component table tbody tr') != null) {
-            $receipts = $this->exts->getElements('div.invoices-component table tbody tr');
-            $invoicesCount = 0;
-            foreach ($receipts as $i => $receipt) {
-                $tags = $this->exts->getElements('td', $receipt);
-                if (count($tags) >= 5) {
-
-                    $receiptUrl = $this->exts->extract('td button', $receipt, 'href');
-                    if (strpos($receiptUrl, 'http') === false) {
-                        $receiptUrl = $this->exts->execute_javascript("return arguments[0].href;", [$this->exts->getElement('td button', $receipt)]);
-                        if ($receiptUrl == null || $receiptUrl == '') {
-                            $actions = $this->exts->getElement('td button', $receipt);
-                            if ($actions != null) {
-                                $receiptDate = trim($tags[0]->getText());
-                                $parsed_date = $this->exts->parse_date($receiptDate);
-                                $this->exts->log('Date parsed: ' . $parsed_date);
-                                if ($parsed_date != '') {
-                                    $receiptDate = $parsed_date;
-                                }
-                                $receiptAmount = trim(preg_replace('/[^\d\.\,]/', '', $tags[2]->getText())) . ' EUR';
-                                $actions->click();
-                                sleep(2);
-                                if ($this->exts->exists('ul >li[role="menuitem"]:nth-child(1):not([class*="disabled"])')) {
-                                    $this->donwloadSingleInvoice('ul >li[role="menuitem"]:nth-child(1):not([class*="disabled"])', $receiptDate, $receiptAmount, $i);
-                                    $invoicesCount++;
-                                } else {
-                                    $tags[0]->click();
-                                    sleep(2);
-                                }
-                            }
-                        }
-                    }
-                }
-            }
-
-            $this->exts->log(">>>>>>>>>>>>>>>>>>>Invoice found: " . $invoicesCount);
-
-            $this->totalFiles = $invoicesCount;
-        }
-    } catch (\Exception $exception) {
-        $this->exts->log("Exception downloading invoice " . $exception->getMessage());
-    }
-}
-function donwloadSingleInvoice($buttonSelector, $invoiceDate, $invoiceAmount, $index)
-{
-    if ($this->exts->exists($buttonSelector)) {
-        $this->exts->moveToElementAndClick($buttonSelector);
-        sleep(3);
-        $this->exts->wait_and_check_download('pdf');
-        $downloaded_file = $this->exts->find_saved_file('pdf');
-
-        if (trim($downloaded_file) != '' && file_exists($downloaded_file)) {
-            $invoiceFileName = basename($downloaded_file);
-            $invoiceName = explode('.pdf', $invoiceFileName)[0];
-            $invoiceName = trim(explode('(', $invoiceName)[0]);
-            $this->exts->log('Final invoice name: ' . $invoiceName);
-
-            // Create new invoice if it not exisited
-            if ($this->exts->invoice_exists($invoiceName)) {
-                $this->exts->log('Invoice existed ' . $invoiceFileName);
-            } else {
-                $this->exts->new_invoice($invoiceName, $invoiceDate, $invoiceAmount, $invoiceFileName);
-                sleep(1);
-            }
-        } else {
-            $invoice_tab = $this->exts->findTabMatchedUrl(['invoice']);
-            if ($invoice_tab != null) {
-                $this->exts->switchToTab($invoice_tab);
-            }
-
-            $invoiceUrl = $this->exts->getUrl();
-            $invoiceName = trim(end(explode('invoice/', $invoiceUrl)));
-            $invoiceFileName = $invoiceName . '.pdf';
-            $this->exts->log("_____________________" . ($index + 1) . "___________________________________________");
-            $this->exts->log("Invoice Date: " . $invoiceDate);
-            $this->exts->log("Invoice Name: " . $invoiceName);
-            $this->exts->log("Invoice Amount: " . $invoiceAmount);
-            $this->exts->log("Invoice Url: " . $invoiceUrl);
-            $this->exts->log("Invoice FileName: " . $invoiceFileName);
-            $this->exts->log("________________________________________________________________");
-
-            if ($this->exts->exists('a[href*="/show_invoice.jsp?ref="]')) {
-                $invoiceUrl = $this->exts->getElement('a[href*="/show_invoice.jsp?ref="]')->getAttribute('href');
-                if (strpos($invoiceUrl, 'http') === false) {
-                    $invoiceUrl = $this->exts->execute_javascript("return arguments[0].href;", [$this->exts->getElement('a[href*="/show_invoice.jsp?ref="]')]);
-                }
-                $this->exts->log("New Invoice URL - " . $invoiceUrl);
-                $downloaded_file = $this->exts->download_capture($invoiceUrl, $invoiceFileName, 5);
-                $this->exts->log("Download file: " . $downloaded_file);
-            } else {
-                if ($this->exts->urlContains('invoice/')) {
-                    $downloaded_file = $this->exts->download_current($invoiceFileName, 5);
-                    $this->exts->log("Download file: " . $downloaded_file);
-                }
-            }
-
-            if (trim($downloaded_file) != "" && file_exists($downloaded_file)) {
-                $this->exts->new_invoice($invoiceName, $invoiceDate, $invoiceAmount, $downloaded_file);
-                sleep(1);
-            }
-
-            $this->exts->switchToInitTab();
-        }
-    }
 }

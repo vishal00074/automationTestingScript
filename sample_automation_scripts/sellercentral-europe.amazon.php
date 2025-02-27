@@ -1,4 +1,4 @@
-<?php // migrated and update download code
+<?php // migrated and update download code // updated login failure code and download code
 // Server-Portal-ID: 156697 - Last modified: 22.08.2024 14:42:23 UTC - User: 1
 
 /*Define constants used in script*/
@@ -140,6 +140,8 @@ private function initPortal($count)
             $this->exts->loginFailure(1);
         } else if ($this->exts->exists('form[name="forgotPassword"]')) {
             $this->exts->account_not_ready();
+        } else if (strpos($this->exts->extract('div#auth-error-message-box div.a-alert-content', null, 'innerText'), 'The credentials you provided were incorrect. Check them and try again.') !== false) {
+            $this->exts->loginFailure(1);
         } else {
             $this->exts->loginFailure();
         }
@@ -155,9 +157,15 @@ private function checkFillLogin()
         $this->exts->moveToElementAndType($this->username_selector, $this->username);
         sleep(1);
 
+
         if ($this->exts->exists('input#auth-captcha-guess')) {
             $this->exts->processCaptcha('img#auth-captcha-image', 'input#auth-captcha-guess');
         }
+
+        $this->exts->capture("2-login-email-filled");
+        $this->exts->moveToElementAndClick($this->submit_login_selector);
+        sleep(7);
+
         $this->exts->log("Enter Password");
         $this->exts->moveToElementAndType($this->password_selector, $this->password);
         sleep(1);
@@ -550,13 +558,16 @@ private function downloadTransaction($pageCount = 1)
                 $this->exts->log(__FUNCTION__ . '::No download ' . $invoiceFileName);
             }
 
-            // close new tab too avoid too much tabs
-            $handles = $this->exts->webdriver->getWindowHandles();
+            $handles = $this->exts->get_all_tabs();
             if (count($handles) > 1) {
-                $this->exts->webdriver->switchTo()->window(end($handles));
-                $this->exts->webdriver->close();
-                $handles = $this->exts->webdriver->getWindowHandles();
-                $this->exts->webdriver->switchTo()->window($handles[0]);
+                $lastTab = end($handles); 
+                $this->exts->closeTab($lastTab);
+
+                $handles = $this->exts->get_all_tabs();
+
+                if (!empty($handles)) {
+                    $this->exts->switchToTab($handles[0]); 
+                }
             }
         }
 
@@ -722,12 +733,16 @@ private function downloadSellerFeeInvoice()
                 }
 
                 // close new tab too avoid too much tabs
-                $handles = $this->exts->webdriver->getWindowHandles();
+                $handles = $this->exts->get_all_tabs();
                 if (count($handles) > 1) {
-                    $this->exts->webdriver->switchTo()->window(end($handles));
-                    $this->exts->webdriver->close();
-                    $handles = $this->exts->webdriver->getWindowHandles();
-                    $this->exts->webdriver->switchTo()->window($handles[0]);
+                    $lastTab = end($handles);
+                    $this->exts->closeTab($lastTab);
+
+                    $handles = $this->exts->get_all_tabs();
+
+                    if (!empty($handles)) {
+                        $this->exts->switchToTab($handles[0]);
+                    }
                 }
             }
             $total_fee_downloaded++;
@@ -984,12 +999,16 @@ private function downloadStatements($pageCount = 1)
             }
 
             // close new tab too avoid too much tabs
-            $handles = $this->exts->webdriver->getWindowHandles();
+            $handles = $this->exts->get_all_tabs();
             if (count($handles) > 1) {
-                $this->exts->webdriver->switchTo()->window(end($handles));
-                $this->exts->webdriver->close();
-                $handles = $this->exts->webdriver->getWindowHandles();
-                $this->exts->webdriver->switchTo()->window($handles[0]);
+                $lastTab = end($handles);
+                $this->exts->closeTab($lastTab);
+
+                $handles = $this->exts->get_all_tabs();
+
+                if (!empty($handles)) {
+                    $this->exts->switchToTab($handles[0]);
+                }
             }
         }
 
@@ -1090,19 +1109,27 @@ private function downloadStatements($pageCount = 1)
                 }
 
                 // close new tab too avoid too much tabs
-                $handles = $this->exts->webdriver->getWindowHandles();
+                $handles = $this->exts->get_all_tabs();
                 if (count($handles) > 1) {
-                    $this->exts->webdriver->switchTo()->window(end($handles));
-                    $this->exts->webdriver->close();
-                    $handles = $this->exts->webdriver->getWindowHandles();
-                    $this->exts->webdriver->switchTo()->window($handles[0]);
+                    $lastTab = end($handles);
+                    $this->exts->closeTab($lastTab);
+
+                    $handles = $this->exts->get_all_tabs();
+
+                    if (!empty($handles)) {
+                        $this->exts->switchToTab($handles[0]);
+                    }
                 }
-                $handles = $this->exts->webdriver->getWindowHandles();
+                $handles = $this->exts->get_all_tabs();
                 if (count($handles) > 1) {
-                    $this->exts->webdriver->switchTo()->window(end($handles));
-                    $this->exts->webdriver->close();
-                    $handles = $this->exts->webdriver->getWindowHandles();
-                    $this->exts->webdriver->switchTo()->window($handles[0]);
+                    $lastTab = end($handles);
+                    $this->exts->closeTab($lastTab);
+
+                    $handles = $this->exts->get_all_tabs();
+
+                    if (!empty($handles)) {
+                        $this->exts->switchToTab($handles[0]);
+                    }
                 }
             }
         }
@@ -1317,12 +1344,16 @@ private function downloadOrderInvoices($pagecount = 1)
                         }
 
                         // close new tab too avoid too much tabs
-                        $handles = $this->exts->webdriver->getWindowHandles();
+                        $handles = $this->exts->get_all_tabs();
                         if (count($handles) > 1) {
-                            $this->exts->webdriver->switchTo()->window(end($handles));
-                            $this->exts->webdriver->close();
-                            $handles = $this->exts->webdriver->getWindowHandles();
-                            $this->exts->webdriver->switchTo()->window($handles[0]);
+                            $lastTab = end($handles);
+                            $this->exts->closeTab($lastTab);
+
+                            $handles = $this->exts->get_all_tabs();
+
+                            if (!empty($handles)) {
+                                $this->exts->switchToTab($handles[0]);
+                            }
                         }
                     } else {
                         $this->exts->log('Invoice existed - ' . $invoiceName);

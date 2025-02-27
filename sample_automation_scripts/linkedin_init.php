@@ -1,6 +1,3 @@
-<?php // updated login code 
-// Server-Portal-ID: 331 - Last modified: 30.01.2025 13:49:18 UTC - User: 1
-
 public $baseUrl = 'https://www.linkedin.com';
 public $loginUrl = 'https://www.linkedin.com/login?fromSignIn=true&trk=guest_homepage-basic_nav-header-signin';
 public $username_selector = 'input[id="username"]';
@@ -98,31 +95,19 @@ private function initPortal($count) {
             sleep(3);
         }
         $this->exts->capture("3-login-success");
-        
-        
-        // Open invoices url and download invoice
-        $this->exts->openUrl('https://www.linkedin.com/payments/purchasehistory?trk=');
-        sleep(10);
 
-        $this->exts->execute_javascript('let selectBox = document.querySelector("select#customDateOption-purchaseHistoryForm");
-                                            selectBox.value = "custom";
-                                            selectBox.dispatchEvent(new Event("change"));');
 
-        $this->processInvoices();
-        $this->exts->openUrl('https://www.linkedin.com/manage/purchases-payments/transactions');
-        sleep(10);
-        $this->processInvoicestransactions();
-        // Final, check no invoice
-        if($this->isNoInvoice){
-            $this->exts->no_invoice();
+        if (!empty($this->exts->config_array['allow_login_success_request'])) {
+
+            $this->exts->triggerLoginSuccess();
         }
-        $this->exts->success();
+
     } else {
         $this->exts->log(__FUNCTION__.'::Use login failed: ' . $this->exts->getUrl());
         if($this->exts->getElement($this->check_login_failed_selector) != null) {
             $this->exts->loginFailure(1);
         } else if($this->exts->exists('[name="pageKey"][content="d_checkpoint_lg_accountRestricted"]')){
-            $this->exts->account_not_ready();
+            $this->exts->loginFailure(1);
         } else {
             $this->exts->loginFailure();
         }
@@ -1422,157 +1407,6 @@ private function handleTwoFactorCode($two_factor_input_selector, $two_factor_msg
         }
     }
     // -------------------- GOOGLE login END
-
-public $invoices = array();
-private function processInvoices($paging_count=1) {
-    sleep(10);
-    $this->exts->capture("4-invoices-page-".$paging_count);
-    
-    
-    $rows = $this->exts->getElements('table > tbody > tr');
-    foreach ($rows as $row) {
-        $tags = $this->exts->getElements('td', $row);
-        if(count($tags) >= 4 && $this->exts->getElement('button.view-receipt[data-order-id]', $row) != null) {
-            $invoiceName = $this->exts->getElement('button.view-receipt[data-order-id]', $row)->getAttribute('data-order-id');
-            $invoiceUrl = 'https://www.linkedin.com/payments/receipt/' . $invoiceName;
-            $invoiceDate = trim($tags[0]->getAttribute('innerText'));
-            $invoiceAmount = trim(preg_replace('/[^\d\.\,]/', '', $tags[3]->getAttribute('innerText'))) . ' EUR';
-            
-            array_push($this->invoices, array(
-                'invoiceName'=>$invoiceName,
-                'invoiceDate'=>$invoiceDate,
-                'invoiceAmount'=>$invoiceAmount,
-                'invoiceUrl'=>$invoiceUrl
-            ));
-            $this->isNoInvoice = false;
-        }
-    }
-    
-    if($this->restrictPages == 0 && $paging_count < 20 && $this->exts->getElement('a#next-order-history') != null){
-        $paging_count++;
-        $this->exts->moveToElementAndClick('a#next-order-history');
-        sleep(5);
-        $this->processInvoices($paging_count);
-    }else if($this->restrictPages > 0 && $paging_count < 4 && $this->exts->getElement('a#next-order-history') != null){
-        $paging_count++;
-        $this->exts->moveToElementAndClick('a#next-order-history');
-        sleep(5);
-        $this->processInvoices($paging_count);
-    } else {
-        $this->downloadInvoices();
-    }
-}
-public function downloadInvoices() {
-    // Download all invoices
-
-    $this->exts->log('Invoices found: '.count($this->invoices));
-    foreach ($this->invoices as $invoice) {
-        $this->exts->log('--------------------------');
-        $this->exts->log('invoiceName: '.$invoice['invoiceName']);
-        $this->exts->log('invoiceDate: '.$invoice['invoiceDate']);
-        $this->exts->log('invoiceAmount: '.$invoice['invoiceAmount']);
-        $this->exts->log('invoiceUrl: '.$invoice['invoiceUrl']);
-        
-        $invoiceFileName = $invoice['invoiceName'].'.pdf';
-        $invoice['invoiceDate'] = $this->exts->parse_date($invoice['invoiceDate'], 'd.m.Y','Y-m-d');
-        $this->exts->log('Date parsed: '.$invoice['invoiceDate']);
-        
-        if($this->exts->invoice_exists($invoice['invoiceName'])){
-            $this->exts->log('Invoice EXISTS');
-            continue;
-        }
-        $this->exts->openUrl($invoice['invoiceUrl']);
-        sleep(3);
-        if($this->company_detail != ''){
-            if($this->exts->exists('.company-billing-info-updater button.add-billing-details-btn:not(.hidden)')){
-                $this->exts->moveToElementAndClick('.company-billing-info-updater button.add-billing-details-btn');
-                sleep(3);
-                $edit_area = $this->exts->getElement('.company-billing-info-updater #company-billing-info');
-                $this->exts->execute_javascript("arguments[0].innerHTML=''", [$edit_area]);
-                $this->exts->moveToElementAndClick('.company-billing-info-updater #company-billing-info');
-                $this->exts->webdriver->getKeyboard()->releaseKey($this->company_detail);
-                sleep(1);
-                $this->exts->moveToElementAndClick('.company-billing-info-updater button.company-button[type="submit"]');
-            } else if($this->exts->exists('.company-billing-info-updater a.edit:not(.hidden)')){
-                $this->exts->moveToElementAndClick('.company-billing-info-updater a.edit:not(.hidden)');
-                sleep(3);
-                $edit_area = $this->exts->getElement('.company-billing-info-updater #company-billing-info');
-                $this->exts->execute_javascript("arguments[0].innerHTML=''", [$edit_area]);
-                $this->exts->moveToElementAndClick('.company-billing-info-updater #company-billing-info');
-                $this->exts->webdriver->getKeyboard()->releaseKey($this->company_detail);
-                sleep(1);
-                $this->exts->moveToElementAndClick('.company-billing-info-updater button.company-button[type="submit"]');
-            }
-            sleep(3);
-        }
-        $downloaded_file = $this->exts->download_current($invoiceFileName);
-        if(trim($downloaded_file) != '' && file_exists($downloaded_file)){
-            $this->exts->new_invoice($invoice['invoiceName'], $invoice['invoiceDate'], $invoice['invoiceAmount'], $invoiceFileName);
-            sleep(1);
-        } else {
-            $this->exts->log(__FUNCTION__.'::No download '.$invoiceFileName);
-        }
-    }
-}
-
-private function processInvoicestransactions() {
-    sleep(25);
-
-    $this->exts->capture("4-invoices-pagetransactions");
-    $invoices = [];
-
-    $rows = $this->exts->getElements('div.invoices-table__list  [role="row"]');
-    foreach ($rows as $row) {
-        $tags = $this->exts->getElements('[role="cell"]', $row);
-        if(count($tags) >= 7 && $this->exts->getElement('button[id*="menu-trigger"]', $tags[6]) != null) {
-            $invoice_menu_action = $this->exts->getElement('button[id*="menu-trigger"]', $tags[6]);
-            try{
-                $this->exts->log('Click download button');
-                $invoice_menu_action->click();
-            } catch(\Exception $exception){
-                $this->exts->log('Click download button by javascript');
-                $this->exts->execute_javascript("arguments[0].click()", [$invoice_menu_action]);
-            }
-            sleep(2);
-            if($this->exts->exists('a[download*="LNKD_INVOICE"]')){
-                $invoiceUrl = $this->exts->getElement('a[download*="LNKD_INVOICE"]')->getAttribute("href");
-                $invoiceName = trim($tags[3]->getAttribute('innerText'));
-                $invoiceDate = trim($tags[0]->getAttribute('innerText'));
-                $invoiceAmount = trim(preg_replace('/[^\d\.\,]/', '', $tags[1]->getAttribute('innerText'))) . ' EUR';
-
-                array_push($invoices, array(
-                    'invoiceName'=>$invoiceName,
-                    'invoiceDate'=>$invoiceDate,
-                    'invoiceAmount'=>$invoiceAmount,
-                    'invoiceUrl'=>$invoiceUrl
-                ));
-                $this->isNoInvoice = false;
-            }
-        }
-    }
-
-    // Download all invoices
-    $this->exts->log('Invoices found: '.count($invoices));
-    foreach ($invoices as $invoice) {
-        $this->exts->log('--------------------------');
-        $this->exts->log('invoiceName: '.$invoice['invoiceName']);
-        $this->exts->log('invoiceDate: '.$invoice['invoiceDate']);
-        $this->exts->log('invoiceAmount: '.$invoice['invoiceAmount']);
-        $this->exts->log('invoiceUrl: '.$invoice['invoiceUrl']);
-
-        $invoiceFileName = $invoice['invoiceName'].'.pdf';
-        $invoice['invoiceDate'] = $this->exts->parse_date($invoice['invoiceDate'], 'd.m.Y','Y-m-d');
-        $this->exts->log('Date parsed: '.$invoice['invoiceDate']);
-        
-        $downloaded_file = $this->exts->direct_download($invoice['invoiceUrl'], 'pdf', $invoiceFileName);
-        if(trim($downloaded_file) != '' && file_exists($downloaded_file)){
-            $this->exts->new_invoice($invoice['invoiceName'], $invoice['invoiceDate'], $invoice['invoiceAmount'], $invoiceFileName);
-            sleep(1);
-        } else {
-            $this->exts->log(__FUNCTION__.'::No download '.$invoiceFileName);
-        }
-    }
-}
 
 
 public function switchToFrame($query_string)

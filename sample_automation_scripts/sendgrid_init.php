@@ -1,6 +1,3 @@
-<?php // migrated // last // updated login code // updated login code // 3rd
-// Server-Portal-ID: 4010 - Last modified: 17.01.2025 03:32:04 UTC - User: 1
-
 public $baseUrl = "https://app.sendgrid.com/login";
 public $loginUrl = "https://app.sendgrid.com/login";
 public $homePageUrl = "https://app.sendgrid.com/settings/billing";
@@ -55,7 +52,11 @@ private function initPortal($count) {
         if($this->checkLogin()) {
             $this->exts->log(">>>>>>>>>>>>>>>Login successful!!!!");
             $this->exts->capture("LoginSuccess");
-            $this->invoicePage();
+
+            if (!empty($this->exts->config_array['allow_login_success_request'])) {
+
+                $this->exts->triggerLoginSuccess();
+            }
         } elseif(strpos(strtolower($this->exts->extract('div#login-error-alert-container p')), 'Your username or password is invalid.') !== false){
             $this->exts->log("Your username or password is invalid.");
             $this->exts->capture("LoginFailed");
@@ -68,7 +69,11 @@ private function initPortal($count) {
         sleep(10);
         $this->exts->log(">>>>>>>>>>>>>>>Login successful!!!!");
         $this->exts->capture("LoginSuccess");
-        $this->invoicePage();
+
+        if (!empty($this->exts->config_array['allow_login_success_request'])) {
+
+            $this->exts->triggerLoginSuccess();
+        }
     }
 }
 
@@ -277,159 +282,5 @@ private function checkFillTwoFactor() {
                 $this->exts->log("Not received two factor code");
             }
         }
-    }
-}
-
-function invoicePage() {
-    $this->exts->log("invoice Page");
-    
-    if ($this->exts->getElement('a[data-nav-title="settings"]') != null) {
-        $this->exts->moveToElementAndClick('a[data-nav-title="settings"]');
-        sleep(15);
-    }
-    
-    if ($this->exts->getElement('ul.subpages a[href*="/account/billing"]') != null) {
-        $this->exts->moveToElementAndClick('ul.subpages a[href*="/account/billing"]');
-        sleep(15);
-    } else if ($this->exts->getElement('ul.subpages a[href*="/account/details"]') != null) {
-        $this->exts->moveToElementAndClick('ul.subpages a[href*="/account/details"]');
-        sleep(15);
-    } else {
-        $this->exts->openUrl($this->homePageUrl);
-        sleep(15);
-    }
-    $this->exts->moveToElementAndClick('li[data-qahook="billingTab"]');
-    sleep(15);
-    $this->downloadInvoice();
-    
-    if ($this->totalFiles == 0) {
-        $this->exts->log("No invoices!!");
-        $this->exts->no_invoice();
-    }
-    $this->exts->success();
-}
-
-public $tryFindBilling = 0;
-public $totalFiles = 0;
-function downloadInvoice(){
-    $this->exts->log("Begin downlaod invoice 1");
-    
-    $this->exts->capture('4-List-invoices');
-    
-    try{
-        if($this->exts->getElement("div.invoice-list > div") != null) {
-            $invoices = array();
-            $receipts = $this->exts->getElements('div.invoice-list > div');
-            foreach ($receipts as $i => $receipt) {
-                $this->exts->log("each record");
-                $tags = $this->exts->getElements('div');
-                if (count($tags) >= 3 && $this->exts->getElement('a.pdf-dowload-link', $receipt) != null) {
-                    $receiptDate = trim($this->getInnerTextByJS('a.pdf-dowload-link', $receipt));
-                    $receiptUrl = $this->exts->getElement('a.pdf-dowload-link', $receipt);
-                    $this->exts->execute_javascript(
-                        "arguments[0].setAttribute(\"id\", \"invoice\" + arguments[1]);",
-                        array($receiptUrl, $i)
-                    );
-                    
-                    $receiptUrl = "div.invoice-list > div a.pdf-dowload-link#invoice" . $i;
-                    // $receiptName = str_replace(",", "", $receiptDate);
-                    $receiptName = preg_replace('/[, ]/', '', $receiptDate);
-                    $receiptFileName = $receiptName . '.pdf';
-                    $parsed_date = $this->exts->parse_date($receiptDate,'M d, Y','Y-m-d');
-                    $receiptAmount = trim($this->getInnerTextByJS('div.amount span', $receipt));
-                    $receiptAmount = str_replace("$", "", $receiptAmount) . ' USD';
-                    $this->exts->log($receiptAmount);
-                    
-                    $this->exts->log("Invoice Date: " . $receiptDate);
-                    $this->exts->log("Invoice Name: " . $receiptName);
-                    $this->exts->log("Invoice FileName: " . $receiptFileName);
-                    $this->exts->log("Invoice parsed_date: " . $parsed_date);
-                    $this->exts->log("Invoice Amount: " . $receiptAmount);
-                    
-                    $invoice = array(
-                        'receiptName' => $receiptName,
-                        'parsed_date' => $parsed_date,
-                        'receiptAmount' => $receiptAmount,
-                        'receiptFileName' => $receiptFileName,
-                        'receiptUrl' => $receiptUrl,
-                    );
-                    
-                    array_push($invoices, $invoice);
-                    
-                }
-                
-            }
-            
-            $this->exts->log("Number of invoices: " . count($invoices));
-            foreach ($invoices as $invoice) {
-                $this->totalFiles += 1;
-                if ($this->exts->getElement($invoice['receiptUrl']) != null) {
-                    $this->exts->moveToElementAndClick($invoice['receiptUrl']);
-                    
-                    $this->exts->wait_and_check_download('pdf');
-                    
-                    $downloaded_file = $this->exts->find_saved_file('pdf', $invoice['receiptFileName']);
-                    sleep(1);
-                    
-                    if(trim($downloaded_file) != '' && file_exists($downloaded_file)){
-                        // Create new invoice if it not exisited
-                        if($this->exts->invoice_exists($invoice['receiptName'])){
-                            $this->exts->log('Invoice existed '.$invoice['receiptFileName']);
-                        } else {
-                            $this->exts->new_invoice($invoice['receiptName'], $invoice['parsed_date'], $invoice['receiptAmount'], $invoice['receiptFileName']);
-                            sleep(1);
-                        }
-                    } else {
-                        $this->exts->log('Timeout when download '.$invoice['receiptFileName']);
-                    }
-                }
-                
-            }
-            
-        } else {
-            $str = "var div = document.querySelector('iframe.appcues-tooltip-container'); if (div != null) {  div.style.display = \"none\"; }";
-            $this->exts->execute_javascript($str);
-            sleep(1);
-            
-            if(stripos($this->exts->getUrl(), "/account/billing") == false && $this->tryFindBilling == 0) {
-                if(stripos($this->exts->getUrl(), "/account/details") == false) {
-                    $this->exts->openUrl($this->homePageUrl);
-                    sleep(15);
-                } else {
-                    if ($this->exts->getElement('ul li.tab[data-qahook="billingTab"]') != null) {
-                        $this->exts->moveToElementAndClick('ul li.tab[data-qahook="billingTab"]');
-                        sleep(15);
-                    } else {
-                        $this->exts->openUrl($this->homePageUrl);
-                        sleep(15);
-                    }
-                }
-                $this->tryFindBilling = $this->tryFindBilling + 1;
-                $this->downloadInvoice();
-            }
-        }
-        
-    } catch(\Exception $exception){
-        $this->exts->log("Exception downlaoding invoice ".$exception->getMessage());
-    }
-}
-
-function getInnerTextByJS($selector_or_object, $parent = null){
-    if($selector_or_object == null){
-        $this->exts->log(__FUNCTION__.' Can not get innerText of null');
-        return;
-    }
-    $element = $selector_or_object;
-    if(is_string($selector_or_object)){
-        $element = $this->exts->getElement($selector_or_object, $parent);
-        if($element == null){
-            $element = $this->exts->getElement($selector_or_object, $parent, 'xpath');
-        }
-        if($element == null){
-            $this->exts->log(__FUNCTION__.':: Can not found element with selector/xpath: '. $selector_or_object);
-        }
-    }
-    if ($element != null) {
-        return $this->exts->execute_javascript("return arguments[0].innerText", [$element]);
     }
 }
