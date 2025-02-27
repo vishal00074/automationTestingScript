@@ -56,7 +56,7 @@ private function initPortal($count) {
 		// If user hase not logged in from cookie, clear cookie, open the login url and do login
 		if($this->exts->getElement($this->check_login_success_selector) == null) {
 			$this->exts->log('NOT logged via cookie');
-			//$this->exts->clearCookies();
+			$this->exts->clearCookies();
 			$this->exts->openUrl($this->baseUrl);
 			sleep(15);
 			
@@ -204,7 +204,7 @@ private function checkFillRecaptcha($tryagain_if_expired=true, $count=1) {
 	}
 }
 
-	private function clearChrome()
+private function clearChrome()
 {
 	$this->exts->log("Clearing browser history, cookie, cache");
 	$this->exts->openUrl('chrome://settings/clearBrowserData');
