@@ -26,13 +26,24 @@ private function initPortal($count) {
 	
 	if(trim($this->username) == '-' || trim($this->username) == '"-"' || trim($this->username) == '.' || trim($this->username) == '"."') {
 		if($this->digistore_subscriptions != ''){
-
-			// remove for init script  only
-
-			if (!empty($this->exts->config_array['allow_login_success_request'])) {
-
-				$this->exts->triggerLoginSuccess();
+			$this->exts->log('subcriptionUrls in condition - ' . $this->digistore_subscriptions);
+			$subcription_urls = explode(',', $this->digistore_subscriptions);
+			$this->exts->log('subcriptionUrls - ' . count($subcription_urls));
+			foreach ($subcription_urls as $key => $subcription_url) {
+				$subcription_url = trim($subcription_url);
+				if (filter_var($subcription_url, FILTER_VALIDATE_URL) === FALSE) {
+					$this->exts->log('INVALID URL - ' . $subcription_url);
+					continue;
+				}
+				$this->exts->openUrl($subcription_url);
+				// remove the SubcriptionInvoices code for only init script
 			}
+			
+			if($this->isNoInvoice){
+				$this->exts->no_invoice();
+			}
+			$this->exts->success();
+			return;
 		}
 	} else {
 		$this->exts->openUrl($this->baseUrl);
@@ -41,7 +52,7 @@ private function initPortal($count) {
 		// If user hase not logged in from cookie, clear cookie, open the login url and do login
 		if($this->exts->getElement($this->check_login_success_selector) == null) {
 			$this->exts->log('NOT logged via cookie');
-			//$this->exts->clearCookies();
+			$this->exts->clearCookies();
 			$this->exts->openUrl($this->baseUrl);
 			sleep(15);
 			
@@ -189,7 +200,7 @@ private function checkFillRecaptcha($tryagain_if_expired=true, $count=1) {
 	}
 }
 
-	private function clearChrome()
+private function clearChrome()
 {
 	$this->exts->log("Clearing browser history, cookie, cache");
 	$this->exts->openUrl('chrome://settings/clearBrowserData');
@@ -326,12 +337,11 @@ private function doAfterLogin() {
 		sleep(3);
 		$this->exts->log(__FUNCTION__.'::User logged in');
 		$this->exts->capture("3-login-success");
-
+		
 		if (!empty($this->exts->config_array['allow_login_success_request'])) {
-
-			$this->exts->triggerLoginSuccess();
-		}
-
+ 
+            $this->exts->triggerLoginSuccess();
+        }
 	} else {
 		$this->exts->capture("login-failed-after-2fa");
 		$this->exts->log(__FUNCTION__.'::Use login failed');
@@ -340,7 +350,7 @@ private function doAfterLogin() {
 			$this->switchToFrame('iframe.login-iframe');
 		}
 		if ($this->exts->getElementByText('form#login div.alert.alert-danger', ['not active'], null, false) != null) {
-			$this->exts->loginFailure(1);
+			$this->exts->account_not_ready();
 		}
 		$logged_in_failed_selector = $this->exts->getElementByText('form#login div.alert.alert-danger', ['kennwort','password', 'Digistore24 ID', 'digistore24-id', 'submit the form again'], null, false);
 		if($logged_in_failed_selector != null) {
