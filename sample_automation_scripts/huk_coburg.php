@@ -1,4 +1,4 @@
-<?php // migrated
+<?php // migrated // udpated login code
 // Server-Portal-ID: 18492 - Last modified: 27.11.2024 13:13:45 UTC - User: 1
 
 /*Define constants used in script*/
@@ -112,22 +112,21 @@ private function checkFillLogin() {
 		$this->exts->log("Enter Username");
 		$this->exts->moveToElementAndType($this->username_selector, $this->username);
 		sleep(1);
-		for ($i=0; $i < 10 && $this->exts->exists('.frc-captcha .frc-progress'); $i++) { 
-			sleep(8);
-		}
+		$this->processWaitCaptcha();
+
 		$this->exts->moveToElementAndClick('form s-button[variant="filled"] button');
 		sleep(10);
 		$this->exts->moveToElementAndClick($this->password_selector);
 		sleep(5);
-		for ($i=0; $i < 10 && $this->exts->exists('.frc-captcha .frc-progress'); $i++) { 
-			sleep(8);
-		}
+
+		$this->processWaitCaptcha();
+
 		$this->exts->log("Enter Password");
 		$this->exts->moveToElementAndType($this->password_selector, $this->password);
 		sleep(1);
-		for ($i=0; $i < 10 && $this->exts->exists('.frc-captcha .frc-progress'); $i++) { 
-			sleep(15);
-		}
+
+		$this->processWaitCaptcha();
+
 		if($this->remember_me_selector != '')
 			$this->exts->moveToElementAndClick($this->remember_me_selector);
 		sleep(2);
@@ -142,6 +141,20 @@ private function checkFillLogin() {
 		$this->exts->log(__FUNCTION__.'::Login page not found');
 		$this->exts->capture("2-login-page-not-found");
 	}
+}
+
+private function processWaitCaptcha()
+{
+    $this->exts->waitTillPresent('button[class="frc-button"]', 10);
+    for ($i = 0; $i < 30; $i++) {
+        if ($this->exts->exists('div.frc-success')) {
+            break;
+        }
+        if ($this->exts->exists('button[class="frc-button"]')) {
+            $this->exts->moveToElementAndClick('button[class="frc-button"]');
+        }
+        $this->exts->waitTillPresent('div.frc-success', 30);
+    }
 }
 
 private function checkFillTwoFactor() {
