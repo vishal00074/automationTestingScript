@@ -208,7 +208,7 @@ function extract_single_zip_save_pdf($zipfile)
 
             $this->exts->log(__FUNCTION__ . '::pathinfo ' . $fileInfo);
 
-            if ($fileInfo['extension'] === 'pdf') {
+            if ($fileInfo['extension'] === 'zip') {
 
                 $this->exts->log('extension verified');
 
