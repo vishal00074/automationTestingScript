@@ -1,4 +1,4 @@
-<?php
+<?php // migrated
 // Server-Portal-ID: 18492 - Last modified: 27.11.2024 13:13:45 UTC - User: 1
 
 /*Define constants used in script*/
@@ -32,14 +32,14 @@ private function initPortal($count) {
 	sleep(1);
 	$this->exts->openUrl($this->baseUrl);
 	sleep(30);
-	if($this->exts->getElementByCssSelector('button.cookie-consent__button--primary') != null) {
+	if($this->exts->getElement('button.cookie-consent__button--primary') != null) {
 		$this->exts->moveToElementAndClick('button.cookie-consent__button--primary');
 		sleep(5);
 	}
 	$this->exts->capture('1-init-page');
 	
 	// If user hase not logged in from cookie, clear cookie, open the login url and do login
-	if($this->exts->getElementByCssSelector($this->check_login_success_selector) == null) {
+	if($this->exts->getElement($this->check_login_success_selector) == null) {
 		$this->exts->log('NOT logged via cookie');
 		$this->exts->openUrl($this->loginUrl);
 		sleep(15);
@@ -67,7 +67,7 @@ private function initPortal($count) {
 		$this->checkFillTwoFactor();
 	}
 	if($this->exts->urlContains('begruessung/uwg')){
-		$button = $this->getElementByText('s-button button', 'Ablehnen', null, false);
+		$button = $this->exts->getElementByText('s-button button', 'Ablehnen', null, false);
 		if($button != null) {
 			try {
 				$button->click();
@@ -82,11 +82,11 @@ private function initPortal($count) {
 		// $this->exts->moveToElementAndClick('button[title=Ablehnen]');
 	}
 	sleep(10);
-	if($this->exts->getElementByCssSelector($this->check_login_success_selector) == null) {
+	if($this->exts->getElement($this->check_login_success_selector) == null) {
 		$this->exts->refresh();
 		sleep(20);
 	}
-	if($this->exts->getElementByCssSelector($this->check_login_success_selector) != null) {
+	if($this->exts->getElement($this->check_login_success_selector) != null) {
 		sleep(3);
 		$this->exts->log(__FUNCTION__.'::User logged in');
 		$this->exts->capture("3-login-success");
@@ -105,7 +105,7 @@ private function initPortal($count) {
 }
 
 private function checkFillLogin() {
-	if($this->exts->getElementByCssSelector($this->username_selector) != null) {
+	if($this->exts->getElement($this->username_selector) != null) {
 		sleep(3);
 		$this->exts->capture("2-login-page");
 		
@@ -149,14 +149,14 @@ private function checkFillTwoFactor() {
 	$two_factor_message_selector = 'form > div > p.text--default';
 	$two_factor_submit_selector = 'form [variant="cta"] button.button__button';
 
-	if($this->exts->getElementByCssSelector($two_factor_selector) != null && $this->exts->two_factor_attempts < 3){
+	if($this->exts->getElement($two_factor_selector) != null && $this->exts->two_factor_attempts < 3){
 		$this->exts->log("Two factor page found.");
 		$this->exts->capture("2.1-two-factor");
 
-		if($this->exts->getElementByCssSelector($two_factor_message_selector) != null){
+		if($this->exts->getElement($two_factor_message_selector) != null){
 			$this->exts->two_factor_notif_msg_en = "";
-			for ($i=0; $i < count($this->exts->getElementsByCssSelector($two_factor_message_selector)); $i++) { 
-				$this->exts->two_factor_notif_msg_en = $this->exts->two_factor_notif_msg_en.$this->exts->getElementsByCssSelector($two_factor_message_selector)[$i]->getText()."\n";
+			for ($i=0; $i < count($this->exts->getElements($two_factor_message_selector)); $i++) { 
+				$this->exts->two_factor_notif_msg_en = $this->exts->two_factor_notif_msg_en.$this->exts->getElements($two_factor_message_selector)[$i]->getText()."\n";
 			}
 			$this->exts->two_factor_notif_msg_en = trim($this->exts->two_factor_notif_msg_en);
 			$this->exts->two_factor_notif_msg_de = $this->exts->two_factor_notif_msg_en;
@@ -170,7 +170,7 @@ private function checkFillTwoFactor() {
 		$two_factor_code = trim($this->exts->fetchTwoFactorCode());
 		if(!empty($two_factor_code) && trim($two_factor_code) != '') {
 			$this->exts->log("checkFillTwoFactor: Entering two_factor_code.".$two_factor_code);
-			$this->exts->getElementByCssSelector($two_factor_selector)->sendKeys($two_factor_code);
+			$this->exts->getElement($two_factor_selector)->sendKeys($two_factor_code);
 			
 			$this->exts->log("checkFillTwoFactor: Clicking submit button.");
 			sleep(3);
@@ -179,7 +179,7 @@ private function checkFillTwoFactor() {
 			$this->exts->moveToElementAndClick($two_factor_submit_selector);
 			sleep(15);
 
-			if($this->exts->getElementByCssSelector($two_factor_selector) == null){
+			if($this->exts->getElement($two_factor_selector) == null){
 				$this->exts->log("Two factor solved");
 			} else if ($this->exts->two_factor_attempts < 3) {
 				$this->exts->notification_uid = "";
@@ -237,44 +237,6 @@ function getInnerTextByJS($selector_or_object, $parent = null){
 	}
 }
 
-private function getElementByText($selector, $multi_language_texts, $parent_element=null, $is_absolutely_matched=true){
-	$this->exts->log(__FUNCTION__);
-	if(is_array($multi_language_texts)){
-		$multi_language_texts = join('|', $multi_language_texts);
-	}
-	// Seaching matched element
-	$object_elements = $this->exts->getElements($selector, $parent_element);
-	foreach ($object_elements as $object_element) {
-		$element_text = trim($object_element->getAttribute('textContent'));
-		// First, search via text
-		// If is_absolutely_matched = true, seach element matched EXACTLY input text, else search element contain the text
-		if($is_absolutely_matched){
-			$multi_language_texts = explode('|', $multi_language_texts);
-			foreach ($multi_language_texts as $searching_text) {
-				if(strtoupper($element_text) == strtoupper($searching_text)){
-					$this->exts->log('Matched element found');
-					return $object_element;
-				}
-			}
-			$multi_language_texts = join('|', $multi_language_texts);
-		} else {
-			if(preg_match('/'.$multi_language_texts.'/i', $element_text) === 1){
-				$this->exts->log('Matched element found');
-				return $object_element;
-			}
-		}
-
-		// Second, is search by text not found element, support searching by regular expression
-		if(@preg_match($multi_language_texts, '') !== FALSE){
-			if(preg_match($multi_language_texts, $element_text) === 1){
-				$this->exts->log('Matched element found');
-				return $object_element;
-			}
-		}
-	}
-	return null;
-}
-
 private function doAfterLogin() {
 	sleep(10);
 	
@@ -316,11 +278,11 @@ private function processInvoices() {
 	$this->exts->capture("4-invoices-page");
 	$invoices = [];
 	
-	$rows = $this->exts->getElementsByCssSelector('div.postfach > div.table_row');
+	$rows = $this->exts->getElements('div.postfach > div.table_row');
 	foreach ($rows as $row) {
-		$tags = $this->exts->getElementsByCssSelector('div.col', $row);
-		if(count($tags) >= 4 && $this->exts->getElementByCssSelector('a[href*="/Dokument"]', $tags[3]) != null) {
-			$invoiceUrl = $this->exts->getElementByCssSelector('a[href*="/Dokument"]', $tags[3])->getAttribute("href");
+		$tags = $this->exts->getElements('div.col', $row);
+		if(count($tags) >= 4 && $this->exts->getElement('a[href*="/Dokument"]', $tags[3]) != null) {
+			$invoiceUrl = $this->exts->getElement('a[href*="/Dokument"]', $tags[3])->getAttribute("href");
 			$invoiceName =array_pop(explode('&dokument=', $invoiceUrl));
 			$invoiceDate = trim($this->getInnerTextByJS($tags[1]));
 			$invoiceAmount = '';
@@ -367,11 +329,11 @@ public function procecssMailBox() {
 	$this->exts->capture("4-mailbox-page");
 	$invoices = [];
 	
-	$rows = $this->exts->getElementsByCssSelector('a.row');
+	$rows = $this->exts->getElements('a.row');
 	foreach ($rows as $row) {
-		$tags = $this->exts->getElementsByCssSelector('div.col', $row);
-		if(count($tags) >= 3 && $this->exts->getElementByCssSelector('a[href*="/Dokument"]', $tags[2]) != null) {
-			$invoiceUrl = $this->exts->getElementByCssSelector('a[href*="/Dokument"]', $tags[2])->getAttribute("href");
+		$tags = $this->exts->getElements('div.col', $row);
+		if(count($tags) >= 3 && $this->exts->getElement('a[href*="/Dokument"]', $tags[2]) != null) {
+			$invoiceUrl = $this->exts->getElement('a[href*="/Dokument"]', $tags[2])->getAttribute("href");
 			$invoiceName =array_pop(explode('&dokument=', $invoiceUrl));
 			$invoiceDate = trim($this->getInnerTextByJS($tags[1]));
 			$invoiceAmount = '';
