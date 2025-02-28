@@ -1,5 +1,4 @@
 <?php // updated login code
-
 // Server-Portal-ID: 24484 - Last modified: 08.01.2025 14:06:15 UTC - User: 1
 /*Define constants used in script*/
 public $baseUrl = "https://www.autoscout24.de/entry/auth?client_id=identity-v2&scope=openid+email+profile+offline_access&state=de-DE%235bc7b103ef634543b289f28ec303b91d&pkce_callback=https%3A%2F%2Fwww.autoscout24.de%2Fidentity%2Foauth%2Fcallback&code_challenge=SWKLArRHsUzOgwAPpnRGFdGKwx-Nh_PUpwAqETOz8UE&social_callback=https%3A%2F%2Fwww.autoscout24.de%2Fidentity%2Foauth%2Fsocial-callback&social_code_challenge=b1f3ebf5-a91d-4245-873f-890d5fd5d9fc&code_challenge_method=S256&response_type=code&redirect_uri=https%3A%2F%2Fwww.autoscout24.de%2Fidentity%2Foauth%2Fcallback";
@@ -7,7 +6,7 @@ public $loginUrl = "https://www.autoscout24.de/entry/auth?client_id=identity-v2&
 public $username_selector = "input#email";
 public $password_selector = "input#password";
 public $submit_button_selector = "button[type='submit']";
-public $check_login_success_selector = 'a[href*="profile/settings"]';
+public $check_login_success_selector = 'a[href*="entry/logout"]';
 public $login_tryout = 0;
 /**
 * Entry Method thats called for a portal
@@ -30,7 +29,7 @@ private function initPortal($count)
         $this->fillForm(0);
         sleep(5);
         $this->checkfillForm();
-        
+
     }
     if ($this->checkLogin()) {
         $this->exts->log(">>>>>>>>>>>>>>>Login successful!!!!");
@@ -60,7 +59,7 @@ private function initPortal($count)
 function checkfillForm($count = 0){
     $this->exts->log("Begin checkfillForm " . $count);
 
-    $this->exts->waitTillPresent("input#email");
+    $this->exts->waitTillPresent("input#email", 5);
 
     if($this->exts->querySelector('input#email') != null){
         $this->exts->log("Enter Username");
@@ -84,6 +83,8 @@ function checkfillForm($count = 0){
         $count = $count + 1;
         $this->checkfillForm($count);
     }
+
+  
 }
 
 function fillForm($count)
@@ -116,6 +117,20 @@ function fillForm($count)
             sleep(5); 
         }
 
+        $error_tab = $this->exts->findTabMatchedUrl(['error']);
+        if ($error_tab != null) {
+            $this->exts->openUrl('https://www.autoscout24.de/account');
+            sleep(10);
+            if($this->exts->exists('input[type="password"]') != null){
+                $this->exts->moveToElementAndType('input[type="password"]', $this->password);
+                sleep(2);
+                $this->exts->moveToElementAndClick('input[type="submit"]');
+                sleep(10);
+                
+            }
+        
+        }
+
     } catch (\Exception $exception) {
 
         $this->exts->log("Exception filling loginform " . $exception->getMessage());
@@ -134,7 +149,9 @@ function checkLogin()
     $this->exts->log("Begin checkLogin ");
     $isLoggedIn = false;
     try {
-        $this->exts->openUrl('https://www.autoscout24.de/account');
+        $this->exts->moveToElementAndClick('button[id="hfo-nav__my-acc-btn"]');
+        sleep(5);
+
         $this->exts->waitTillPresent($this->check_login_success_selector);
         if ($this->exts->exists($this->check_login_success_selector)) {
 

@@ -3,7 +3,7 @@ public $loginUrl = "https://www.autoscout24.de/entry/auth?client_id=identity-v2&
 public $username_selector = "input#email";
 public $password_selector = "input#password";
 public $submit_button_selector = "button[type='submit']";
-public $check_login_success_selector = 'a[href*="profile/settings"]';
+public $check_login_success_selector = 'a[href*="entry/logout"]';
 public $login_tryout = 0;
 /**
 * Entry Method thats called for a portal
@@ -26,11 +26,12 @@ private function initPortal($count)
         $this->fillForm(0);
         sleep(5);
         $this->checkfillForm();
-        
+
     }
     if ($this->checkLogin()) {
         $this->exts->log(">>>>>>>>>>>>>>>Login successful!!!!");
         $this->exts->capture("LoginSuccess");
+
         if (!empty($this->exts->config_array['allow_login_success_request'])) {
  
             $this->exts->triggerLoginSuccess();
@@ -59,7 +60,7 @@ private function initPortal($count)
 function checkfillForm($count = 0){
     $this->exts->log("Begin checkfillForm " . $count);
 
-    $this->exts->waitTillPresent("input#email");
+    $this->exts->waitTillPresent("input#email", 5);
 
     if($this->exts->querySelector('input#email') != null){
         $this->exts->log("Enter Username");
@@ -83,6 +84,8 @@ function checkfillForm($count = 0){
         $count = $count + 1;
         $this->checkfillForm($count);
     }
+
+  
 }
 
 function fillForm($count)
@@ -115,6 +118,20 @@ function fillForm($count)
             sleep(5); 
         }
 
+        $error_tab = $this->exts->findTabMatchedUrl(['error']);
+        if ($error_tab != null) {
+            $this->exts->openUrl('https://www.autoscout24.de/account');
+            sleep(10);
+            if($this->exts->exists('input[type="password"]') != null){
+                $this->exts->moveToElementAndType('input[type="password"]', $this->password);
+                sleep(2);
+                $this->exts->moveToElementAndClick('input[type="submit"]');
+                sleep(10);
+                
+            }
+        
+        }
+
     } catch (\Exception $exception) {
 
         $this->exts->log("Exception filling loginform " . $exception->getMessage());
@@ -133,7 +150,9 @@ function checkLogin()
     $this->exts->log("Begin checkLogin ");
     $isLoggedIn = false;
     try {
-        $this->exts->openUrl('https://www.autoscout24.de/account');
+        $this->exts->moveToElementAndClick('button[id="hfo-nav__my-acc-btn"]');
+        sleep(5);
+
         $this->exts->waitTillPresent($this->check_login_success_selector);
         if ($this->exts->exists($this->check_login_success_selector)) {
 
