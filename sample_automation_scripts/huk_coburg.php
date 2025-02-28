@@ -1,4 +1,4 @@
-<?php // migrated and  udpated login code
+<?php // migrated and  udpated login  and download code
 // Server-Portal-ID: 18492 - Last modified: 27.11.2024 13:13:45 UTC - User: 1
 
 /*Define constants used in script*/
@@ -24,8 +24,6 @@ private function initPortal($count) {
 	$this->exts->log('Begin initPortal '.$count);
 	
 	$this->restrictPages = isset($this->exts->config_array["restrictPages"]) ? (int)@$this->exts->config_array["restrictPages"] : 3;
-
-	// $this->disable_unexpected_extensions();
 
 	// Load cookies
 	$this->exts->loadCookiesFromFile();
@@ -218,27 +216,7 @@ private function checkFillTwoFactor() {
 	}
 }
 
-private function disable_unexpected_extensions(){
-	$this->exts->openUrl('chrome://extensions/?id=cjpalhdlnbpafiamejdnhcphjbkeiagm');// disable Block origin extension
-	sleep(2);
-	$this->exts->executeSafeScript("
-		if(document.querySelector('extensions-manager') != null) {
-			if(document.querySelector('extensions-manager').shadowRoot.querySelector('extensions-detail-view')  != null){
-				var disable_button = document.querySelector('extensions-manager').shadowRoot.querySelector('extensions-detail-view').shadowRoot.querySelector('#enableToggle[checked]');
-				if(disable_button != null){
-					disable_button.click();
-				}
-			}
-		}
-	");
-	sleep(1);
-	$this->exts->openUrl('chrome://extensions/?id=ifibfemgeogfhoebkmokieepdoobkbpo');
-	sleep(1);
-		$this->exts->executeSafeScript("if (document.querySelector('extensions-manager').shadowRoot.querySelector('extensions-detail-view').shadowRoot.querySelector('#enableToggle[checked]') != null) {
-			document.querySelector('extensions-manager').shadowRoot.querySelector('extensions-detail-view').shadowRoot.querySelector('#enableToggle[checked]').click();
-		}");
-	sleep(2);
-}
+
 
 function getInnerTextByJS($selector_or_object, $parent = null){
 	if($selector_or_object == null){
