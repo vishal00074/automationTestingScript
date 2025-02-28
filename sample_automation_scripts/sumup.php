@@ -1,4 +1,4 @@
-<?php
+<?php // updated login code
 // Server-Portal-ID: 36580 - Last modified: 15.01.2025 16:54:51 UTC - User: 1
 
 /*Define constants used in script*/
@@ -83,6 +83,8 @@ private function initPortal($count)
             sleep(5);
     }
 
+   
+
     if ($this->exts->getElement($this->check_login_success_selector) != null) {
         $this->exts->log(__FUNCTION__ . '::User logged in');
 
@@ -142,6 +144,9 @@ private function initPortal($count)
         if (!filter_var($this->username, FILTER_VALIDATE_EMAIL)) {
             $this->exts->loginFailure(1);
         }
+
+        $isTwoFAIncorrect = $this->exts->execute_javascript('document.body.innerHTML.includes("Please enter the correct code")');
+        $this->exts->log('isTwoFAIncorrect: '. $isTwoFAIncorrect);
         if (
             stripos($this->exts->extract($this->check_login_failed_selector), 'incorrect email address or password') !== false ||
             stripos($this->exts->extract($this->check_login_failed_selector), 'passwort falsch') !== false ||
@@ -151,7 +156,11 @@ private function initPortal($count)
 
         ) {
             $this->exts->loginFailure(1);
-        } else {
+        }elseif($isTwoFAIncorrect){
+            $this->exts->log('Please enter the correct code');
+            $this->exts->loginFailure(1);
+        }
+         else {
             $this->exts->loginFailure();
         }
     }

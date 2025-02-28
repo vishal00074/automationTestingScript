@@ -76,8 +76,8 @@ private function initPortal($count) {
 		}
 	
 	
-		$this->exts->waitTillPresent('input[name="emailCode"]', 10);
-		if($this->exts->exists('input[name="emailCode"]')){
+		$this->exts->waitTillAnyPresent(explode(',','input[name="emailCode"], form#loginform input#otp'), 10);
+		if($this->exts->exists('input[name="emailCode"], form#loginform input#otp')){
 			$this->checkFillTwoFactor();
 		}
 
@@ -87,6 +87,7 @@ private function initPortal($count) {
 		}
 
 		$isErrorMessage = $this->exts->execute_javascript('document.body.innerHTML.includes("Invalid username or email.")');
+		$isInvalidTwoFA = $this->exts->execute_javascript('document.body.innerHTML.includes("Invalid confirmation code.")');
 
 		$this->exts->log('isErrorMessage:' . $isErrorMessage);
 
@@ -97,7 +98,6 @@ private function initPortal($count) {
  
 				$this->exts->triggerLoginSuccess();
 			}
-
 		} else if (strpos($this->exts->extract('div.login div.alert--error'), 'passwor') !== false){
 			$this->exts->capture("LoginFailed");
 			$this->exts->loginFailure(1);
@@ -105,7 +105,11 @@ private function initPortal($count) {
 			$this->exts->capture("LoginFailed");
 			$this->exts->log("Invalid username or email.");
 			$this->exts->loginFailure(1);
-		} else {
+		} else if ($isInvalidTwoFA) {
+			$this->exts->capture("LoginFailed");
+			$this->exts->log("Invalid confirmation code.");
+			$this->exts->loginFailure(1);
+		}else {
 			$this->exts->log('Login failed');
 			$this->exts->capture("LoginFailed");
 			$this->exts->loginFailure();
@@ -113,7 +117,7 @@ private function initPortal($count) {
 	} else {
 		$this->exts->capture("LoginSuccess-else");
 		
-		if (!empty($this->exts->config_array['allow_login_success_request'])) {
+	    if (!empty($this->exts->config_array['allow_login_success_request'])) {
  
             $this->exts->triggerLoginSuccess();
         }
@@ -191,7 +195,7 @@ function fillForm($count){
 				$isErrorPassMessage = $this->exts->execute_javascript('document.body.innerHTML.includes("Invalid password.")');
 				$this->exts->log('isErrorPassMessage:' . $isErrorPassMessage);
 				if (!$isErrorPassMessage && !$this->checkLogin()) {
-					$this->findPasswordPage('input[name="emailCode"]');
+					$this->findPasswordPage('input[name="emailCode"], form#loginform input#otp');
 				}
 				
 			}
@@ -206,7 +210,7 @@ function fillForm($count){
 
 private function findPasswordPage($selector, $button = null)
 {
-    $this->exts->waitTillPresent($selector, 10);
+    $this->exts->waitTillAnyPresent(explode(',',$selector), 10);
     $timeout = 200; // Max wait time in seconds
     $interval = 5;  // Time to wait between checks (adjust as needed)
     $startTime = time();
@@ -222,7 +226,7 @@ private function findPasswordPage($selector, $button = null)
             $this->exts->click_by_xdotool($button);
         }
        
-        $this->exts->waitTillPresent($selector, 10);
+        $this->exts->waitTillAnyPresent(explode(',',$selector), 10);
         sleep($interval); 
     }
 
@@ -293,6 +297,8 @@ private function checkFillTwoFactor()
 		}
 	}
 }
+
+
 public function switchToFrame($query_string)
 {
 	$this->exts->log(__FUNCTION__ . " Begin with " . $query_string);
