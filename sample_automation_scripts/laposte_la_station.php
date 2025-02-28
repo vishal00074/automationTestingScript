@@ -79,6 +79,10 @@ private function initPortal($count)
 
             $this->exts->success();
         } else {
+            $this->exts->log(__FUNCTION__ . '::Use login failed');
+
+            $this->exts->capture("login-failed");
+
             if ($this->exts->exists($this->check_login_failed_selector)) {
                 $this->exts->log("Wrong credential !!!!");
                 $this->exts->loginFailure(1);
@@ -109,12 +113,13 @@ function fillForm($count)
             $this->exts->log("Enter Password");
             $this->exts->moveToElementAndType($this->password_selector, $this->password);
 
-            $this->exts->capture("1-login-page-filled");
-            sleep(5);
-
+            sleep(2);
+            
             if ($this->exts->exists($this->submit_login_selector)) {
                 $this->exts->click_element($this->submit_login_selector);
+                sleep(5);
             }
+            $this->exts->capture("1-login-page-filled");
         }
     } catch (\Exception $exception) {
         $this->exts->log("Exception filling loginform " . $exception->getMessage());

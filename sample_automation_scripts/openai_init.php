@@ -1,8 +1,4 @@
-<?php //  Updated Two FA Code
-// Server-Portal-ID: 771787 - Last modified: 15.01.2025 08:53:34 UTC - User: 1
-
 public $baseUrl = 'https://platform.openai.com/settings/organization/billing/history';
-
 public $loginUrl = 'https://platform.openai.com/';
 public $username_selector = 'input[name="email"], input#email-input, input#username';
 public $password_selector = 'input#password';
@@ -56,23 +52,14 @@ private function initPortal($count) {
     if($this->isLoggedin()) {
         sleep(5);
         $this->exts->log(__FUNCTION__.'::User logged in');
-        $popup_ok = $this->exts->getElementByText('[role="dialog"][data-state="open"] button.btn-primary', 'Okay', null, false);
-        if($popup_ok != null){
-            $this->exts->click_element($popup_ok);
-            sleep(2);
-        }
-        if($this->exts->exists('[role="dialog"][data-state="open"] .text-token-text-tertiary button')){
-            $this->exts->click_element('[role="dialog"][data-state="open"] .text-token-text-tertiary button');
-            sleep(1);
-        }
-        if($this->exts->exists('[role="dialog"][data-state="open"]')){
-            $unwanted_dialog = $this->exts->getElement('[role="dialog"][data-state="open"]');
-            $this->exts->execute_javascript('arguments[0].remove();', [$unwanted_dialog]);
-            sleep(1);
-        }
+      
         $this->exts->capture("3-login-success");
+        if (!empty($this->exts->config_array['allow_login_success_request'])) {
 
-        $this->processAfterLogin();
+            $this->exts->triggerLoginSuccess();
+        }
+
+     
     } else {
         $this->exts->log(__FUNCTION__.'::Use login failed');
 
@@ -1025,83 +1012,3 @@ private function fillGoogleTwoFactor($input_selector, $message_selector, $submit
     }
 }
 // -------------------- GOOGLE login END
-
-private function processAfterLogin(){
-    if(!$this->exts->urlContains('/billing/history')){
-        $this->exts->openUrl($this->baseUrl);
-        sleep(5);
-    }
-    $this->exts->click_if_existed('[data-testid="cookie-consent-banner"] button + button.btn-primary');
-    $this->processInvoices();
-
-    // check if have more profiles
-    $this->exts->click_if_existed('button[id="select-trigger-radix-:r0:"][data-state="closed"][aria-haspopup="dialog"]');
-    sleep(2);
-    if($this->exts->exists('[role="dialog"][data-state="open"] [data-option-id]:not([aria-selected="true"])')){
-        $this->exts->moveToElementAndClick('[role="dialog"][data-state="open"] [data-option-id]:not([aria-selected="true"])');
-        $this->processInvoices();
-    }
-
-    // Final, check no invoice
-    if($this->isNoInvoice){
-        $this->exts->no_invoice();
-    }
-    $this->exts->success();
-}
-private function processInvoices() {
-    sleep(10);
-    exec("sudo docker exec -i --user root ".$this->node_name." sh -c 'sudo chmod -R 777 /home/seluser/Downloads/'");
-    $this->exts->capture("4-invoices-page-".time());
-    $invoices = [];
-
-    $rows = $this->exts->getElements('.billing-history-table tr');
-    foreach ($rows as $row) {
-        $invoice_link = $row->querySelector('a[href*="invoice.stripe.com"]');
-        if($invoice_link != null){
-            $invoice_url = $invoice_link->getAttribute("href");
-            $invoice_name = trim($this->exts->extract('td:nth-child(1)', $row));
-            $invoice_amount = trim($this->exts->extract('td:nth-child(3)', $row));
-            array_push($invoices, array(
-                'invoice_name'=>$invoice_name,
-                'invoice_date'=>'',
-                'invoice_amount'=>$invoice_amount,
-                'invoice_url'=>$invoice_url
-            ));
-            $this->isNoInvoice = false;
-        }
-    }
-
-    // Download all invoices
-    $this->exts->log('Invoices found: '.count($invoices));
-    if(count($invoices) > 0){
-        $this->exts->openNewTab();
-    }
-    foreach ($invoices as $invoice) {
-        $this->exts->log('--------------------------');
-        $this->exts->log('invoice_name: '.$invoice['invoice_name']);
-        $this->exts->log('invoice_amount: '.$invoice['invoice_amount']);
-        $this->exts->log('invoice_url: '.$invoice['invoice_url']);
-        if($this->exts->invoice_exists($invoice['invoice_name'])){
-            $this->exts->log('Invoice Existed '.$invoice['invoice_name']);
-        } else {
-            $invoiceFileName = $invoice['invoice_name'].'.pdf';
-            $this->exts->openUrl($invoice['invoice_url']);
-            sleep(2);
-            
-            $this->exts->click_element('//button//*[contains(text(), "Download invoice") or contains(text(), "Rechnung herunterladen")]/../..');
-            sleep(6);
-            $this->exts->wait_and_check_download('pdf');
-
-            $downloaded_file = $this->exts->find_saved_file('pdf', $invoiceFileName);
-            if(trim($downloaded_file) != '' && file_exists($downloaded_file)){
-                $this->exts->new_invoice($invoice['invoice_name'], '', $invoice['invoice_amount'], $downloaded_file);
-            } else {
-                $this->exts->log(__FUNCTION__.'::No download '.$invoice['invoice_name']);
-            }
-        }
-    }
-
-    if(count($invoices) > 0){
-        $this->exts->switchToInitTab();
-    }
-}
