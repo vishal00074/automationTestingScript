@@ -1,4 +1,4 @@
-<?php // migrated // udpated login code
+<?php // migrated and  udpated login code
 // Server-Portal-ID: 18492 - Last modified: 27.11.2024 13:13:45 UTC - User: 1
 
 /*Define constants used in script*/
@@ -56,12 +56,12 @@ private function initPortal($count) {
 			sleep(25);
 		}
 
-		$this->checkFillLogin();
+		$this->checkFillLogin(0);
 		sleep(20);
 		if ($this->exts->exists('huk-button[modifier="inverted"]')) {
 			$this->exts->moveToElementAndClick('huk-button[modifier="inverted"]');
 			sleep(20);
-			$this->checkFillLogin();
+			$this->checkFillLogin(1);
 			sleep(20);
 		}
 		$this->checkFillTwoFactor();
@@ -75,7 +75,7 @@ private function initPortal($count) {
 				$this->exts->executeSafeScript('arguments[0].click()', [$button]);
 			}
 			sleep(5);
-			$this->checkFillLogin();
+			$this->checkFillLogin(2);
 			sleep(20);
 			$this->checkFillTwoFactor();
 		}
@@ -98,13 +98,26 @@ private function initPortal($count) {
 		$this->exts->log(__FUNCTION__.'::Use login failed');
 		if(strpos(strtolower($this->getInnerTextByJS($this->check_login_failed_selector)), 'passwor') !== false) {
 			$this->exts->loginFailure(1);
-		} else {
+		} elseif(stripos(strtolower($this->exts->extract('div.s-banner__column--content  div.s-banner__supporting-text')), 'Das eingegebene Passwort ist falsch.') !== false){
+            $this->exts->log("Wrong credential !!!!");
+            $this->exts->loginFailure(1);
+        } elseif (stripos(strtolower($this->exts->extract('div.s-banner__column--content  div.s-banner__supporting-text')), 'Sie haben Ihr Passwort mehrfach falsch eingegeben. Ihr Konto haben wir deshalb aus SicherheitsgrÃ¼nden gesperrt. Bitte erstellen Sie sich unter folgendem Link neue Zugangsdaten:') !== false) {
+            $this->exts->log("Wrong credential !!!!");
+            $this->exts->loginFailure(1);
+        } elseif (stripos(strtolower($this->exts->extract('div[class="s-banner__wrapper"] div.s-banner__supporting-text')), 'Ihr Zugang ist gesperrt. Bitte erstellen Sie sich unter folgendem Link neue Zugangsdaten:') !== false) {
+            $this->exts->log("Wrong credential !!!!");
+            $this->exts->loginFailure(1);
+        } 
+		else {
 			$this->exts->loginFailure();
 		}
 	}
 }
 
-private function checkFillLogin() {
+private function checkFillLogin($count = 0) {
+
+	$this->exts->log("checkFillLogin". $count);
+
 	if($this->exts->getElement($this->username_selector) != null) {
 		sleep(3);
 		$this->exts->capture("2-login-page");
@@ -116,9 +129,6 @@ private function checkFillLogin() {
 
 		$this->exts->moveToElementAndClick('form s-button[variant="filled"] button');
 		sleep(10);
-		$this->exts->moveToElementAndClick($this->password_selector);
-		sleep(5);
-
 		$this->processWaitCaptcha();
 
 		$this->exts->log("Enter Password");

@@ -7,7 +7,7 @@ public $loginUrl = "https://www.autoscout24.de/entry/auth?client_id=identity-v2&
 public $username_selector = "input#email";
 public $password_selector = "input#password";
 public $submit_button_selector = "button[type='submit']";
-public $check_login_success_selector = '';
+public $check_login_success_selector = 'a[href*="profile/settings"]';
 public $login_tryout = 0;
 /**
 * Entry Method thats called for a portal
@@ -21,6 +21,8 @@ private function initPortal($count)
     $this->exts->openUrl($this->baseUrl);
 
     if (!$this->checkLogin()) {
+        $this->exts->openUrl($this->baseUrl);
+        sleep(10);
         $this->exts->waitTillPresent("button._consent-accept_1lphq_114", 5);
         if ($this->exts->exists("button._consent-accept_1lphq_114")) {
             $this->exts->click_element("button._consent-accept_1lphq_114");
@@ -29,13 +31,29 @@ private function initPortal($count)
         sleep(5);
         $this->checkfillForm();
         
-
-        $this->handleFailedLogin();
     }
     if ($this->checkLogin()) {
         $this->exts->log(">>>>>>>>>>>>>>>Login successful!!!!");
         $this->exts->capture("LoginSuccess");
         $this->exts->success();
+    }else{
+        $invalidMessageSelector = "small.error-highlight";
+        if ($this->exts->querySelector($invalidMessageSelector) != null) {
+            $this->exts->log("Invalid username or password detected!");
+            $this->exts->capture("login-failed-invalid-credentials");
+            $this->exts->loginFailure(1);
+        }elseif (stripos($this->exts->extract('div.error p b'), "Der Login war leider nicht erfolgreich.") !== false) {
+            $this->exts->log("Unfortunately, the login was not successful.");
+            $this->exts->capture("login-failed");
+            $this->exts->loginFailure(1);
+        } elseif (stripos($this->exts->extract('div.error p b'), "Unfortunately, the login was not successful.") !== false) {
+            $this->exts->log("Unfortunately, the login was not successful.");
+            $this->exts->capture("login-failed");
+            $this->exts->loginFailure(1);
+        } else {
+            $this->exts->log("Login failed due to unknown reasons.");
+            $this->exts->loginFailure();
+        }
     }
 }
 
@@ -116,7 +134,8 @@ function checkLogin()
     $this->exts->log("Begin checkLogin ");
     $isLoggedIn = false;
     try {
-        $this->exts->waitTillPresent($this->check_login_success_selector, 5);
+        $this->exts->openUrl('https://www.autoscout24.de/account');
+        $this->exts->waitTillPresent($this->check_login_success_selector);
         if ($this->exts->exists($this->check_login_success_selector)) {
 
             $this->exts->log(">>>>>>>>>>>>>>>Login successful!!!!");
@@ -140,34 +159,6 @@ function checkLogin()
 
     return $isLoggedIn;
 }
-
-function handleFailedLogin()
-{
-    $this->exts->log("Begin handleFailedLogin");
-    try {
-        $invalidMessageSelector = "small.error-highlight";
-
-        if ($this->exts->querySelector($invalidMessageSelector) != null) {
-            $this->exts->log("Invalid username or password detected!");
-            $this->exts->capture("login-failed-invalid-credentials");
-            $this->exts->loginFailure(1);
-        }elseif (stripos($this->exts->extract('div.error p b'), "Der Login war leider nicht erfolgreich.") !== false) {
-            $this->exts->log("Unfortunately, the login was not successful.");
-            $this->exts->capture("login-failed");
-            $this->exts->loginFailure(1);
-        } elseif (stripos($this->exts->extract('div.error p b'), "Unfortunately, the login was not successful.") !== false) {
-            $this->exts->log("Unfortunately, the login was not successful.");
-            $this->exts->capture("login-failed");
-            $this->exts->loginFailure(1);
-        } else {
-            $this->exts->log("Login failed due to unknown reasons.");
-            $this->exts->loginFailure();
-        }
-    } catch (\Exception $exception) {
-        $this->exts->log("Exception in handleFailedLogin: " . $exception->getMessage());
-    }
-}
-
 private function checkFillRecaptcha($count = 1)
 {
     $this->exts->log(__FUNCTION__);

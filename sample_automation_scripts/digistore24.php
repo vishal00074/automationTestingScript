@@ -391,6 +391,10 @@ private function doAfterLogin() {
 		$this->exts->capture("login-failed-after-2fa");
 		$this->exts->log(__FUNCTION__.'::Use login failed');
 		$this->exts->log(__FUNCTION__.'::Last URL: '. $this->exts->getUrl());
+
+
+		$isTwoFAError = $this->exts->execute_javascript('document.body.innerHTML.includes("The code is incorrect. Please enter the code from your authenticator app.")');
+		$this->exts->log('isTwoFAError '. $isTwoFAError);
 		if($this->exts->exists('iframe.login-iframe')){
 			$this->switchToFrame('iframe.login-iframe');
 		}
