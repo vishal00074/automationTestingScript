@@ -9,7 +9,7 @@ public $invoicePageUrl = '';
 public $username_selector = 's-text-field input[type="email"],form#formZentralDataLogin input[name="TXT_B_KENNUNG"], input[name*="username-input"],input[name*="username"]';
 public $password_selector = 'form#formZentralDataLogin input[name="TXT_PIN"], input[name*="password"]';
 public $remember_me_selector = '';
-public $submit_login_selector = 'form#formZentralDataLogin a.genButton[name="weiter"],  form button[title*="Weiter"],  form button[title*="button__button"]';
+public $submit_login_selector = 'button[type="submit"][class="s-button__button"]';
 
 public $check_login_failed_selector = '.message--error div.message__message';
 public $check_login_success_selector = 'div.s-menu__menu [name="logout"]';
@@ -264,10 +264,11 @@ private function doAfterLogin() {
 	sleep(10);
 	
 	//Download document from mailbox;
-	$this->exts->moveToElementAndClick('[class*="-meinehuk"], div.s-menu__activator a[href="/"]');
-	sleep(1);
+	// $this->exts->moveToElementAndClick('[class*="-meinehuk"], div.s-menu__activator a[href="/"]');
+	// sleep(1);
 	
-	$this->exts->moveToElementAndClick('#meinehuk a[href="/start_postfach.do"], #meinehuk a[href*="/postfach"], .s-menu__menu a[href*="/postfach"], [class*=cardlink][href*="meine-huk"]');
+	// $this->exts->moveToElementAndClick('#meinehuk a[href="/start_postfach.do"], #meinehuk a[href*="/postfach"], .s-menu__menu a[href*="/postfach"], [class*=cardlink][href*="meine-huk"]');
+	$this->exts->openUrl('https://www.huk.de/meine-huk/postfach/');
 	sleep(15);
 	
 	$this->procecssMailBox();
@@ -467,19 +468,6 @@ public function procecssMailBox() {
 			} else {
 				$this->exts->log(__FUNCTION__.'::No download '.$invoice['invoiceName']);
 			}
-
-			// if(!$this->exts->invoice_exists($invoice['invoiceName'])) {
-			// 	//We don't need to pass invoicefilename here because we want the same file name as website provide when get downloaded.
-			// 	$downloaded_file = $this->exts->direct_download($invoice['invoiceUrl'], 'pdf', '');
-			// 	if (trim($downloaded_file) != '' && file_exists($downloaded_file)) {
-			// 		$this->exts->new_invoice($invoice['invoiceName'], $invoice['invoiceDate'], $invoice['invoiceAmount'], $downloaded_file);
-			// 		sleep(1);
-			// 	} else {
-			// 		$this->exts->log(__FUNCTION__.'::No download '.$invoiceFileName);
-			// 	}
-			// } else {
-			// 	$this->exts->log(__FUNCTION__.'::Invoice already exists '.$invoiceFileName);
-			// }
 		}
 	}
 }
