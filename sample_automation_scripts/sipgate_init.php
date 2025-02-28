@@ -92,9 +92,9 @@ private function initPortal($count) {
 
 		if($this->checkLogin()) {
 			$this->exts->capture("LoginSuccess-if");
-
+			
 			if (!empty($this->exts->config_array['allow_login_success_request'])) {
-
+ 
 				$this->exts->triggerLoginSuccess();
 			}
 
@@ -113,22 +113,10 @@ private function initPortal($count) {
 	} else {
 		$this->exts->capture("LoginSuccess-else");
 		
-		if(stripos($this->exts->getUrl(), "secure.live.sipgate.de/settings/products/change") !== FALSE) {
-			$this->exts->account_not_ready();
-		} else if (strpos($this->exts->getUrl(), 'clinq.app') !== false) {
-			$this->invoicePage();
-		} else {
-			$curent_w = explode('/',
-				end(explode('sipgate.com/', $this->exts->getUrl()))
-			)[0];
-			$this->afterLoginUrl = 'https://app.sipgate.com/'.$curent_w.'/connections/phonelines/p0';
-			sleep(10);
-			$this->exts->openUrl($this->afterLoginUrl);
-			sleep(5);
-			
-			$this->processAfterLogin(0);
-		}
-		$this->exts->success();
+		if (!empty($this->exts->config_array['allow_login_success_request'])) {
+ 
+            $this->exts->triggerLoginSuccess();
+        }
 	}
 }
 
@@ -202,7 +190,7 @@ function fillForm($count){
 				sleep(5);
 				$isErrorPassMessage = $this->exts->execute_javascript('document.body.innerHTML.includes("Invalid password.")');
 				$this->exts->log('isErrorPassMessage:' . $isErrorPassMessage);
-				if (!$isErrorPassMessage) {
+				if (!$isErrorPassMessage && !$this->checkLogin()) {
 					$this->findPasswordPage('input[name="emailCode"]');
 				}
 				

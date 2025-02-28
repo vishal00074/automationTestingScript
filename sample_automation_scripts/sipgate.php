@@ -1,4 +1,4 @@
-<?php //migrated and updated login code // updated login code // optimize code // update login failure code
+<?php //migrated and updated login code // updated login code // optimize code // update login failure code 
 // Server-Portal-ID: 3179 - Last modified: 27.01.2025 13:48:07 UTC - User: 1
 
 public $baseUrl = "https://login.sipgate.com/";
@@ -216,7 +216,7 @@ function fillForm($count){
 				sleep(5);
 				$isErrorPassMessage = $this->exts->execute_javascript('document.body.innerHTML.includes("Invalid password.")');
 				$this->exts->log('isErrorPassMessage:' . $isErrorPassMessage);
-				if (!$isErrorPassMessage) {
+				if (!$isErrorPassMessage && !$this->checkLogin()) {
 					$this->findPasswordPage('input[name="emailCode"]');
 				}
 				
