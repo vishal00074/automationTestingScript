@@ -756,11 +756,14 @@ private function processInvoicesLatest($paging_count = 1)
 	foreach ($rows as $row) {
 		if ($this->exts->querySelector('td:nth-child(7) button', $row) != null) {
 			$invoiceUrl = '';
-			$invoiceName = $this->exts->extract('td:nth-child(4)', $row);
+			$invoiceName = 'sipgate-invoice-'. $this->exts->extract('td:nth-child(4)', $row);
 			$invoiceAmount =  $this->exts->extract('td:nth-child(6)', $row);
 			$invoiceDate =  $this->exts->extract('td:nth-child(2)', $row);
 
+
 			$downloadBtn = $this->exts->querySelector('td:nth-child(7) button', $row);
+
+			
 
 			array_push($invoices, array(
 				'invoiceName' => $invoiceName,
@@ -786,9 +789,16 @@ private function processInvoicesLatest($paging_count = 1)
 		$invoice['invoiceDate'] = $this->exts->parse_date($invoice['invoiceDate'], 'd. F Y', 'Y-m-d');
 		$this->exts->log('Date parsed: ' . $invoice['invoiceDate']);
 
-		// $downloaded_file = $this->exts->direct_download($invoice['invoiceUrl'], 'pdf', $invoiceFileName);
-		$downloaded_file = $this->exts->click_and_download($invoice['downloadBtn'], 'pdf', $invoiceFileName);
+		
+		// Exception case in button
+		$downloadedFileExcep = $this->exts->click_and_download($invoice['downloadBtn'], 'pdf', $invoiceFileName);
+		sleep(7);
+		if($this->exts->exists('button[aria-label="Neu ausstellen"]')){
+			$this->exts->moveToElementAndClick('button[aria-label="Neu ausstellen"]');
+			sleep(5);
+		}
 
+		$downloaded_file = $this->exts->click_and_download($invoice['downloadBtn'], 'pdf', $invoiceFileName);
 		if (trim($downloaded_file) != '' && file_exists($downloaded_file)) {
 			$this->exts->new_invoice($invoice['invoiceName'], $invoice['invoiceDate'], $invoice['invoiceAmount'], $invoiceFileName);
 			sleep(1);
