@@ -1,4 +1,4 @@
-<?php
+<?php // optimized
 // Server-Portal-ID: 185148 - Last modified: 20.02.2025 02:43:11 UTC - User: 1
 
 public $baseUrl = 'https://portal.klarna.com/';
@@ -21,7 +21,7 @@ private function initPortal($count) {
 	$this->exts->log('Begin initPortal '.$count);   
 	$this->only_monthly_statements = isset($this->exts->config_array["only_monthly_statements"]) ? (int)@$this->exts->config_array["only_monthly_statements"] : $this->only_monthly_statements; 
 	$this->exts->openUrl($this->baseUrl);
-	sleep(1);
+	sleep(10);
 
 	// Load cookies
 	$this->exts->loadCookiesFromFile();
@@ -33,7 +33,7 @@ private function initPortal($count) {
 	// If user hase not logged in from cookie, clear cookie, open the login url and do login
 	if($this->exts->getElement($this->check_login_success_selector) == null) {
 		$this->exts->log('NOT logged via cookie');
-		// $this->exts->clearCookies();
+		$this->exts->clearCookies();
 		$this->exts->openUrl($this->baseUrl);
 		sleep(10);
 		for ($i=0; $i < 5; $i++) { 
