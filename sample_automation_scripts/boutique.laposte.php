@@ -103,7 +103,6 @@ private function checkFillLogin() {
 			$this->exts->moveToElementAndClick($this->remember_me_selector);
 		sleep(2);
 
-		// $this->checkFillHcaptcha(0);
 		$this->exts->waitTillPresent('input#li-antibot-token');
 		if ($this->exts->exists('input#li-antibot-token')) {
 			$this->exts->execute_javascript("document.querySelector('input#li-antibot-token').value = 'eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJyZXF1ZXN0SWQiOiI4M2IxOTMxM2IwOWU0YzQzYWQxYzkwOWRlZGIzYTA3MCIsImludmlzaWJsZUNhcHRjaGFJZCI6IjMyYTI2NGNjLThkZmYtNDNmNS1iMTQ2LTVjYmMzN2MwN2ExMCIsImFudGlib3RJZCI6ImQyNzE1NjUwMjk0OTQ4MjJhNDQ1ZWQxYTY1NjhkZWUzIiwiYW50aWJvdE1ldGhvZCI6IkNBUFRDSEEiLCJleHAiOjE3Mzc1MzEwMjgsImlhdCI6MTczNzUzMDcyOCwiY2FwdGNoYUlkIjoiYzk5Y2ZjMWEzMDZlNDg4YjllZTM1ODBlY2U5YmQyYTkifQ.QpzZ52-c6fDmKGfhgAOHMxGMrXmRk_ofpIZ3xkPjqiQ';");
@@ -113,63 +112,14 @@ private function checkFillLogin() {
 		$this->exts->moveToElementAndClick($this->submit_login_selector);
 		sleep(15);
 
-		// $this->checkFillHcaptcha(1);
-		$this->exts->waitTillPresent('input#li-antibot-token');
-		if ($this->exts->exists('input#li-antibot-token')) {
-			$this->exts->execute_javascript("document.querySelector('input#li-antibot-token').value = 'eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJyZXF1ZXN0SWQiOiI4M2IxOTMxM2IwOWU0YzQzYWQxYzkwOWRlZGIzYTA3MCIsImludmlzaWJsZUNhcHRjaGFJZCI6IjMyYTI2NGNjLThkZmYtNDNmNS1iMTQ2LTVjYmMzN2MwN2ExMCIsImFudGlib3RJZCI6ImQyNzE1NjUwMjk0OTQ4MjJhNDQ1ZWQxYTY1NjhkZWUzIiwiYW50aWJvdE1ldGhvZCI6IkNBUFRDSEEiLCJleHAiOjE3Mzc1MzEwMjgsImlhdCI6MTczNzUzMDcyOCwiY2FwdGNoYUlkIjoiYzk5Y2ZjMWEzMDZlNDg4YjllZTM1ODBlY2U5YmQyYTkifQ.QpzZ52-c6fDmKGfhgAOHMxGMrXmRk_ofpIZ3xkPjqiQ';");
-		}
 
-		if ($this->exts->urlContains('faviconLaposte.ico')) $this->exts->openUrl($this->invoicePageUrl);
+		if ($this->exts->urlContains('faviconLaposte.ico')){
+			$this->exts->openUrl($this->invoicePageUrl);
+		} 
 		
 	} else {
 		$this->exts->log(__FUNCTION__.'::Login page not found');
 		$this->exts->capture("2-login-page-not-found");
-	}
-}
-
-function checkFillHcaptcha($count = 0){
-	$hcaptcha_iframe_selector = 'iframe[src*="hcaptcha"]';
-	if ($this->exts->exists($hcaptcha_iframe_selector)) {
-		$iframeUrl = $this->exts->extract($hcaptcha_iframe_selector, null, 'src');
-		$data_siteKey =  explode('&', end(explode("&sitekey=", $iframeUrl)))[0];
-		$jsonRes = $this->exts->processHumanCaptcha("", $data_siteKey, $this->exts->getUrl(), false);
-		$captchaScript = '
-	function submitToken(token) {
-		document.querySelector("[name=g-recaptcha-response]").innerText = token;
-		document.querySelector("[name=h-captcha-response]").innerText = token;   
-		iframe = document.querySelector("iframe[src*=\"hcaptcha\"]");
-		iframe.removeAttribute("style"); 
-		var att = document.createAttribute("style");
-		att.value = "display: block;";
-		iframe.setAttributeNode(att); 
-		
-		iframe.removeAttribute("data-hcaptcha-response");
-		var att = document.createAttribute("data-hcaptcha-response");
-		att.value = token;
-		iframe.setAttributeNode(att);  
-		document.getElementById("submit").remove();
-	}
-	submitToken(arguments[0]);
-	';
-	// .data-hcaptcha-response = token;
-	
-
-		$params = array($jsonRes);
-		$this->exts->executeSafeScript($captchaScript, $params);
-		
-		$this->exts->log($this->exts->extract('iframe[src*="hcaptcha"]', null, 'data-hcaptcha-response'));
-		sleep(15);
-		// $this->exts->moveToElementAndClick('form#formConnect input#authentificationEnvoyer, #login-form #submit');
-		if ($this->exts->exists('div#login-form form.form')) {
-			$this->exts->executeSafeScript('document.getElementsByClassName("form")[1].submit();');
-		} else {
-			$this->exts->moveToElementAndClick('form#formConnect input#authentificationEnvoyer, #login-form #submit');
-		}
-		sleep(2);
-		$this->exts->switchToDefault();
-		// if ($this->exts->exists($this->username_selector)) {
-		// 	$this->exts->moveToElementAndClick('form#formConnect input#authentificationEnvoyer, #login-form #submit');
-		// }
 	}
 }
 
