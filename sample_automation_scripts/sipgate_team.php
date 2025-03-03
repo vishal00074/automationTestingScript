@@ -1,4 +1,4 @@
-<?php // updated login code
+<?php // updated login and download code
 // Server-Portal-ID: 311 - Last modified: 26.02.2025 14:33:52 UTC - User: 1
 
 public $baseUrl = "https://login.sipgate.com/";

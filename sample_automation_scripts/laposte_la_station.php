@@ -109,7 +109,9 @@ function fillForm($count)
                 $this->exts->click_element($this->submit_login_selector);
             }
             sleep(5);
-
+            $this->exts->capture("username-page-filled");
+        }
+        if ($this->exts->querySelector($this->password_selector) != null) { 
             $this->exts->log("Enter Password");
             $this->exts->moveToElementAndType($this->password_selector, $this->password);
 
