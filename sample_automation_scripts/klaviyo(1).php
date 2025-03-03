@@ -21,8 +21,8 @@ private function initPortal($count)
 {
 
     $this->exts->log('Begin initPortal ' . $count);
-    $this->exts->loadCookiesFromFile();
     $this->exts->openUrl($this->loginUrl);
+    $this->exts->loadCookiesFromFile();
     if (!$this->checkLogin()) {
         $this->exts->log('NOT logged via cookie');
         $this->exts->clearCookies();
