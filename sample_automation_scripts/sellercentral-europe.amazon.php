@@ -122,13 +122,19 @@ private function initPortal($count)
         $this->exts->capture("3-login-success");
 
         // country picker
-        try {
-            $this->exts->execute_javascript('document.querySelectorAll("button.full-page-account-switcher-account-details")[document.querySelectorAll("button.full-page-account-switcher-account-details").length - 1]?.click();');
-            sleep(4);
-        } catch (\Exception $exception) {
-            $this->exts->log('Error: '.  $exception->getMessage());
+        if ($this->exts->exists('button.full-page-account-switcher-account-details')) {
+            $countrySelectorButtons = $this->exts->getElements('button.full-page-account-switcher-account-details');
+            try {
+                $countrySelectorButtons[count($countrySelectorButtons) - 2]->click();
+            } catch (\Exception $exception) {
+                $this->exts->execute_javascript('arguments[0].click();', [$countrySelectorButtons[count($countrySelectorButtons) - 2]]);
+            }
+            sleep(1);
+            if ($this->exts->exists('button[class*="kat-button"]:not([disabled])')) {
+                $this->exts->moveToElementAndClick('button[class*="kat-button"]:not([disabled])');
+                sleep(10);
+            }
         }
-        $this->exts->execute_javascript('document.querySelector("button[class*="kat-button"]")?.click();');
 
         if ($this->exts->exists('.picker-app .picker-item-column button.picker-button')) {
             $totalSelectorButtons = $this->exts->getElements('.picker-app .picker-item-column button.picker-button');
