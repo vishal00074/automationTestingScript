@@ -1,4 +1,4 @@
-<?php // migrated and update download code // updated login failure code and download code
+<?php // migrated and update download code // updated login failure code and download code // updated login code
 // Server-Portal-ID: 156697 - Last modified: 22.08.2024 14:42:23 UTC - User: 1
 
 /*Define constants used in script*/
@@ -120,6 +120,16 @@ private function initPortal($count)
         sleep(3);
         $this->exts->log(__FUNCTION__ . '::User logged in');
         $this->exts->capture("3-login-success");
+
+        // country picker
+        try {
+            $this->exts->execute_javascript('document.querySelectorAll("button.full-page-account-switcher-account-details")[document.querySelectorAll("button.full-page-account-switcher-account-details").length - 1]?.click();');
+            sleep(4);
+        } catch (\Exception $exception) {
+            $this->exts->log('Error: '.  $exception->getMessage());
+        }
+        $this->exts->execute_javascript('document.querySelector("button[class*="kat-button"]")?.click();');
+
         if ($this->exts->exists('.picker-app .picker-item-column button.picker-button')) {
             $totalSelectorButtons = $this->exts->getElements('.picker-app .picker-item-column button.picker-button');
             try {
@@ -308,7 +318,14 @@ private function captcha_required()
     return false;
 }
 private function isLoginSuccess()
-{
+{  
+    if($this->exts->execute_javascript('document.body.innerHTML.includes("/gp/sign-in/logout.html");')){
+        return true;
+    }
+    if($this->exts->execute_javascript('document.body.innerHTML.includes("/sign-out");')){
+        return true;
+    }
+    
     return $this->exts->exists('.nav-right-section [data-test-tag="nav-settings-button"], li.sc-logout-quicklink, .sc-header #partner-switcher button.dropdown-button, #sc-quicklinks #sc-quicklink-logout, .authenticated-header a[href*="/logout.html"], .picker-app .picker-item-column button.picker-button') && !$this->exts->exists($this->password_selector);
 }
 
