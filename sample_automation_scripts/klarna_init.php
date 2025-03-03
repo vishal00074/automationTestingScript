@@ -1,6 +1,3 @@
-<?php // optimized updated
-// Server-Portal-ID: 185148 - Last modified: 20.02.2025 02:43:11 UTC - User: 1
-
 public $baseUrl = 'https://portal.klarna.com/';
 public $invoicePageUrl = 'https://portal.klarna.com/settlements/reports';
 public $username_selector = 'form#login input#username';
@@ -85,47 +82,12 @@ private function initPortal($count) {
 		sleep(3);
 		$this->exts->log(__FUNCTION__.'::User logged in');
 		$this->exts->capture("3-login-success");
-		if($this->exts->exists('button#onetrust-accept-btn-handler')){
-			$this->exts->moveToElementAndClick('button#onetrust-accept-btn-handler');
-			sleep(5);
+
+		if (!empty($this->exts->config_array['allow_login_success_request'])) {
+
+			$this->exts->triggerLoginSuccess();
 		}
-		$this->exts->openUrl($this->invoicePageUrl);
-		sleep(5);
-		if ($this->exts->exists('div#regional-landing-page input[value="EU"]')) {
-			$this->exts->moveToElementAndClick('div#regional-landing-page input[value="EU"]');
-			$this->exts->moveToElementAndClick('div#regional-landing-page button');
-			sleep(5);
-		}
-		// Open invoices url and download invoice
-		if($this->only_monthly_statements == 1){
-			$startDate = date('Y-m-01');
-			$endDate = date('Y-m-d');
-			$invoicePageUrl = 'https://portal.klarna.com/settlements/reports?start_date='.$startDate.'&end_date='.$endDate.'&merchant_id=All&currency=EUR';
-			$this->exts->openUrl($invoicePageUrl);
-			$this->processInvoicesOnlyMonthly();
-		} else {
-			if($this->exts->config_array["restrictPages"] == '0'){
-				$startDate = date('Y-m-d', strtotime('-4 years'));
-				$endDate = date('Y-m-d');
-				$invoicePageUrl = 'https://portal.klarna.com/settlements/reports?start_date='.$startDate.'&end_date='.$endDate.'&merchant_id=All&currency=EUR';
-				$this->exts->openUrl($invoicePageUrl);
-			} else{
-				$this->exts->openUrl($this->invoicePageUrl);
-			}
-			
-			sleep(15);
-			if($this->exts->exists('button#onetrust-accept-btn-handler')) {
-				$this->exts->moveToElementAndClick('button#onetrust-accept-btn-handler');
-				sleep(1);
-			}
-			$this->processInvoices();
-		}
-		
-		// Final, check no invoice
-		if($this->isNoInvoice){
-			$this->exts->no_invoice();
-		}
-		$this->exts->success();
+
 	} else {
 		$this->exts->log(__FUNCTION__.'::Use login failed');
 		$this->exts->log(__FUNCTION__.'::Last URL: '. $this->exts->getUrl());
@@ -313,78 +275,5 @@ private function checkFillRecaptcha($count = 1)
 		}
 	} else {
 		$this->exts->log(__FUNCTION__ . '::Not found reCaptcha');
-	}
-}
-
-private function processInvoices($paging_count=1) {
-	sleep(5);
-	$this->exts->capture("4-invoices-page");
-
-	$rows_count = count($this->exts->getElements('div#settlements-page div[data-payment-reference]'));
-	for ($i=0; $i < $rows_count; $i++) { 
-		$row = $this->exts->getElements('div#settlements-page div[data-payment-reference]')[$i];
-		$download_button = $this->exts->getElement('.//form[contains(@action, "/download")]//a[contains(text(),"PDF")]', $row, 'xpath');
-		if($download_button != null) {
-			$action = $this->exts->extract('form[action*="/download/"]', $row, 'action');
-			$temps = explode('/download/', $action);
-			$invoiceName = end($temps);
-			$invoiceDate = '';
-			$invoiceAmount = '';
-			$invoiceFileName = $invoiceName.'.pdf';
-
-			$this->exts->log('invoiceName: '.$invoiceName);
-			$this->exts->log('invoiceDate: '.$invoiceDate);
-			$this->exts->log('invoiceAmount: '.$invoiceAmount);
-
-			if($this->exts->invoice_exists($invoiceName)){
-				$this->exts->log('Invoice existed '.$invoiceFileName);
-			} else {
-				try{
-					$this->exts->log(__FUNCTION__.' trigger click.');
-					$download_button->getLocationOnScreenOnceScrolledIntoView();
-					$download_button->click();
-				} catch(\Exception $exception){
-					$this->exts->log(__FUNCTION__.' by javascript' . $exception);
-					$this->exts->execute_javascript("arguments[0].click()", [$download_button]);
-				}
-				sleep(3);
-				$this->exts->wait_and_check_download('pdf');
-				$downloaded_file = $this->exts->find_saved_file('pdf', $invoiceFileName);
-				if(trim($downloaded_file) != '' && file_exists($downloaded_file)){
-					$this->exts->new_invoice($invoiceName, $invoiceDate, $invoiceAmount, $downloaded_file);
-				} else {
-					$this->exts->log(__FUNCTION__.'::No download '.$invoiceFileName);
-				}
-			}
-			$this->isNoInvoice = false;
-		}
-	}
-
-
-	if($this->exts->config_array["restrictPages"] == '0' && $this->exts->exists('button[data-testid="mpui_pagination_next"]:not([disabled])') && $paging_count < 100){
-		$this->exts->moveToElementAndClick('button[data-testid="mpui_pagination_next"]:not([disabled])');
-		sleep(10);
-		$paging_count++;
-		$this->processInvoices($paging_count);
-	}
-}
-
-private function processInvoicesOnlyMonthly() {
-	sleep(15);
-	$this->exts->capture("4-invoices-page-only-month");
-	
-	if($this->exts->exists('button#BatchReportButtonGroup__download-pdf__button')){
-		$invoiceName = date('Y-m').'-only-month-statement';
-		$invoiceFileName = $invoiceName.'.pdf';
-		$this->isNoInvoice = false;
-		$this->exts->moveToElementAndClick('button#BatchReportButtonGroup__download-pdf__button');
-		sleep(5);
-		$this->exts->wait_and_check_download('pdf');
-		$downloaded_file = $this->exts->find_saved_file('pdf', $invoiceFileName);
-		if(trim($downloaded_file) != '' && file_exists($downloaded_file)){
-			$this->exts->new_invoice($invoiceName, '', '', $downloaded_file);
-		} else {
-			$this->exts->log(__FUNCTION__.'::No download '.$invoiceFileName);
-		}
 	}
 }
