@@ -60,6 +60,13 @@ private function initPortal($count) {
 		// Open invoices url and download invoice
 		$this->exts->openUrl($this->invoicePageUrl);
 		sleep(10);
+
+		if($this->exts->exists('input#otpCode')){
+			$this->checkFillTwoFactor();
+			sleep(10);
+		}
+
+		
 		$this->exts->moveToElementAndClick('#footer_tc_privacy_button');
 		// $dateTo = date('d/m/Y');
 		// $dateFrom = date('d/m/Y',strtotime('-1 years'));
@@ -70,11 +77,11 @@ private function initPortal($count) {
 		// $this->exts->moveToElementAndClick('.btn-send-minor input[type="submit"]');
 		//$this->exts->executeSafeScript('document.getElementById("formSearchCommandesByDates").submit();');
 		$this->processInvoices();
-		
-		// Final, check no invoice
-		if($this->isNoInvoice){
-			$this->exts->no_invoice();
+
+		if ($this->exts->exists('input#otpCode')) {
+			$this->exts->no_permission();
 		}
+		
 		$this->exts->success();
 	} else {
 		$this->exts->log(__FUNCTION__.'::Use login failed');
@@ -122,6 +129,58 @@ private function checkFillLogin() {
 		$this->exts->capture("2-login-page-not-found");
 	}
 }
+
+
+
+private function checkFillTwoFactor()
+{
+    $two_factor_selector = 'input#otpCode';
+    $two_factor_message_selector = 'div[id="otp-error-message"]';
+    $two_factor_submit_selector = 'input#submit:not([disabled])';
+
+    $this->exts->waitTillPresent($two_factor_selector, 10);
+    if ($this->exts->querySelector($two_factor_selector) != null && $this->exts->two_factor_attempts < 3) {
+        $this->exts->log("Two factor page found.");
+        $this->exts->capture("2.1-two-factor");
+        if ($this->exts->getElement($two_factor_message_selector) != null) {
+            $this->exts->two_factor_notif_msg_en = $this->exts->extract($two_factor_message_selector);
+            $this->exts->two_factor_notif_msg_en = trim($this->exts->two_factor_notif_msg_en);
+            $this->exts->two_factor_notif_msg_de = $this->exts->two_factor_notif_msg_en;
+            $this->exts->log("Message:\n" . $this->exts->two_factor_notif_msg_en);
+        }
+        if ($this->exts->two_factor_attempts == 2) {
+            $this->exts->two_factor_notif_msg_en = $this->exts->two_factor_notif_msg_en . ' ' . $this->exts->two_factor_notif_msg_retry_en;
+            $this->exts->two_factor_notif_msg_de = $this->exts->two_factor_notif_msg_de . ' ' . $this->exts->two_factor_notif_msg_retry_de;
+        }
+        $two_factor_code = trim($this->exts->fetchTwoFactorCode());
+        if (!empty($two_factor_code) && trim($two_factor_code) != '') {
+            $this->exts->log("checkFillTwoFactor: Entering two_factor_code." . $two_factor_code);
+            $this->exts->click_by_xdotool($two_factor_selector);
+            sleep(2);
+            $this->exts->type_text_by_xdotool($two_factor_code);
+
+            $this->exts->log("checkFillTwoFactor: Clicking submit button.");
+            sleep(3);
+            $this->exts->capture("2.2-two-factor-filled-" . $this->exts->two_factor_attempts);
+
+
+            $this->exts->click_by_xdotool($two_factor_submit_selector);
+            $this->exts->waitTillPresent($two_factor_selector);
+            if ($this->exts->querySelector($two_factor_selector) == null) {
+                $this->exts->log("Two factor solved");
+            } else if ($this->exts->two_factor_attempts < 3) {
+                $this->exts->two_factor_attempts++;
+                $this->checkFillTwoFactor();
+            } else {
+                $this->exts->log("Two factor can not solved");
+            }
+        } else {
+            $this->exts->log("Not received two factor code");
+        }
+    }
+}
+
+
 
 private function processInvoices($paging_count=1) {
 	sleep(20);

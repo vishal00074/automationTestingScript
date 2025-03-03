@@ -31,7 +31,7 @@ private function initPortal($count) {
 	$this->exts->capture('1-init-page');
 
 	// If user hase not logged in from cookie, clear cookie, open the login url and do login
-	if($this->exts->getElementByCssSelector($this->check_login_success_selector) == null) {
+	if($this->exts->getElement($this->check_login_success_selector) == null) {
 		$this->exts->log('NOT logged via cookie');
 		$this->exts->clearCookies();
 		$this->exts->openUrl($this->loginUrl);
@@ -52,7 +52,7 @@ private function initPortal($count) {
 		$this->checkFillLogin();
 		sleep(20);
 	}
-	if($this->exts->getElementByCssSelector($this->check_login_success_selector) != null) {
+	if($this->exts->getElement($this->check_login_success_selector) != null) {
 		sleep(3);
 		$this->exts->log(__FUNCTION__.'::User logged in');
 		$this->exts->capture("3-login-success");
@@ -78,7 +78,7 @@ private function initPortal($count) {
 		$this->exts->success();
 	} else {
 		$this->exts->log(__FUNCTION__.'::Use login failed');
-		if($this->exts->getElementByCssSelector($this->check_login_failed_selector) != null) {
+		if($this->exts->getElement($this->check_login_failed_selector) != null) {
 			$this->exts->loginFailure(1);
 		} else {
 			$this->exts->loginFailure();
@@ -87,7 +87,7 @@ private function initPortal($count) {
 }
 
 private function checkFillLogin() {
-	if($this->exts->getElementByCssSelector($this->password_selector) != null) {
+	if($this->exts->getElement($this->password_selector) != null) {
 		sleep(3);
 		$this->exts->capture("2-login-page");
 
@@ -170,13 +170,13 @@ private function processInvoices($paging_count=1) {
 	$this->exts->capture("4-invoices-page");
 	$invoices = [];
 
-	$rows = $this->exts->getElementsByCssSelector('div#commands-container ul.command');
+	$rows = $this->exts->getElements('div#commands-container ul.command');
 	foreach ($rows as $row) {
-		if($this->exts->getElementByCssSelector('a[href*="commande-detail/"]', $row) != null) {
-			$invoiceUrl = $this->exts->getElementByCssSelector('a[href*="commande-detail/"]', $row)->getAttribute("href");
+		if($this->exts->getElement('a[href*="commande-detail/"]', $row) != null) {
+			$invoiceUrl = $this->exts->getElement('a[href*="commande-detail/"]', $row)->getAttribute("href");
 			$invoiceName = end(explode('/', $invoiceUrl));
-			$invoiceDate = trim(end(explode('du', trim($this->exts->getElementByCssSelector('.date-commande', $row)->getText()))));
-			$invoiceAmount = end(explode(':', trim($this->exts->getElementByCssSelector('.command-price', $row)->getText())));
+			$invoiceDate = trim(end(explode('du', trim($this->exts->getElement('.date-commande', $row)->getText()))));
+			$invoiceAmount = end(explode(':', trim($this->exts->getElement('.command-price', $row)->getText())));
 			$invoiceAmount = trim(preg_replace('/[^\d\.\,]/', '', $invoiceAmount)) . ' EUR';
 			
 			array_push($invoices, array(
@@ -219,9 +219,9 @@ private function processInvoices($paging_count=1) {
 	$this->exts->capture("4-new-invoices-page");
 	$invoices = [];
 
-	$rows_len = count($this->exts->getElementsByCssSelector('li[id*="-product-"]'));
+	$rows_len = count($this->exts->getElements('li[id*="-product-"]'));
 	for ($i = 0; $i < $rows_len; $i++) {
-		$row = $this->exts->getElementsByCssSelector('li[id*="-product-"]')[$i];
+		$row = $this->exts->getElements('li[id*="-product-"]')[$i];
 		try{
 			$this->exts->log('Click download button');
 			$row->click();
@@ -269,7 +269,7 @@ private function processInvoices($paging_count=1) {
 	$restrictPages = isset($this->exts->config_array["restrictPages"]) ? (int)@$this->exts->config_array["restrictPages"] : 3;
 	if($restrictPages == 0 &&
 		$paging_count < 50 &&
-		$this->exts->getElementByCssSelector('a.pagi-previous') != null
+		$this->exts->getElement('a.pagi-previous') != null
 	){
 		$paging_count++;
 		$this->exts->moveToElementAndClick('a.pagi-previous');
