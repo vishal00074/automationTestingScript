@@ -33,6 +33,8 @@ private function initPortal($count) {
 	// If user hase not logged in from cookie, clear cookie, open the login url and do login
 	if(!$this->exts->exists($this->check_login_success_selector)) {
 		$this->exts->log('NOT logged via cookie');
+        $this->exts->clearCookies();
+
         $this->exts->openUrl($this->baseUrl);
         sleep(10);
 		$this->exts->moveToElementAndClick('button[id="login-button"]');
@@ -46,7 +48,6 @@ private function initPortal($count) {
 	
 		sleep(5);
 		
-		$this->exts->capture("loadform-timeout");
 		if($this->exts->waitTillPresent($this->username_selector)){
 			$this->checkFillLogin();
 			
