@@ -1,4 +1,4 @@
-<?php // migrated and updated login code
+<?php // migrated and updated login code // stuck in 2fa input filled
 // Server-Portal-ID: 8824 - Last modified: 22.08.2023 14:32:03 UTC - User: 1
 
 /*Define constants used in script*/
