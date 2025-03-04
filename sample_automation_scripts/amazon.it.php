@@ -1,4 +1,4 @@
-<?php
+<?php // updated login code
 // Server-Portal-ID: 10252 - Last modified: 25.02.2025 12:54:23 UTC - User: 1
 
 // Script here
@@ -173,6 +173,10 @@ private function initPortal($count) {
     } else {
         $this->exts->log(__FUNCTION__.'::Use login failed');
         $this->exts->log('::URL login failure:: '.$this->exts->getUrl());
+
+        $isErrorMessage =$this->exts->execute_javascript('document.body.innerHTML.includes("Si è verificato un problema!")');
+        $this->exts->log('::isErrorMessage:: ' . $isErrorMessage);
+
         if ($this->exts->urlContains('forgotpassword/reverification')) {
             // Password reset required
             // Please set a new password for your account that you have not used elsewhere.
@@ -182,6 +186,8 @@ private function initPortal($count) {
             // Add Cell Number
             $this->exts->account_not_ready();
         } elseif($this->exts->exists($this->check_login_failed_selector)) {
+            $this->exts->loginFailure(1);
+        } elseif ($this->exts->exists($isErrorMessage)) {
             $this->exts->loginFailure(1);
         } else {
             $this->exts->loginFailure();

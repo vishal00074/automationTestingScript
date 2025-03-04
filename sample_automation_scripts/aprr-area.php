@@ -1,4 +1,4 @@
-<?php // migrated
+<?php // migrated update login and download code
 // Server-Portal-ID: 27504 - Last modified: 16.07.2024 13:39:28 UTC - User: 1
 
 /*Define constants used in script*/
@@ -6,10 +6,10 @@ public $baseUrl = 'https://espaceclient.aprr.fr/aprr/Pages/connexion.aspx';
 public $loginUrl = 'https://espaceclient.aprr.fr/aprr/Pages/connexion.aspx';
 public $invoicePageUrl = 'https://espaceclient.aprr.fr/aprr/Pages/MaConsommation/conso_factures.aspx';
 
-public $username_selector = 'form#aspnetForm input[name="ctl00$PlaceHolderMain$TextBoxLogin"], input[id*="TbxLogin"], input#username';
-public $password_selector = 'form#aspnetForm input[name="ctl00$PlaceHolderMain$TextBoxPass"], input[id*="TbxPassword"], input#password';
-public $remember_me_selector = '#ctl00_PlaceHolderMain_CheckBoxMemoriserMail';
-public $submit_login_selector = '#ctl00_PlaceHolderMain_LbnButtonConnection, a[id*="LbnButtonConnection"], input[name="login"]';
+public $username_selector = 'input[name="username"]';
+public $password_selector = 'input[name="password"]';
+public $remember_me_selector = 'input[name="rememberMe"]';
+public $submit_login_selector = 'input[type="submit"]';
 
 public $check_login_failed_selector = '.erreur_blanc, .login-pf-header ~ div div.alert.alert-error, .Messages-group.-error.-closable.js--closable ';
 public $check_login_success_selector = 'button.account-menu-link.UserLink, a[href*="/user/logout"]';
@@ -42,11 +42,8 @@ private function initPortal($count) {
 		sleep(5);
 	}
 
-	// then check user logged in or not
-	// for ($wait_count = 1; $wait_count <= 10 && $this->exts->getElement($this->check_login_success_selector) == null; $wait_count++) {
-	// 	$this->exts->log('Waiting for login...');
-	// 	sleep(5);
-	// }
+	$this->exts->waitTillPresent($this->check_login_success_selector);
+
 	if($this->exts->exists($this->check_login_success_selector)) {
 		sleep(3);
 		$this->exts->log(__FUNCTION__.'::User logged in');
