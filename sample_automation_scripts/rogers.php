@@ -1,4 +1,4 @@
-<?php // migrated
+<?php // migrated and updated login code
 // Server-Portal-ID: 8824 - Last modified: 22.08.2023 14:32:03 UTC - User: 1
 
 /*Define constants used in script*/
@@ -23,13 +23,11 @@ private function initPortal($count) {
 	$this->exts->log('Begin initPortal '.$count);
 	
 	$this->exts->openUrl($this->baseUrl);
-	sleep(20);
+	sleep(15);
 
 	// Load cookies
 	$this->exts->loadCookiesFromFile();
 	sleep(1);
-	$this->exts->openUrl($this->baseUrl);
-	sleep(20);
 	$this->exts->capture('1-init-page');
 
 	// If user hase not logged in from cookie, clear cookie, open the login url and do login
@@ -39,12 +37,16 @@ private function initPortal($count) {
 		$this->exts->openUrl($this->loginUrl);
 		sleep(15);
 		$this->checkFillLogin();
-		sleep(30);
-		if($this->exts->exists('otp-device-list button[title*="verification code in your registered email"]')){
-			$this->exts->moveToElementAndClick('otp-device-list button[title*="verification code in your registered email"]');
-			sleep(10);
-			$this->checkFillTwoFactor();
+
+		$this->exts->waitTillPresent('button[title*="email"]', 20);
+
+		if($this->exts->exists('button[title*="email"]')){
+			$this->exts->moveToElementAndClick('button[title*="email"]');
+			sleep(20);
 		}
+
+		$this->checkFillTwoFactor();
+		
 	}
 	if ($this->exts->getElement('form#phoneNumberForm') != null) {
 		$this->exts->moveToElementAndClick('button.ds-button.ds-corners.ds-pointer:not([type="submit"])');
@@ -254,7 +256,7 @@ private function checkFillTwoFactor() {
 			$this->exts->two_factor_notif_msg_de = $this->exts->two_factor_notif_msg_de .' '. $this->exts->two_factor_notif_msg_retry_de;
 		}
 
-		$two_factor_code = trim($this->exts->fetchTwoFactorCode());
+		$two_factor_code = '123456';//trim($this->exts->fetchTwoFactorCode());
 		if(!empty($two_factor_code) && trim($two_factor_code) != '') {
 			$this->exts->log("checkFillTwoFactor: Entering two_factor_code.".$two_factor_code);
 			$resultCodes = str_split($two_factor_code);
@@ -262,7 +264,7 @@ private function checkFillTwoFactor() {
 			foreach ($code_inputs as $key => $code_input) {
 				if(array_key_exists($key, $resultCodes)){
 					$this->exts->log('"checkFillTwoFactor: Entering key '. $resultCodes[$key] . 'to input #'.$key);
-					$code_input->sendKeys($resultCodes[$key]);
+					$this->exts->moveToElementAndType($code_input, $resultCodes[$key]);
 					$this->exts->capture("2.2-two-factor-filled-".$this->exts->two_factor_attempts);
 				} else {
 					$this->exts->log('"checkFillTwoFactor: Have no char for input #'.$key);

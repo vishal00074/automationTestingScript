@@ -131,7 +131,7 @@ private function processInvoices() {
 
 		$invoiceUrl = '';
 		if($invoiceLink){
-			$invoiceUrl = 'https://www.fulli.com' . $invoiceLink->getAttribute('href');
+			$invoiceUrl = $invoiceLink->getAttribute('href');
 		}
 
         preg_match('/(\d+)$/', $invoiceUrl, $matches);
