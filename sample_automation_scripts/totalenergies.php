@@ -155,6 +155,11 @@ function checkLogin()
 private function processInvoices() {
     sleep(10);
     $this->exts->waitTillPresent('table#invoiceListTable tbody tr', 30);
+
+    if(!$this->exts->exists('table#invoiceListTable')){
+        $this->exts->openUrl($this->invoicePageUrl);
+        sleep(20);
+    }
     $rows = $this->exts->querySelectorAll('table#invoiceListTable tbody tr');
 
     $this->exts->log('invoices found: ' . count($rows));

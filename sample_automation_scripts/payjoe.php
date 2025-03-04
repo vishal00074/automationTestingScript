@@ -1,7 +1,5 @@
-<?php // added download code 
-// Server-Portal-ID: 778938 - Last modified: 24.12.2024 14:08:10 UTC - User: 1
-
-/*Define constants used in script*/
+<?php  // updated  download code
+// Server-Portal-ID: 778938 - Last modified: 06.02.2025 07:04:43 UTC - User: 1
 
 public $baseUrl = 'https://login.payjoe.de/login';
 public $loginUrl = 'https://login.payjoe.de/login';
@@ -197,6 +195,7 @@ private function downloadInvoice()
         $invoiceFileName = $invoice['invoiceName'].'.pdf';
         $invoice['invoiceDate'] = $this->exts->parse_date($invoice['invoiceDate'], 'M d, Y','Y-m-d');
         $this->exts->log('Date parsed: '.$invoice['invoiceDate']);
+        
         
         $downloaded_file = $this->exts->direct_download($invoice['invoiceUrl'], 'pdf', $invoiceFileName);
         if(trim($downloaded_file) != '' && file_exists($downloaded_file)){

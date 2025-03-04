@@ -42,8 +42,6 @@ private function initPortal($count)
         $this->exts->success();
         
 
-        $this->processInvoice();
-
         // Final, check no invoice
         if ($this->isNoInvoice) {
             $this->exts->no_invoice();
@@ -122,87 +120,4 @@ function checkLogin()
     }
 
     return $isLoggedIn;
-}
-
-
-/**
- * download invoice of current year
- * 
- */
-private function processInvoice()
-{
-    sleep(5);
-    $year = date('Y');
-    $month = date('m');
-    $this->exts->log("Invoice Listing of year : " . $year. "Current month: " . $month);
-
-    for($i=1; $i <= $month; $i++)
-    {
-      $this->exts->log("Download Invoice year: " . $year. "month: " . $i);  
-       $openUrl = 'https://login.payjoe.de/activities?year='.$year.'&month='.$i;
-       $this->exts->openUrl($openUrl);
-       sleep(5);
-       $this->exts->waitTillPresent('table > tbody > tr');
-
-       $this->exts->capture("4-invoices-page-month ".$i);
-
-       $this->downloadInvoice();
-   
-    }
-}
-
-private function downloadInvoice()
-{
-    $invoices = [];
-
-    $rows = $this->exts->getElements('table > tbody > tr');
-    $this->exts->log('No of rows: '.count($rows));
-    foreach ($rows as $row) {
-        $tags = $this->exts->getElements('td', $row);
-
-        $this->exts->log('No of columns: '.count($tags));
-
-        if(count($tags) > 1 && $this->exts->getElement('a[href*="/download"]', $tags[6]) != null) {
-            $invoiceUrl = $this->exts->getElement('a[href*="/download"]', $tags[6])->getAttribute("href");
-            $parts = explode('/', $invoiceUrl);
-            $lastPart = array_pop($parts); 
-
-            sleep(1);
-            $invoiceName = trim($tags[1]->getAttribute('innerText')) . '_' . time();
-
-            $invoiceName = trim(preg_replace('/[^\d]/', '', $invoiceName));
-            $invoiceDate = trim($tags[0]->getAttribute('innerText'));
-            $invoiceAmount = trim(preg_replace('/[^\d\.\,]/', '', $tags[5]->getAttribute('innerText'))) . ' EUR';
-
-            array_push($invoices, array(
-                'invoiceName'=>$invoiceName,
-                'invoiceDate'=>$invoiceDate,
-                'invoiceAmount'=>$invoiceAmount,
-                'invoiceUrl'=>$invoiceUrl
-            ));
-            $this->isNoInvoice = false;
-        }
-    }
-    // Download all invoices
-    $this->exts->log('Invoices found: '.count($invoices));
-    foreach ($invoices as $invoice) {
-        $this->exts->log('--------------------------');
-        $this->exts->log('invoiceName: '.$invoice['invoiceName']);
-        $this->exts->log('invoiceDate: '.$invoice['invoiceDate']);
-        $this->exts->log('invoiceAmount: '.$invoice['invoiceAmount']);
-        $this->exts->log('invoiceUrl: '.$invoice['invoiceUrl']);
-
-        $invoiceFileName = $invoice['invoiceName'].'.pdf';
-        $invoice['invoiceDate'] = $this->exts->parse_date($invoice['invoiceDate'], 'M d, Y','Y-m-d');
-        $this->exts->log('Date parsed: '.$invoice['invoiceDate']);
-        
-        
-        $downloaded_file = $this->exts->direct_download($invoice['invoiceUrl'], 'pdf', $invoiceFileName);
-        if(trim($downloaded_file) != '' && file_exists($downloaded_file)){
-            $this->exts->new_invoice($invoice['invoiceName'], $invoice['invoiceDate'], $invoice['invoiceAmount'], $invoiceFileName);
-            sleep(1);
-        } else {
-            $this->exts->log(__FUNCTION__.'::No download '.$invoiceFileName);
-        }
-    }
 }
