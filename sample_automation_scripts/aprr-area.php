@@ -4,7 +4,7 @@
 /*Define constants used in script*/
 public $baseUrl = 'https://espaceclient.aprr.fr/aprr/Pages/connexion.aspx';
 public $loginUrl = 'https://espaceclient.aprr.fr/aprr/Pages/connexion.aspx';
-public $invoicePageUrl = 'https://espaceclient.aprr.fr/aprr/Pages/MaConsommation/conso_factures.aspx';
+public $invoicePageUrl = 'https://www.fulli.com/customer-space/invoices';
 
 public $username_selector = 'input[name="username"]';
 public $password_selector = 'input[name="password"]';
@@ -51,9 +51,6 @@ private function initPortal($count) {
 
 		// Open invoices url and download invoice
 		$this->exts->openUrl($this->invoicePageUrl);
-		$this->processInvoices();
-
-		$this->exts->moveToElementAndClick('nav a[href="/customer-space/invoices"]');
 		$this->processInvoices();
 		
 		// Final, check no invoice
@@ -126,8 +123,17 @@ private function processInvoices() {
 	$invoices = [];
 
 	$rows = $this->exts->getElements('ul#history-lines li');
+
+	$this->exts->log("Invoice count: ". count($rows));
+
 	foreach ($rows as $row) {
-        $invoiceUrl = 'https://www.fulli.com'. $this->exts->extract('ul#history-lines li a[href*="invoice"]', $row)->getAttribute('href');
+		$invoiceLink = $this->exts->getElement('ul#history-lines li a[href*="invoice"]', $row);
+
+		$invoiceUrl = '';
+		if($invoiceLink){
+			$invoiceUrl = 'https://www.fulli.com' . $invoiceLink->getAttribute('href');
+		}
+
         preg_match('/(\d+)$/', $invoiceUrl, $matches);
         if (!empty($matches[1])) {
             $invoiceName =  $matches[1]; 
