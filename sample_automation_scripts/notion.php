@@ -1,4 +1,4 @@
-<?php
+<?php // optimize the script
 // Server-Portal-ID: 68981 - Last modified: 03.03.2025 23:12:02 UTC - User: 1
 
 public $baseUrl = 'https://www.notion.so';
@@ -137,7 +137,7 @@ private function initPortal($count) {
         }
     }
     $this->exts->waitTillPresent($this->check_login_success_selector, 15);
-    $this->doAfterLogin();
+    $this->checkLoggedIn();
 }
 
 // -------------------- GOOGLE login
@@ -734,7 +734,7 @@ private function checkFillLoginCode() {
     }
 }
 
-private function doAfterLogin() {
+private function checkLoggedIn() {
 
     // then check user logged in or not
 
@@ -865,10 +865,12 @@ private function processInvoices() {
         sleep(1);
         if (!$this->exts->urlContains('upcoming')) {
             $invoiceUrl = $this->exts->getUrl();
-
-            $this->exts->log('invoice url : ' .$invoiceUrl);
-
             $invoiceName = array_pop(explode('invoice/', $invoiceUrl));
+
+            $this->exts->log('invoice url : ' . $invoiceUrl);
+            $this->exts->log('invoiceName : ' . $invoiceName);
+
+
             $invoiceFileName = $invoiceName . '.pdf';
             $this->isNoInvoice = false;
             if($this->exts->invoice_exists($invoiceName)){
