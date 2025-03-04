@@ -1,6 +1,3 @@
-<?php // optimize the script
-// Server-Portal-ID: 68981 - Last modified: 03.03.2025 23:12:02 UTC - User: 1
-
 public $baseUrl = 'https://www.notion.so';
 public $loginUrl = 'https://www.notion.so/login';
 
@@ -744,38 +741,11 @@ private function checkLoggedIn() {
         $this->exts->log(__FUNCTION__.'::User logged in');
         $this->exts->capture("3-login-success");
 
-        $this->exts->execute_javascript("var div = document.querySelector('div.notion-peek-renderer'); 
-            if (div != null) {  
-                div.style.display = \"none\"; 
-            }
-        ");
-        
-        if($this->exts->exists('.notion-media-menu')) 
-        $this->exts->execute_javascript("document.querySelector('.notion-media-menu').remove();");
-    
+        if (!empty($this->exts->config_array['allow_login_success_request'])) {
 
-        $this->exts->waitTillPresent('.notion-sidebar .notion-sidebar-switcher', 25);
-
-        if($this->exts->exists('.notion-sidebar .notion-sidebar-switcher')){
-            $this->exts->click_element('.notion-sidebar .notion-sidebar-switcher');
+            $this->exts->triggerLoginSuccess();
         }
 
-        $this->exts->log('Open the scroller');
-
-        $this->exts->waitTillPresent('div[role="menu"]',25);
-
-        if($this->exts->exists('div[role="menu"]')){
-
-            $this->processMultipleWorkspaces();
-        }
-
-    
-        // Final, check no invoice
-        if($this->isNoInvoice){
-            $this->exts->no_invoice();
-        }
-        
-        $this->exts->success();
     } else {
         $this->exts->log(__FUNCTION__.'::Use login failed');
         if ($this->exts->urlContains('notion.so/onboarding')) {
@@ -789,119 +759,4 @@ private function checkLoggedIn() {
             $this->exts->loginFailure();
         }
     }
-}
-
-private function processMultipleWorkspaces(){
-    
-    $workspaces = count($this->exts->getElements('div[role="menu"] > div > div >div > div > div[role="menuitem"]'));
-
-    $this->exts->log('Total no of workspace : ' . $workspaces);
-
-    if($workspaces > 0){
-        for ($w=1; $w <= $workspaces; $w++) {
-                
-            $workspace_button = $this->exts->querySelector('div[role="menu"] > div > div >div:nth-child(' . $w . ') > div > div[role="menuitem"]');
-
-            sleep(2);
-
-            $this->exts->execute_javascript("arguments[0].click()", [$workspace_button]);
-
-            sleep(5);
-            if($this->exts->exists($workspace_button)){
-                $workspace_button->click();
-            }
-            
-            $this->exts->log('Open the scroller');
-
-            $this->exts->waitTillPresent('.notion-sidebar .notion-sidebar-switcher',25);
-
-            if($this->exts->exists('.notion-sidebar .notion-sidebar-switcher')){
-                $this->exts->click_element('.notion-sidebar .notion-sidebar-switcher');
-            }
-            
-            $this->exts->waitTillPresent('//div[text()="Settings" and @role="button"]', 10);
-
-            if($this->exts->getElement('//div[text()="Settings" and @role="button"]') != null){
-                
-                $this->exts->click_element('//div[text()="Settings" and @role="button"]');  
-
-                $this->exts->waitTillPresent('//div[contains(text(), "Facturation") or contains(text(), "Billing") or contains(text(), "Abrechnung")]', 10);
-                    
-                if($this->exts->getElement('//div[contains(text(), "Facturation") or contains(text(), "Billing") or contains(text(), "Abrechnung")]') != null){
-
-                    $this->exts->click_element('//div[contains(text(), "Facturation") or contains(text(), "Billing") or contains(text(), "Abrechnung")]');
-
-                    $this->exts->waitTillPresent('//div[contains(text(), "Afficher la facture") or contains(text(), "Rechnung anzeigen") or contains(text(), "View invoice")]', 10);
-                    
-                    if($this->exts->getElements('//div[contains(text(), "Afficher la facture") or contains(text(), "Rechnung anzeigen") or contains(text(), "View invoice")]') != null){
-                        $this->processInvoices();
-                    }
-                } else{ 
-                    $this->exts->log('NO Abrechnung or Billing button found');                      
-                } 
-                    
-                $this->exts->waitTillPresent('.notion-sidebar .notion-sidebar-switcher', 15);
-                $this->exts->click_element('.notion-sidebar .notion-sidebar-switcher');
-                
-            } else{
-                $this->exts->log('NO Einstellungen button or Settings & members button found');  
-            } 
-        }
-    }            
-}
-
-private function processInvoices() {
-    $this->exts->waitTillPresent('//div[contains(text(), "Afficher la facture") or contains(text(), "Rechnung anzeigen") or contains(text(), "View invoice")]',15);
-    $this->exts->capture("4-invoices-page");
-    $invoices = [];
-
-    $row_count = count($this->exts->getElements('//div[@role="button"]/div[text()="View invoice"]'));
-    $this->exts->log('No of rows : '. $row_count);
-    for ($i=0; $i < $row_count; $i++) {
-        $download_button = $this->exts->getElements('//div[@role="button"]/div[text()="View invoice"]')[$i];
-
-        $this->exts->click_element($download_button);
-        sleep(5);
-        $this->exts->switchToNewestActiveTab();
-        sleep(1);
-        if (!$this->exts->urlContains('upcoming')) {
-            $invoiceUrl = $this->exts->getUrl();
-            $invoiceName = array_pop(explode('invoice/', $invoiceUrl));
-
-            $this->exts->log('invoice url : ' . $invoiceUrl);
-            $this->exts->log('invoiceName : ' . $invoiceName);
-
-
-            $invoiceFileName = $invoiceName . '.pdf';
-            $this->isNoInvoice = false;
-            if($this->exts->invoice_exists($invoiceName)){
-                $this->exts->log('Invoice existed '.$invoiceFileName);
-            }else{
-                sleep(10);
-                if($this->exts->exists('.notion-print-ignore')){
-                    // $this->exts->click_element('.notion-print-ignore');
-                    // sleep(8);
-                    // $this->exts->wait_and_check_download('pdf');
-                    $downloaded_file = $this->exts->click_and_print('.notion-print-ignore', $invoiceFileName);
-                    if(trim($downloaded_file) != '' && file_exists($downloaded_file)){
-                        $this->exts->new_invoice($invoiceName, '', '', $invoiceFileName);
-                        sleep(1);
-                    } else {
-                        $this->exts->log(__FUNCTION__.'::No download '.$invoiceFileName);
-                    }
-                } else {
-                    $this->exts->log(__FUNCTION__.'::Seem this is not invoice '.$invoiceUrl);
-                }
-            }
-        }
-        
-        sleep(2);
-        $this->exts->switchToInitTab();
-        sleep(2);
-        $this->exts->closeAllTabsButThis();
-    
-    }
-    // Close any overlay popup
-    $this->exts->execute_javascript('document.elementFromPoint(1, 1).click();');
-    sleep(5);
 }
