@@ -1,4 +1,5 @@
 <?php// updated login code and download code // updated login code and added extract zip code in invoice download
+// updated download code
 // Server-Portal-ID: 2798003 - Last modified: 07.02.2025 10:53:05 UTC - User: 1
 
 /*Define constants used in script*/
@@ -208,9 +209,14 @@ function extract_single_zip_save_pdf($zipfile)
 
             $this->exts->log(__FUNCTION__ . '::Pathinfo: ' . print_r($fileInfo, true));
 
-            if (isset($fileInfo['extension']) && strtolower($fileInfo['extension']) === 'pdf') {
-                $this->exts->log('PDF file verified');
+            if (isset($fileInfo['extension'])) {
+                if(strtolower($fileInfo['extension']) === 'zip'){
+                    $this->exts->log('zip file verified');
+                }
 
+                if (strtolower($fileInfo['extension']) === 'pdf') {
+                    $this->exts->log('pdf file verified');
+                }
                 $this->isNoInvoice = false;
                 
                 $zip->extractTo($this->exts->config_array['download_folder'], $fileName);
