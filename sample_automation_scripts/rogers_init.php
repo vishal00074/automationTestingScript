@@ -19,13 +19,11 @@ private function initPortal($count) {
 	$this->exts->log('Begin initPortal '.$count);
 	
 	$this->exts->openUrl($this->baseUrl);
-	sleep(20);
+	sleep(15);
 
 	// Load cookies
 	$this->exts->loadCookiesFromFile();
 	sleep(1);
-	$this->exts->openUrl($this->baseUrl);
-	sleep(20);
 	$this->exts->capture('1-init-page');
 
 	// If user hase not logged in from cookie, clear cookie, open the login url and do login
@@ -35,12 +33,16 @@ private function initPortal($count) {
 		$this->exts->openUrl($this->loginUrl);
 		sleep(15);
 		$this->checkFillLogin();
-		sleep(30);
-		if($this->exts->exists('otp-device-list button[title*="verification code in your registered email"]')){
-			$this->exts->moveToElementAndClick('otp-device-list button[title*="verification code in your registered email"]');
-			sleep(10);
-			$this->checkFillTwoFactor();
+
+		$this->exts->waitTillPresent('button[title*="email"]', 20);
+
+		if($this->exts->exists('button[title*="email"]')){
+			$this->exts->moveToElementAndClick('button[title*="email"]');
+			sleep(20);
 		}
+
+		$this->checkFillTwoFactor();
+		
 	}
 	if ($this->exts->getElement('form#phoneNumberForm') != null) {
 		$this->exts->moveToElementAndClick('button.ds-button.ds-corners.ds-pointer:not([type="submit"])');
@@ -127,9 +129,6 @@ private function checkFillLogin() {
 	}
 }
 
-
-
-
 private function checkFillRecaptcha() {
 	$this->exts->log(__FUNCTION__);
 	$recaptcha_iframe_selector = 'iframe[src*="/recaptcha/api2/anchor?"]';
@@ -210,17 +209,21 @@ private function checkFillTwoFactor() {
 		$two_factor_code = trim($this->exts->fetchTwoFactorCode());
 		if(!empty($two_factor_code) && trim($two_factor_code) != '') {
 			$this->exts->log("checkFillTwoFactor: Entering two_factor_code.".$two_factor_code);
+
 			$resultCodes = str_split($two_factor_code);
-			$code_inputs = $this->exts->getElements($two_factor_selector);
-			foreach ($code_inputs as $key => $code_input) {
-				if(array_key_exists($key, $resultCodes)){
-					$this->exts->log('"checkFillTwoFactor: Entering key '. $resultCodes[$key] . 'to input #'.$key);
-					$code_input->sendKeys($resultCodes[$key]);
-					$this->exts->capture("2.2-two-factor-filled-".$this->exts->two_factor_attempts);
-				} else {
-					$this->exts->log('"checkFillTwoFactor: Have no char for input #'.$key);
-				}
+
+			for ($i = 0; $i < 4; $i++) {
+				$this->exts->type_key_by_xdotool('Tab');
+				sleep(1);
 			}
+			$this->exts->type_key_by_xdotool('Return');
+			sleep(2);
+			foreach($resultCodes as $inputVal){
+				$this->exts->log("inputVal" . $inputVal);
+				sleep(2);
+				$this->exts->type_text_by_xdotool($inputVal);
+			}
+			
 			$this->exts->capture("2.2-two-factor-filled-".$this->exts->two_factor_attempts);
 
 			$this->exts->moveToElementAndClick($two_factor_submit_selector);
@@ -241,4 +244,3 @@ private function checkFillTwoFactor() {
 		}
 	}
 }
-
