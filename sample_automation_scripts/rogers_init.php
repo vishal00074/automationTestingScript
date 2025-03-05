@@ -224,6 +224,7 @@ private function checkFillTwoFactor() {
 				$this->exts->type_text_by_xdotool($inputVal);
 			}
 			
+			
 			$this->exts->capture("2.2-two-factor-filled-".$this->exts->two_factor_attempts);
 
 			$this->exts->moveToElementAndClick($two_factor_submit_selector);
