@@ -1,4 +1,4 @@
-<?php
+<?php // updated login code
 // Server-Portal-ID: 1723333 - Last modified: 17.02.2025 12:53:26 UTC - User: 1
 
 /*Define constants used in script*/
@@ -261,7 +261,7 @@ private function fillForm($count)
                         $this->exts->capture("1-filled-login");
                         $this->exts->click_by_xdotool($this->submit_button_selector);
                         sleep(5);
-                        if ($this->exts->exists($this->submit_button_selector)) {
+                        if ($this->exts->exists($this->password_selector)) {
                             if ($this->exts->exists('div#auth-password-missing-alert[style="display: block;"]')) {
                                 $this->exts->log("Enter Password Again");
                                 $this->exts->moveToElementAndType($this->password_selector, $this->password);
@@ -317,240 +317,57 @@ private function fillForm($count)
         $this->exts->log("END fillForm URL - " . $this->exts->getUrl());
     }
 }
+
+
+
 private function checkFillTwoFactor()
 {
-    $this->exts->capture("2.0-two-factor-checking");
-    if ($this->exts->exists('div.auth-SMS input[type="radio"], input[type="radio"][value="mobile"]')) {
-        $this->exts->click_by_xdotool('div.auth-SMS input[type="radio"]:not(:checked), input[type="radio"][value="mobile"]:not(:checked)');
-        sleep(2);
-        $this->exts->click_by_xdotool('input#auth-send-code, input#continue');
-        sleep(5);
-    } else if ($this->exts->exists('div.auth-TOTP input[type="radio"], input[type="radio"][value="email"]')) {
-        $this->exts->click_by_xdotool('div.auth-TOTP input[type="radio"]:not(:checked), input[type="radio"][value="email"]:not(:checked)');
-        sleep(2);
-        $this->exts->click_by_xdotool('input#auth-send-code, input#continue');
-        sleep(5);
-    } else if ($this->exts->allExists(['input[type="radio"]', 'input#auth-send-code']) || $this->exts->exists('input[name="OTPChallengeOptions"]')) {
-        $this->exts->click_by_xdotool('input[type="radio"]');
-        sleep(2);
-        $this->exts->click_by_xdotool('input#auth-send-code, input#continue');
-        sleep(5);
-    }
+    $two_factor_selector = 'input[id="auth-mfa-otpcode"]';
+    $two_factor_message_selector = '#auth-mfa-form h1 + p, #verification-code-form > .a-spacing-small > .a-spacing-none, #channelDetailsForOtp';
+    $two_factor_submit_selector = 'input#auth-signin-button:not([disabled])';
 
-    if ($this->exts->exists('input[name="otpCode"]:not([type="hidden"]), input[name="code"], input#input-box-otp')) {
-        $two_factor_selector = 'input[name="otpCode"]:not([type="hidden"]), input[name="code"], input#input-box-otp';
-        $two_factor_message_selector = '#auth-mfa-form h1 + p, #verification-code-form > .a-spacing-small > .a-spacing-none, #channelDetailsForOtp';
-        $two_factor_submit_selector = '#auth-signin-button, #verification-code-form input[type="submit"]';
+    $this->exts->waitTillPresent($two_factor_selector, 10);
+    if ($this->exts->querySelector($two_factor_selector) != null && $this->exts->two_factor_attempts < 3) {
         $this->exts->log("Two factor page found.");
         $this->exts->capture("2.1-two-factor");
-
-        $this->exts->two_factor_notif_msg_en = trim($this->exts->extract($two_factor_message_selector, null, 'innerText'));
-        $this->exts->two_factor_notif_msg_de = $this->exts->two_factor_notif_msg_en;
-        $this->exts->log("Message:\n" . $this->exts->two_factor_notif_msg_en);
-        $this->exts->notification_uid = "";
+        if ($this->exts->getElement($two_factor_message_selector) != null) {
+            $this->exts->two_factor_notif_msg_en = $this->exts->extract($two_factor_message_selector);
+            $this->exts->two_factor_notif_msg_en = trim($this->exts->two_factor_notif_msg_en);
+            $this->exts->two_factor_notif_msg_de = $this->exts->two_factor_notif_msg_en;
+            $this->exts->log("Message:\n" . $this->exts->two_factor_notif_msg_en);
+        }
+        if ($this->exts->two_factor_attempts == 2) {
+            $this->exts->two_factor_notif_msg_en = $this->exts->two_factor_notif_msg_en . ' ' . $this->exts->two_factor_notif_msg_retry_en;
+            $this->exts->two_factor_notif_msg_de = $this->exts->two_factor_notif_msg_de . ' ' . $this->exts->two_factor_notif_msg_retry_de;
+        }
         $two_factor_code = trim($this->exts->fetchTwoFactorCode());
-        if (!empty($two_factor_code)) {
-            $this->exts->log("checkFillTwoFactor: Entering two_factor_code: " . $two_factor_code);
-            if (!$this->exts->exists($two_factor_selector)) { // by some javascript reason, sometime selenium can not find the input
-                $this->exts->refresh();
-                sleep(5);
-                $this->exts->capture("2.1-two-factor-refreshed." . $this->exts->two_factor_attempts);
-            }
+        if (!empty($two_factor_code) && trim($two_factor_code) != '') {
+            $this->exts->log("checkFillTwoFactor: Entering two_factor_code." . $two_factor_code);
+            $this->exts->click_by_xdotool($two_factor_selector);
+            sleep(2);
+            $this->exts->type_text_by_xdotool($two_factor_code);
 
-            // Weak password alert shows and script cannot click on elements
-            sleep(2);
-            $this->exts->type_key_by_xdotool("Escape");
-            sleep(2);
-            $this->exts->moveToElementAndType($two_factor_selector, $two_factor_code);
-            if ($this->exts->exists('label[for="auth-mfa-remember-device"] input[name="rememberDevice"]:not(:checked)')) {
-                $this->exts->click_by_xdotool('label[for="auth-mfa-remember-device"] input[name="rememberDevice"]:not(:checked)');
-            }
-            sleep(1);
+            $this->exts->log("checkFillTwoFactor: Clicking submit button.");
+            sleep(3);
             $this->exts->capture("2.2-two-factor-filled-" . $this->exts->two_factor_attempts);
-            if ($this->exts->exists('#cvf-submit-otp-button input[type="submit"]')) {
-                $this->exts->click_by_xdotool('#cvf-submit-otp-button input[type="submit"]');
-            } else {
-                $this->exts->click_by_xdotool($two_factor_submit_selector);
-            }
 
-            sleep(5);
-            $this->exts->waitTillPresent('#auth-error-message-box .a-alert-content, #invalid-otp-code-message', 7);
-            $this->exts->capture("2.2-two-factor-submitted-" . $this->exts->two_factor_attempts);
+
+            $this->exts->click_by_xdotool($two_factor_submit_selector);
+            $this->exts->waitTillPresent($two_factor_selector);
+            if ($this->exts->querySelector($two_factor_selector) == null) {
+                $this->exts->log("Two factor solved");
+            } else if ($this->exts->two_factor_attempts < 3) {
+                $this->exts->two_factor_attempts++;
+                $this->checkFillTwoFactor();
+            } else {
+                $this->exts->log("Two factor can not solved");
+            }
         } else {
             $this->exts->log("Not received two factor code");
         }
-
-        // Huy added this 2022-12 Retry if incorrect code inputted
-        if ($this->exts->exists($two_factor_selector)) {
-            if (
-                stripos($this->exts->extract('#auth-error-message-box .a-alert-content', null, 'innerText'), 'Der eingegebene Code ist ung') !== false ||
-                stripos($this->exts->extract('#auth-error-message-box .a-alert-content, #invalid-otp-code-message', null, 'innerText'), 'you entered is not valid') !== false ||
-                stripos($this->exts->extract('#invalid-otp-code-message', null, 'innerText'), 'Code ist ung') !== false
-            ) {
-                $temp_text = trim($this->exts->extract($two_factor_message_selector, null, 'innerText'));
-                if (!empty($temp_text)) {
-                    $this->exts->two_factor_notif_msg_en = $temp_text;
-                }
-                $this->exts->two_factor_notif_msg_de = $this->exts->two_factor_notif_msg_en;
-                $this->exts->two_factor_notif_msg_en = $this->exts->two_factor_notif_msg_en . ' ' . $this->exts->two_factor_notif_msg_retry_en;
-                $this->exts->two_factor_notif_msg_de = $this->exts->two_factor_notif_msg_de . ' ' . $this->exts->two_factor_notif_msg_retry_de;
-                for ($t = 2; $t <= 3; $t++) {
-                    $this->exts->log("Retry 2FA Message:\n" . $this->exts->two_factor_notif_msg_en);
-                    $this->exts->notification_uid = "";
-                    $this->exts->two_factor_attempts++;
-                    $two_factor_code = trim($this->exts->fetchTwoFactorCode());
-                    if (!empty($two_factor_code)) {
-                        $this->exts->log("Retry 2FA: Entering two_factor_code: " . $two_factor_code);
-                        if (!$this->exts->exists($two_factor_selector)) { // by some javascript reason, sometime selenium can not find the input
-                            $this->exts->refresh();
-                            sleep(5);
-                            $this->exts->capture("2.1-two-factor-refreshed." . $this->exts->two_factor_attempts);
-                        }
-
-                        $this->exts->moveToElementAndType($two_factor_selector, $two_factor_code);
-                        if ($this->exts->exists('label[for="auth-mfa-remember-device"] input[name="rememberDevice"]:not(:checked)')) {
-                            $this->exts->click_by_xdotool('label[for="auth-mfa-remember-device"]');
-                        }
-                        sleep(1);
-                        $this->exts->capture("2.2-two-factor-filled-" . $this->exts->two_factor_attempts);
-                        if ($this->exts->exists('#cvf-submit-otp-button input[type="submit"]')) {
-                            $this->exts->click_by_xdotool('#cvf-submit-otp-button input[type="submit"]');
-                        } else {
-                            $this->exts->click_by_xdotool($two_factor_submit_selector);
-                        }
-                        sleep(10);
-                        $this->exts->capture("2.2-two-factor-submitted-" . $this->exts->two_factor_attempts);
-                        if (!$this->exts->exists($two_factor_selector)) {
-                            break;
-                        }
-                    } else {
-                        $this->exts->log("Not received Retry two factor code");
-                    }
-                }
-            }
-        }
-    } else if ($this->exts->exists('div.otp-input-box-container input[name*="otc"]')) {
-        $two_factor_selector = 'div.otp-input-box-container input[name*="otc"]';
-        $two_factor_message_selector = 'div#channelDetailsForOtp';
-        $two_factor_submit_selector = 'form#verification-code-form input[type="submit"][aria-labelledby="cvf-submit-otp-button-announce"]';
-
-        if ($this->exts->querySelector($two_factor_selector) != null) {
-            $this->exts->log("Two factor page found.");
-            $this->exts->capture("2.1-two-factor");
-
-            if ($this->exts->querySelector($two_factor_message_selector) != null) {
-                $this->exts->two_factor_notif_msg_en = "";
-                for ($i = 0; $i < count($this->exts->querySelectorAll($two_factor_message_selector)); $i++) {
-                    $this->exts->two_factor_notif_msg_en = $this->exts->two_factor_notif_msg_en . $this->exts->querySelectorAll($two_factor_message_selector)[$i]->getText() . "\n";
-                }
-                $this->exts->two_factor_notif_msg_en = trim($this->exts->two_factor_notif_msg_en);
-                $this->exts->two_factor_notif_msg_de = $this->exts->two_factor_notif_msg_en;
-                $this->exts->log("Message:\n" . $this->exts->two_factor_notif_msg_en);
-            }
-
-            $two_factor_code = trim($this->exts->fetchTwoFactorCode());
-            if (!empty($two_factor_code) && trim($two_factor_code) != '') {
-                $this->exts->log("checkFillTwoFactor: Entering two_factor_code." . $two_factor_code);
-
-                $resultCodes = str_split($two_factor_code);
-                $code_inputs = $this->exts->querySelectorAll($two_factor_selector);
-                foreach ($code_inputs as $key => $code_input) {
-                    if (array_key_exists($key, $resultCodes)) {
-                        $this->exts->log('"checkFillTwoFactor: Entering key ' . $resultCodes[$key] . 'to input #');
-                        $this->exts->moveToElementAndType('div.otp-input-box-container input[name*="otc"]:nth-child(' . ($key + 1) . ')', $resultCodes[$key]);
-                        // $code_input->sendKeys($resultCodes[$key]);
-                    } else {
-                        $this->exts->log('"checkFillTwoFactor: Have no char for input #');
-                    }
-                }
-
-                if ($this->exts->exists('label[for="auth-mfa-remember-device"] input[name="rememberDevice"]:not(:checked)')) {
-                    $this->exts->click_by_xdotool('label[for="auth-mfa-remember-device"]');
-                }
-
-                $this->exts->log("checkFillTwoFactor: Clicking submit button.");
-                sleep(3);
-                $this->exts->capture("2.2-two-factor-filled-" . $this->exts->two_factor_attempts);
-
-                $this->exts->click_by_xdotool($two_factor_submit_selector);
-                sleep(15);
-
-                if ($this->exts->exists($two_factor_selector)) {
-                    $temp_text = trim($this->exts->extract($two_factor_message_selector, null, 'innerText'));
-                    if (!empty($temp_text)) {
-                        $this->exts->two_factor_notif_msg_en = $temp_text;
-                    }
-                    $this->exts->two_factor_notif_msg_de = $this->exts->two_factor_notif_msg_en;
-                    $this->exts->two_factor_notif_msg_en = $this->exts->two_factor_notif_msg_en . ' ' . $this->exts->two_factor_notif_msg_retry_en;
-                    $this->exts->two_factor_notif_msg_de = $this->exts->two_factor_notif_msg_de . ' ' . $this->exts->two_factor_notif_msg_retry_de;
-                    for ($t = 2; $t <= 3; $t++) {
-                        $this->exts->log("Retry 2FA Message:\n" . $this->exts->two_factor_notif_msg_en);
-                        $this->exts->notification_uid = "";
-                        $this->exts->two_factor_attempts++;
-                        $two_factor_code = trim($this->exts->fetchTwoFactorCode());
-                        if (!empty($two_factor_code)) {
-                            $this->exts->log("Retry 2FA: Entering two_factor_code: " . $two_factor_code);
-                            $resultCodes = str_split($two_factor_code);
-                            $code_inputs = $this->exts->getElements($two_factor_selector);
-                            $resultCodes = str_split($two_factor_code);
-                            $code_inputs = $this->exts->querySelectorAll($two_factor_selector);
-                            foreach ($code_inputs as $key => $code_input) {
-                                if (array_key_exists($key, $resultCodes)) {
-                                    $this->exts->log('"checkFillTwoFactor: Entering key ' . $resultCodes[$key] . 'to input #');
-                                    $this->exts->moveToElementAndType('div.otp-input-box-container input[name*="otc"]:nth-child(' . ($key + 1) . ')', $resultCodes[$key]);
-                                } else {
-                                    $this->exts->log('"checkFillTwoFactor: Have no char for input #');
-                                }
-                            }
-
-                            if ($this->exts->exists('label[for="auth-mfa-remember-device"] input[name="rememberDevice"]:not(:checked)')) {
-                                $this->exts->click_by_xdotool('label[for="auth-mfa-remember-device"]');
-                            }
-                            $this->exts->capture("2.2-two-factor-filled-" . $this->exts->two_factor_attempts);
-
-                            $this->exts->click_by_xdotool($two_factor_submit_selector);
-                            sleep(10);
-                            $this->exts->capture("2.2-two-factor-submitted-" . $this->exts->two_factor_attempts);
-                            if (!$this->exts->exists($two_factor_selector)) {
-                                break;
-                            }
-                        } else {
-                            $this->exts->log("Not received Retry two factor code");
-                        }
-                    }
-                }
-            } else {
-                $this->exts->log("Not received two factor code");
-            }
-        }
-    } else if ($this->exts->exists('[name="transactionApprovalStatus"], form[action*="/approval/poll"]')) {
-        $this->exts->log("Two factor page found.");
-        $this->exts->capture("2.1-two-factor");
-        $message_selector = '.transaction-approval-word-break, #channelDetails, #channelDetailsWithImprovedLayout';
-        $this->exts->two_factor_notif_msg_en = join(' ', $this->exts->getElementsAttribute($message_selector, 'innerText'));
-        $this->exts->two_factor_notif_msg_de = $this->exts->two_factor_notif_msg_en . "\n>>>Geben Sie danach hier unten \"OK\" ein.";
-        $this->exts->two_factor_notif_msg_en = $this->exts->two_factor_notif_msg_en . "\n>>>Enter \"OK\" after confirmation";
-        $this->exts->log($this->exts->two_factor_notif_msg_en);
-
-        $this->exts->notification_uid = "";
-        $this->exts->two_factor_attempts++;
-        $two_factor_code = trim($this->exts->fetchTwoFactorCode());
-
-        if ($this->exts->exists('label[for="auth-mfa-remember-device"] input[name="rememberDevice"]:not(:checked)')) {
-            $this->exts->click_by_xdotool('label[for="auth-mfa-remember-device"]');
-        }
-        // Huy added this 2023-02
-        if (!empty($two_factor_code) && stripos($two_factor_code, 'OK') !== false) {
-            sleep(7);
-        } else {
-            sleep(5 * 60);
-            $this->exts->update_process_lock();
-            if ($this->exts->exists('[name="transactionApprovalStatus"], form[action*="/approval/poll"]')) {
-                $this->exts->two_factor_expired();
-            }
-        }
     }
 }
+
 private function isIncorrectCredential()
 {
     $incorrect_credential_keys = [
