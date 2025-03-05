@@ -1,7 +1,3 @@
-<?php // migrated
-// Server-Portal-ID: 1334803 - Last modified: 02.08.2023 05:28:40 UTC - User: 1
-
-/*Define constants used in script*/
 public $baseUrl = 'https://m2.paybyphone.com/';
 public $loginUrl = 'https://m2.paybyphone.com/login';
 public $transactionPageUrl = '';
@@ -58,11 +54,11 @@ private function initPortal($count) {
 		$this->exts->log(__FUNCTION__.'::User logged in');
 		$this->exts->capture("3-login-success");
 
-		// Final, check no invoice
-		if($this->isNoInvoice){
-			$this->exts->no_invoice();
+		if (!empty($this->exts->config_array['allow_login_success_request'])) {
+
+			$this->exts->triggerLoginSuccess();
 		}
-		$this->exts->success();
+
 	} else {
 		$this->exts->log(__FUNCTION__.'::Use login failed');
 		if($this->exts->getElement($this->check_login_failed_selector) != null) {
