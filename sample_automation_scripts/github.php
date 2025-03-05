@@ -1,4 +1,4 @@
-<?php
+<?php // updated login code
 // Server-Portal-ID: 419 - Last modified: 23.01.2025 14:54:11 UTC - User: 1
 
 /*Define constants used in script*/
@@ -103,8 +103,29 @@ private function checkFillLogin() {
 
 		$this->exts->capture("2-login-page-filled");
 		$this->exts->moveToElementAndClick($this->submit_login_selector);
-		
-	} else {
+        sleep(10);
+
+        if ($this->exts->exists('iframe[src*="octocaptcha"]')) {
+            $this->switchToFrame('iframe[src*="octocaptcha"]');
+            sleep(2);
+        }
+        if ($this->exts->exists('iframe[src*="arkoselabs"][title="Verification challenge"]')) {
+            $this->switchToFrame('iframe[src*="arkoselabs"][title="Verification challenge"]');
+            sleep(2);
+        }
+
+
+        $this->exts->waitTillPresent('iframe[id="game-core-frame"]');
+        if ($this->exts->exists('iframe[id="game-core-frame"]')) {
+            $this->switchToFrame('iframe[id="game-core-frame"]');
+            $this->exts->moveToElementAndClick('button[data-theme="home.verifyButton"]');
+            $this->exts->waitTillPresent('img[aria-labelledby="key-frame-text"]');
+            if ($this->exts->exists('img[aria-labelledby="key-frame-text"]')) {
+                $this->exts->processRotateCaptcha('div[class*="sc-99cwso-0 sc-1t9on73-0 gMEQEa cOLSza box challenge-container"]', 'a[aria-label="Navigate to next image"]', 'a[aria-label="Navigate to previous image"]', 'button.button');
+            }
+        }
+
+    } else {
 		$this->exts->log(__FUNCTION__.'::Login page not found');
 		$this->exts->capture("2-login-page-not-found");
 	}

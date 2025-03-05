@@ -256,40 +256,24 @@ private function checkFillTwoFactor() {
 			$this->exts->two_factor_notif_msg_de = $this->exts->two_factor_notif_msg_de .' '. $this->exts->two_factor_notif_msg_retry_de;
 		}
 
-		$two_factor_code = '123456';//trim($this->exts->fetchTwoFactorCode());
+		$two_factor_code = trim($this->exts->fetchTwoFactorCode());
 		if(!empty($two_factor_code) && trim($two_factor_code) != '') {
 			$this->exts->log("checkFillTwoFactor: Entering two_factor_code.".$two_factor_code);
 
 			$resultCodes = str_split($two_factor_code);
 
-			$inputRows = $this->exts->moveToElementAndClick('input[type="tel"]');
-			$this->exts->log("Input count: " . count($inputRows));
+			for ($i = 0; $i < 4; $i++) {
+				$this->exts->type_key_by_xdotool('Tab');
+				sleep(1);
+			}
+			$this->exts->type_key_by_xdotool('Return');
+			sleep(2);
 			foreach($resultCodes as $inputVal){
+				$this->exts->log("inputVal" . $inputVal);
 				sleep(2);
 				$this->exts->type_text_by_xdotool($inputVal);
 			}
 			
-			
-
-			// $code_inputs = $this->exts->getElements($two_factor_selector);
-			// foreach ($code_inputs as $key => $code_input) {
-			// 	if(array_key_exists($key, $resultCodes)){
-
-			// 		$this->exts->log('"checkFillTwoFactor: Entering key '. $resultCodes[$key] . 'to input #'.$key);
-
-			// 		try{
-			// 			$this->exts->type_text_by_xdotool();
-			// 		}catch(\Exception $e){
-			// 			$this->exts->log('Error Message: ' . $e->getMessage());
-			// 		}
-					
-					
-
-			// 		$this->exts->capture("2.2-two-factor-filled-".$this->exts->two_factor_attempts);
-			// 	} else {
-			// 		$this->exts->log('"checkFillTwoFactor: Have no char for input #'.$key);
-			// 	}
-			// }
 			$this->exts->capture("2.2-two-factor-filled-".$this->exts->two_factor_attempts);
 
 			$this->exts->moveToElementAndClick($two_factor_submit_selector);
