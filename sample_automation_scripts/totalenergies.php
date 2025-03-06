@@ -4,7 +4,7 @@
 
 /*Define constants used in script*/
 
-public $baseUrl = 'https://client.mobility.totalenergies.com/web/guest/select-account';
+public $baseUrl = 'https://client.mobility.totalenergies.com/group/france/invoices';
 public $loginUrl = 'https://client.mobility.totalenergies.com/web/guest/home';
 public $invoicePageUrl = 'https://client.mobility.totalenergies.com/group/france/invoices';
 
@@ -40,7 +40,7 @@ private function initPortal($count)
 
     $this->exts->log('Begin initPortal ' . $count);
    
-    $this->exts->openUrl($this->invoicePageUrl);
+    $this->exts->openUrl($this->baseUrl);
     sleep(10);
     $this->exts->loadCookiesFromFile();
     if (!$this->checkLogin()) {
@@ -54,16 +54,45 @@ private function initPortal($count)
 
         $this->fillForm(0);
         sleep(5);
-        $this->exts->openUrl($this->invoicePageUrl);
+        $this->exts->openUrl($this->baseUrl);
         sleep(10);
         if($this->exts->exists($this->continue_login_button)){
              $this->exts->click_element($this->continue_login_button);
         }
+        sleep(10);
     }
+
+   
 
     if ($this->checkLogin()) {
         $this->exts->log(">>>>>>>>>>>>>>>Login successful!!!!");
         $this->exts->capture("LoginSuccess");
+
+        // Select Account Code
+        if ($this->exts->exists('table#cardProAccountList')) {
+
+            $this->exts->log('Select Account');
+
+            $accountRows = $this->exts->querySelectorAll('table#cardProAccountList');
+
+            $this->exts->log('account count: '. count($accountRows));
+
+            foreach($accountRows as $account){
+               $accountStatus  = $this->exts->extract('span[class="status_tag actif"]', $account, 'innerText');
+               $getInput = $this->exts->getElement('input[name="selectedUserId"]', $account);
+            
+               if($accountStatus != null){
+                    $this->exts->log('account status: '. $accountStatus);
+                    $this->exts->click_element($getInput);
+                    sleep(5);
+                    $this->exts->capture("select-account-filled");
+
+                    $this->exts->moveToElementAndClick('button[type="submit"][class="submitButton"]');
+                    sleep(10);
+                    break;
+               }
+            } 
+        }
 
         $this->exts->openUrl($this->invoicePageUrl);
         $this->processInvoices();
@@ -161,6 +190,8 @@ private function processInvoices() {
         sleep(20);
     }
     $rows = $this->exts->querySelectorAll('table#invoiceListTable tbody tr');
+
+    $this->exts->capture("List-invoice");
 
     $this->exts->log('invoices found: ' . count($rows));
 
