@@ -1,4 +1,4 @@
-<?php //  Updated Two FA Code
+<?php //  Updated Two FA Code // updated 2fa submit button selector and optimize to find login page in every secnerio
 // Server-Portal-ID: 771787 - Last modified: 15.01.2025 08:53:34 UTC - User: 1
 
 public $baseUrl = 'https://platform.openai.com/settings/organization/billing/history';
@@ -76,7 +76,7 @@ private function initPortal($count) {
     } else {
         $this->exts->log(__FUNCTION__.'::Use login failed');
 
-        $isTwoFAError  =  $this->exts->execute_javascript('document.body.innerHTML.includes("The code you entered is incorrect. Please try again.")');
+        $isTwoFAError = $this->exts->execute_javascript('document.body.innerHTML.includes("The code you entered is incorrect. Please try again.")');
        
         $this->exts->log('isTwoFAError '. $isTwoFAError);
 
@@ -108,8 +108,15 @@ private function findLoginPage()
             $this->exts->log("username_selector Found");
             break;
         }
+
         $this->exts->refresh();
         $this->exts->waitTillAnyPresent(explode(',', $this->username_selector), 10);
+
+        $overviewTab = $this->exts->findTabMatchedUrl(['overview']);
+        if ($overviewTab != null) {
+            $this->exts->click_by_xdotool('div[class="ovr-section"] button[type="button"]');
+        }
+
         sleep($interval); // Wait before retrying
     }
 
@@ -195,7 +202,7 @@ private function checkFillLogin() {
 private function checkFillTwoFactor() {
     $two_factor_selector = 'input[autocomplete="one-time-code"], input#code';
     $two_factor_message_selector = 'header p, [class*="loginChallengePage"] > p';
-    $two_factor_submit_selector = 'button[class*="continueButton"]';
+    $two_factor_submit_selector = 'button[class*="continueButton"], button[type="submit"][data-action-button-primary="true"]';
 
     if($this->exts->querySelector($two_factor_selector) != null && $this->exts->two_factor_attempts < 3){
         $this->exts->log("Two factor page found.");
@@ -217,8 +224,11 @@ private function checkFillTwoFactor() {
 
         $two_factor_code = trim($this->exts->fetchTwoFactorCode());
 
+        $this->exts->log("checkFillTwoFactor: Entering two_factor_code. " . $two_factor_code);
+
         if(!empty($two_factor_code) && trim($two_factor_code) != '') {
-            $this->exts->log("checkFillTwoFactor: Entering two_factor_code.".$two_factor_code);
+
+
             $this->exts->moveToElementAndType($two_factor_selector, $two_factor_code);
             
             $this->exts->log("checkFillTwoFactor: Clicking submit button.");
