@@ -1,4 +1,4 @@
-<?php
+<?php// updated choose account selector and otmize the login code
 // Server-Portal-ID: 450 - Last modified: 04.03.2025 13:40:59 UTC - User: 1
 
 public $baseUrl = 'https://account.adobe.com/';
@@ -29,25 +29,15 @@ private function initPortal($count)
 
     $this->exts->openUrl($this->baseUrl);
     sleep(10);
-    if ($this->exts->exists('[data-id="PP-ProfileChooser-Chooser"] [data-id="PP-ProfileChooser-AuthAccount"], [data-id="AccountChooser-AccountList-individual"]')) {
-        $this->exts->capture("x-profile-selection-page-1");
-        $this->exts->type_key_by_xdotool('Return');
-        sleep(2);
-        $this->exts->click_by_xdotool('[data-id="PP-ProfileChooser-Chooser"] [data-id="PP-ProfileChooser-AuthAccount"], [data-id="AccountChooser-AccountList-individual"]');
-        sleep(7);
-    }
-    if ($this->exts->getElement($this->check_login_success_selector) == null) {
-        $this->exts->loadCookiesFromFile(true);
-        $this->exts->openUrl($this->baseUrl);
+    // Choose Account
+    if ($this->exts->exists('[data-id="PP-ProfileChooser-Chooser"] [data-id="PP-ProfileChooser-AuthAccount"]')) {
+        $this->exts->capture("x-profile-selection-page-3");
+
+        $this->exts->moveToElementAndClick('div[data-id="PP-ProfileChooser-AuthAccount"] > div:last-child');
         sleep(10);
-        if ($this->exts->exists('[data-id="PP-ProfileChooser-Chooser"] [data-id="PP-ProfileChooser-AuthAccount"], [data-id="AccountChooser-AccountList-individual"]')) {
-            $this->exts->capture("x-profile-selection-page-2");
-            $this->exts->type_key_by_xdotool('Return');
-            sleep(2);
-            $this->exts->click_by_xdotool('[data-id="PP-ProfileChooser-Chooser"] [data-id="PP-ProfileChooser-AuthAccount"], [data-id="AccountChooser-AccountList-individual"]');
-            sleep(7);
-        }
     }
+    $this->exts->loadCookiesFromFile(true);
+    sleep(5);
     $this->exts->capture('1-init-page');
 
     // If user hase not logged in from cookie, clear cookie, open the login url and do login
@@ -56,18 +46,19 @@ private function initPortal($count)
         $this->exts->openUrl($this->loginUrl);
         sleep(3);
         $this->checkFillLogin();
-        if ($this->exts->exists('[data-id="PP-ProfileChooser-Chooser"] [data-id="PP-ProfileChooser-AuthAccount"], [data-id="AccountChooser-AccountList-individual"]')) {
-            $this->exts->type_key_by_xdotool('Return');
-            sleep(2);
+
+        // Choose Account
+        $this->exts->waitTillPresent('[data-id="PP-ProfileChooser-Chooser"] [data-id="PP-ProfileChooser-AuthAccount"]');
+
+        if ($this->exts->exists('[data-id="PP-ProfileChooser-Chooser"] [data-id="PP-ProfileChooser-AuthAccount"]')) {
             $this->exts->capture("x-profile-selection-page-3");
-            $this->exts->click_by_xdotool('[data-id="PP-ProfileChooser-Chooser"] [data-id="PP-ProfileChooser-AuthAccount"], [data-id="AccountChooser-AccountList-individual"]');
-            sleep(7);
+
+            if ($this->exts->exists('div[data-id="PP-ProfileChooser-AuthAccount"] > div:last-child')) {
+                $this->exts->moveToElementAndClick('div[data-id="PP-ProfileChooser-AuthAccount"] > div:last-child');
+                sleep(10);
+            }
         }
         
-        if($this->exts->exists('div[class="ActionList ChallengeChooser__chooser"] > div:last-child')){
-            $this->exts->click_by_xdotool('div[class="ActionList ChallengeChooser__chooser"] > div:last-child');
-        }
-
         sleep(5);
         $this->exts->two_factor_attempts++;
         $this->exts->notification_uid = "";
@@ -118,9 +109,7 @@ private function initPortal($count)
             sleep(5);
             $this->exts->moveToElementAndClick('[data-id="PP-T2E-AssetMigration"] .T2EAssetMigration__chooser .ActionList-Item');
             sleep(5);
-            // [data-id="PP-T2E-AssetMigration"] button[data-id="PP-T2E-AssetMigration-Confirmation-ConfirmMigrationButton"]
-            // All content stored in your Adobe cloud storage, including content related to any individual plan, will be moved to the business storage and accessible from your Business profile. Once your profiles are set up, you can always move content between them.
-        }
+           }
         if ($this->exts->exists('[data-id="PP-T2E-ProfilesSetup-Introduction-ContinueButton"]')) {
             $this->exts->moveToElementAndClick('[data-id="PP-T2E-ProfilesSetup-Introduction-ContinueButton"]');
             sleep(10);
@@ -145,12 +134,17 @@ private function initPortal($count)
             sleep(5);
         }
     }
-
+    
+    if ($this->exts->exists('button[data-id="PP-PasskeyEnroll-skip-btn"]')) {
+        $this->exts->moveToElementAndClick('button[data-id="PP-PasskeyEnroll-skip-btn"]');
+        sleep(10);
+    }
     // then check user logged in or not
     if ($this->exts->getElement($this->check_login_success_selector) != null) {
         sleep(3);
         $this->exts->log(__FUNCTION__ . '::User logged in');
         $this->exts->capture("3-login-success");
+       
 
         $this->processAfterLogin();
 
@@ -254,13 +248,7 @@ private function checkFillLogin()
                         sleep(12);
                     }
                     $this->exts->capture("2-password-submitted-1");
-                    if ($this->exts->exists('[data-id="PP-ProfileChooser-Chooser"] [data-id="PP-ProfileChooser-AuthAccount"], [data-id="AccountChooser-AccountList-individual"]')) {
-                        $this->exts->capture("x-profile-selection-page-6");
-                        $this->exts->type_key_by_xdotool('Return');
-                        sleep(2);
-                        $this->exts->click_by_xdotool('[data-id="PP-ProfileChooser-Chooser"] [data-id="PP-ProfileChooser-AuthAccount"], [data-id="AccountChooser-AccountList-individual"]');
-                        sleep(7);
-                    }
+                  
                     if ($this->exts->exists($this->password_selector)) {
                         $this->exts->log("Enter Password again");
                         $this->exts->moveToElementAndType($this->password_selector, $this->password);
