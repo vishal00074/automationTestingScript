@@ -1,4 +1,4 @@
-public $baseUrl = 'https://client.mobility.totalenergies.com/web/guest/select-account';
+public $baseUrl = 'https://client.mobility.totalenergies.com/group/france/invoices';
 public $loginUrl = 'https://client.mobility.totalenergies.com/web/guest/home';
 public $invoicePageUrl = 'https://client.mobility.totalenergies.com/group/france/invoices';
 
@@ -34,7 +34,7 @@ private function initPortal($count)
 
     $this->exts->log('Begin initPortal ' . $count);
    
-    $this->exts->openUrl($this->invoicePageUrl);
+    $this->exts->openUrl($this->baseUrl);
     sleep(10);
     $this->exts->loadCookiesFromFile();
     if (!$this->checkLogin()) {
@@ -48,22 +48,24 @@ private function initPortal($count)
 
         $this->fillForm(0);
         sleep(5);
-        $this->exts->openUrl($this->invoicePageUrl);
+        $this->exts->openUrl($this->baseUrl);
         sleep(10);
         if($this->exts->exists($this->continue_login_button)){
              $this->exts->click_element($this->continue_login_button);
         }
+        sleep(10);
     }
+
+   
 
     if ($this->checkLogin()) {
         $this->exts->log(">>>>>>>>>>>>>>>Login successful!!!!");
         $this->exts->capture("LoginSuccess");
 
         if (!empty($this->exts->config_array['allow_login_success_request'])) {
- 
+
             $this->exts->triggerLoginSuccess();
         }
-
 
     } else {
         if ($this->exts->exists($this->check_login_failed_selector1) || $this->exts->exists($this->check_login_failed_selector2)) {

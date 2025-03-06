@@ -1,7 +1,6 @@
 <?php
-// Server-Portal-ID: 1248104 - Last modified: 20.01.2025 06:16:23 UTC - User: 15
+// Server-Portal-ID: 450 - Last modified: 04.03.2025 13:40:59 UTC - User: 1
 
-/*Define constants used in script*/
 public $baseUrl = 'https://account.adobe.com/';
 public $loginUrl = 'https://account.adobe.com/';
 public $invoicePageUrl = 'https://account.adobe.com/';
@@ -30,18 +29,22 @@ private function initPortal($count)
 
     $this->exts->openUrl($this->baseUrl);
     sleep(10);
-    if ($this->exts->getElement('[data-id="PP-ProfileChooser-Chooser"] [data-id="PP-ProfileChooser-AuthAccount"], [data-id="AccountChooser-AccountList-individual"]') != null) {
-        $this->exts->capture("x-profile-selection-page");
-        $this->exts->moveToElementAndClick('[data-id="PP-ProfileChooser-Chooser"] [data-id="PP-ProfileChooser-AuthAccount"], [data-id="AccountChooser-AccountList-individual"]');
+    if ($this->exts->exists('[data-id="PP-ProfileChooser-Chooser"] [data-id="PP-ProfileChooser-AuthAccount"], [data-id="AccountChooser-AccountList-individual"]')) {
+        $this->exts->capture("x-profile-selection-page-1");
+        $this->exts->type_key_by_xdotool('Return');
+        sleep(2);
+        $this->exts->click_by_xdotool('[data-id="PP-ProfileChooser-Chooser"] [data-id="PP-ProfileChooser-AuthAccount"], [data-id="AccountChooser-AccountList-individual"]');
         sleep(7);
     }
     if ($this->exts->getElement($this->check_login_success_selector) == null) {
         $this->exts->loadCookiesFromFile(true);
         $this->exts->openUrl($this->baseUrl);
         sleep(10);
-        if ($this->exts->getElement('[data-id="PP-ProfileChooser-Chooser"] [data-id="PP-ProfileChooser-AuthAccount"], [data-id="AccountChooser-AccountList-individual"]') != null) {
-            $this->exts->capture("x-profile-selection-page");
-            $this->exts->moveToElementAndClick('[data-id="PP-ProfileChooser-Chooser"] [data-id="PP-ProfileChooser-AuthAccount"], [data-id="AccountChooser-AccountList-individual"]');
+        if ($this->exts->exists('[data-id="PP-ProfileChooser-Chooser"] [data-id="PP-ProfileChooser-AuthAccount"], [data-id="AccountChooser-AccountList-individual"]')) {
+            $this->exts->capture("x-profile-selection-page-2");
+            $this->exts->type_key_by_xdotool('Return');
+            sleep(2);
+            $this->exts->click_by_xdotool('[data-id="PP-ProfileChooser-Chooser"] [data-id="PP-ProfileChooser-AuthAccount"], [data-id="AccountChooser-AccountList-individual"]');
             sleep(7);
         }
     }
@@ -50,15 +53,22 @@ private function initPortal($count)
     // If user hase not logged in from cookie, clear cookie, open the login url and do login
     if ($this->exts->getElement($this->check_login_success_selector) == null) {
         $this->exts->log('NOT logged via cookie');
-
         $this->exts->openUrl($this->loginUrl);
-
+        sleep(3);
         $this->checkFillLogin();
-        if ($this->exts->getElement('[data-id="PP-ProfileChooser-Chooser"] [data-id="PP-ProfileChooser-AuthAccount"], [data-id="AccountChooser-AccountList-individual"]') != null) {
-            $this->exts->capture("x-profile-selection-page");
-            $this->exts->moveToElementAndClick('[data-id="PP-ProfileChooser-Chooser"] [data-id="PP-ProfileChooser-AuthAccount"], [data-id="AccountChooser-AccountList-individual"]');
+        if ($this->exts->exists('[data-id="PP-ProfileChooser-Chooser"] [data-id="PP-ProfileChooser-AuthAccount"], [data-id="AccountChooser-AccountList-individual"]')) {
+            $this->exts->type_key_by_xdotool('Return');
+            sleep(2);
+            $this->exts->capture("x-profile-selection-page-3");
+            $this->exts->click_by_xdotool('[data-id="PP-ProfileChooser-Chooser"] [data-id="PP-ProfileChooser-AuthAccount"], [data-id="AccountChooser-AccountList-individual"]');
             sleep(7);
         }
+        
+        if($this->exts->exists('div[class="ActionList ChallengeChooser__chooser"] > div:last-child')){
+            $this->exts->click_by_xdotool('div[class="ActionList ChallengeChooser__chooser"] > div:last-child');
+        }
+
+        sleep(5);
         $this->exts->two_factor_attempts++;
         $this->exts->notification_uid = "";
         $this->checkFillTwoFactor();
@@ -75,6 +85,12 @@ private function initPortal($count)
             $this->exts->moveToElementAndClick('button[data-id="PP-RecordMarketingConsent-ContinueBtn"]');
             sleep(5);
         }
+
+        if ($this->exts->exists('iframe[name="external-action"]')) {
+            $this->exts->makeFrameExecutable('iframe[name="external-action"]')->click_element('div[data-testid="footer-view-component-button-group"] > button:first-child');
+            sleep(5);
+        }
+
         if ($this->exts->getElement('button[data-id="PP-AddSecondaryEmail-skip-btn"]') != null) {
             $this->exts->moveToElementAndClick('button[data-id="PP-AddSecondaryEmail-skip-btn"]');
             sleep(5);
@@ -114,9 +130,11 @@ private function initPortal($count)
             sleep(10);
         }
 
-        if ($this->exts->getElement('[data-id="PP-ProfileChooser-Chooser"] [data-id="PP-ProfileChooser-AuthAccount"], [data-id="AccountChooser-AccountList-individual"]') != null) {
-            $this->exts->capture("x-profile-selection-page");
-            $this->exts->moveToElementAndClick('[data-id="PP-ProfileChooser-Chooser"] [data-id="PP-ProfileChooser-AuthAccount"], [data-id="AccountChooser-AccountList-individual"]');
+        if ($this->exts->exists('[data-id="PP-ProfileChooser-Chooser"] [data-id="PP-ProfileChooser-AuthAccount"], [data-id="AccountChooser-AccountList-individual"]')) {
+            $this->exts->type_key_by_xdotool('Return');
+            sleep(2);
+            $this->exts->capture("x-profile-selection-page-4");
+            $this->exts->click_by_xdotool('[data-id="PP-ProfileChooser-Chooser"] [data-id="PP-ProfileChooser-AuthAccount"], [data-id="AccountChooser-AccountList-individual"]');
             sleep(7);
         }
 
@@ -149,15 +167,17 @@ private function initPortal($count)
             $this->exts->account_not_ready();
         } else if (strpos(strtolower($this->exts->extract('[data-id="EmailPage-Toaster"] .spectrum-Toast-content')), 'your personal account has been deactivated.') !== false) {
             $this->exts->account_not_ready();
+        } else if ($this->exts->makeFrameExecutable('iframe[name="external-action"]')->exists('div[class*="TeamUpgradeDelegation__teamUpgradeDelegationTitle"]')) {
+            $this->exts->account_not_ready();
         } else {
             $this->exts->loginFailure();
         }
     }
 }
+
 private function checkFillLogin()
 {
-    $this->exts->waitTillPresent($this->username_selector, 20);
-
+    sleep(20);
     if ($this->exts->oneExists([$this->username_selector, $this->password_selector])) {
         sleep(3);
         $this->exts->capture("2-login-page");
@@ -169,13 +189,22 @@ private function checkFillLogin()
             if ($this->exts->exists($this->username_selector)) {
                 $this->exts->log("Enter Username");
                 $this->exts->moveToElementAndType($this->username_selector, $this->username);
-                sleep(1);
+                sleep(2);
 
                 $this->exts->capture("2-email-page-filled");
                 $this->exts->moveToElementAndClick($this->next_button);
                 sleep(5);
             }
-            if ($this->exts->getElement('[data-id="PP-ProfileChooser-Chooser"] [data-id="PP-ProfileChooser-AuthAccount"], [data-id="AccountChooser-AccountList-individual"]') != null) {
+
+            if($this->exts->exists('h1[data-id="PasskeyFactorPage-Title"]') && !$this->exts->exists($this->password_selector)){
+                $this->exts->type_key_by_xdotool('Return');
+                sleep(2);
+                $this->exts->click_by_xdotool('button[data-id="Page-PrimaryButton"]');
+                sleep(1);
+            }
+
+
+            if ($this->exts->exists('[data-id="PP-ProfileChooser-Chooser"] [data-id="PP-ProfileChooser-AuthAccount"], [data-id="AccountChooser-AccountList-individual"]')) {
                 $this->exts->capture("x-profile-selection-page");
                 $this->exts->moveToElementAndClick('[data-id="PP-ProfileChooser-Chooser"] [data-id="PP-ProfileChooser-AuthAccount"], [data-id="AccountChooser-AccountList-individual"]');
                 sleep(7);
@@ -225,9 +254,11 @@ private function checkFillLogin()
                         sleep(12);
                     }
                     $this->exts->capture("2-password-submitted-1");
-                    if ($this->exts->getElement('[data-id="PP-ProfileChooser-Chooser"] [data-id="PP-ProfileChooser-AuthAccount"], [data-id="AccountChooser-AccountList-individual"]') != null) {
-                        $this->exts->capture("x-profile-selection-page");
-                        $this->exts->moveToElementAndClick('[data-id="PP-ProfileChooser-Chooser"] [data-id="PP-ProfileChooser-AuthAccount"], [data-id="AccountChooser-AccountList-individual"]');
+                    if ($this->exts->exists('[data-id="PP-ProfileChooser-Chooser"] [data-id="PP-ProfileChooser-AuthAccount"], [data-id="AccountChooser-AccountList-individual"]')) {
+                        $this->exts->capture("x-profile-selection-page-6");
+                        $this->exts->type_key_by_xdotool('Return');
+                        sleep(2);
+                        $this->exts->click_by_xdotool('[data-id="PP-ProfileChooser-Chooser"] [data-id="PP-ProfileChooser-AuthAccount"], [data-id="AccountChooser-AccountList-individual"]');
                         sleep(7);
                     }
                     if ($this->exts->exists($this->password_selector)) {
@@ -938,7 +969,7 @@ private function loginAppleIfRequired()
         sleep(1);
         $this->exts->switchToDefault();
         if ($this->exts->exists('iframe[name="aid-auth-widget"]')) {
-            $this->exts->switchToFrame('iframe[name="aid-auth-widget"]');
+            $this->switchToFrame('iframe[name="aid-auth-widget"]');
         }
         if ($this->exts->exists('.signin-error #errMsg + a')) {
             $this->exts->loginFailure(1);
@@ -950,7 +981,7 @@ private function loginAppleIfRequired()
         $this->checkFillAppleTwoFactor();
         $this->exts->switchToDefault();
         if ($this->exts->exists('iframe[src*="/account/repair"]')) {
-            $this->exts->switchToFrame('iframe[src*="/account/repair"]');
+            $this->switchToFrame('iframe[src*="/account/repair"]');
             // If 2FA setting up page showed, click to cancel
             if ($this->exts->allExists(['.idms-step-content .icon-2fa', 'button.button-secondary.nav-cancel'])) {
                 // Click "Other Option"
@@ -965,10 +996,10 @@ private function loginAppleIfRequired()
 
         // Click to accept consent temps, Must go inside 2 frame
         if ($this->exts->exists('iframe#aid-auth-widget-iFrame')) {
-            $this->exts->switchToFrame('iframe#aid-auth-widget-iFrame');
+            $this->switchToFrame('iframe#aid-auth-widget-iFrame');
         }
         if ($this->exts->exists('iframe[src*="/account/repair"]')) {
-            $this->exts->switchToFrame('iframe[src*="/account/repair"]');
+            $this->switchToFrame('iframe[src*="/account/repair"]');
             // If 2FA setting up page showed, click to cancel
             if ($this->exts->allExists(['.idms-step-content .icon-2fa', 'button.button-secondary.nav-cancel'])) {
                 // Click "Other Option"
@@ -989,7 +1020,7 @@ private function loginAppleIfRequired()
 }
 private function checkFillAppleLogin()
 {
-    $this->exts->switchToFrame('iframe[name="aid-auth-widget"]');
+    $this->switchToFrame('iframe[name="aid-auth-widget"]');
     $this->exts->capture("2-apple_login-page");
     if ($this->exts->getElement($this->apple_username_selector) != null) {
         sleep(1);
@@ -1020,11 +1051,11 @@ private function checkFillAppleLogin()
         $this->exts->switchToDefault();
 
         $this->exts->log(count($this->exts->getElements('iframe[name="aid-auth-widget"]')));
-        $this->exts->switchToFrame('iframe[name="aid-auth-widget"]');
+        $this->switchToFrame('iframe[name="aid-auth-widget"]');
         sleep(1);
 
         if ($this->exts->exists('iframe[src*="/account/repair"]')) {
-            $this->exts->switchToFrame('iframe[src*="/account/repair"]');
+            $this->switchToFrame('iframe[src*="/account/repair"]');
             // If 2FA setting up page showed, click to cancel
             if ($this->exts->allExists(['.idms-step-content .icon-2fa', 'button.button-secondary.nav-cancel'])) {
                 // Click "Other Option"
@@ -1042,7 +1073,7 @@ private function checkFillAppleLogin()
 }
 private function checkFillAppleTwoFactor()
 {
-    $this->exts->switchToFrame('#aid-auth-widget-iFrame');
+    $this->switchToFrame('#aid-auth-widget-iFrame');
     if ($this->exts->exists('.devices [role="list"] [role="button"][device-id]')) {
         $this->exts->moveToElementAndClick('.devices [role="list"] [role="button"][device-id]');
         sleep(5);
@@ -1094,7 +1125,7 @@ private function checkFillAppleTwoFactor()
 
             sleep(15);
             $this->exts->capture("2.2-apple-two-factor-submitted-" . $this->exts->two_factor_attempts);
-            $this->exts->switchToFrame('#aid-auth-widget-iFrame');
+            $this->switchToFrame('#aid-auth-widget-iFrame');
 
             if ($this->exts->getElement('input[id^="char"]') != null && $this->exts->two_factor_attempts < 3) {
                 $this->exts->two_factor_attempts++;
@@ -1113,6 +1144,28 @@ private function checkFillAppleTwoFactor()
     }
 }
 // ==================================END LOGIN WITH APPLE==================================
+
+
+public function switchToFrame($query_string)
+{
+    $this->exts->log(__FUNCTION__ . " Begin with " . $query_string);
+    $frame = null;
+    if (is_string($query_string)) {
+        $frame = $this->exts->queryElement($query_string);
+    }
+
+    if ($frame != null) {
+        $frame_context = $this->exts->get_frame_excutable_context($frame);
+        if ($frame_context != null) {
+            $this->exts->current_context = $frame_context;
+            return true;
+        }
+    } else {
+        $this->exts->log(__FUNCTION__ . " Frame not found " . $query_string);
+    }
+
+    return false;
+}
 
 private function processAfterLogin()
 {
@@ -1188,9 +1241,9 @@ private function processAfterLogin()
         sleep(3);
     }
 
-   
+    
 
-   
+    
     if ($this->exts->exists('[data-id="PP-T2EInviteIntroduction-SkipBtn"]')) {
         $this->exts->moveToElementAndClick('[data-id="PP-T2EInviteIntroduction-SkipBtn"]');
         sleep(3);
@@ -1330,14 +1383,8 @@ private function processAfterLogin()
 }
 private function downloadInvoices()
 {
-    if ($this->exts->exists('button[data-e2e="getHelp-close-btn"]')) {
-        $this->exts->moveToElementAndClick('button[data-e2e="getHelp-close-btn"]');
-        sleep(10);
-    }
-    for ($wait_count = 1; $wait_count <= 10 && !$this->exts->exists('tr a[href*="/billing/"], tr button[data-e2e="view-invoice-button"], tr button[data-e2e="download-invoices"], button:has([d^="M17.64941,26.85645a.4999.4999,0,0,0,.70118,0l7"])'); $wait_count++) {
-        $this->exts->log('Waiting invoice loaded');
-        sleep(10);
-    }
+    sleep(30);
+    $this->exts->capture("4-invoices-page-before");
     if ($this->exts->exists('div[id*="banner"] button[id*="accept-button"], button#onetrust-accept-btn-handler')) {
         $this->exts->moveToElementAndClick('div[id*="banner"] button[id*="accept-button"], button#onetrust-accept-btn-handler');
         sleep(1);
@@ -1357,58 +1404,56 @@ private function downloadInvoices()
     $date_from = $restrictPages == 0 ? date('Y-m-d', strtotime('-3 years')) : date('Y-m-d', strtotime('-3 months'));
     $this->exts->log("Download invoices from Date: " . $date_from);
 
-    $rows = $this->exts->getElements('table > tbody > tr, div[role="rowgroup"] div[role="row"]');
+    $rows = $this->exts->getElements('div[data-testid="table-view"] > div:last-child > div > div[role="rowgroup"] div[role="row"]');
+    if(count($rows) == 0){     
+        $rows = $this->exts->getElements('table[class*="invoices-and-billing-history-table"] tbody tr');
+    }
     foreach ($rows as $row) {
         $tags = $this->exts->getElements('td, div[role="presentation"]', $row);
-        if (count($tags) >= 6 && $this->exts->getElement('a[href*="/billing/"]', end($tags)) != null) {
-            $this->exts->log('--------------------------');
-            $invoiceUrl = $this->exts->getElement('a[href*="/billing/"]', end($tags))->getAttribute("href");
-            $invoiceName = end(explode(
-                '/',
-                trim(explode('?', $invoiceUrl)[0], '/')
-            ));
-            $invoiceDate = trim($tags[0]->getText());
-            $amountText = trim($tags[count($tags) - 2]->getText());
-            $invoiceAmount = preg_replace('/[^\d\.\,]/', '', $amountText);
-            if (stripos($amountText, 'A$') !== false) {
-                $invoiceAmount = $invoiceAmount . ' AUD';
-            } else if (stripos($amountText, '$') !== false) {
-                $invoiceAmount = $invoiceAmount . ' USD';
-            } else if (stripos(urlencode($amountText), '%C2%A3') !== false) {
-                $invoiceAmount = $invoiceAmount . ' GBP';
-            } else {
-                $invoiceAmount = $invoiceAmount . ' EUR';
-            }
 
+        $this->exts->log('No of Rows : '. count($rows));
+
+        if ($this->exts->getElement('div:nth-child(6) > div > span > span > div > button:nth-child(2)', $row) != null) {  
+            $invoiceUrl = '';
+            $invoiceAmount = $this->exts->extract('div:nth-child(5)', $row);
+            $invoiceDate =  $this->exts->extract('div:nth-child(1) span[data-testid="formatted-date"]', $row);
+            $invoiceUniqueName = $this->exts->extract('div:nth-child(3)', $row);
+
+            $formattedDate = date("d-M-Y", strtotime($invoiceDate));
+
+            // Concatenate if invoice name exists
+            $invoiceName = $formattedDate . ($invoiceUniqueName ? "-$invoiceUniqueName" : "");
+
+            $downloadBtn = $this->exts->querySelector('div:nth-child(6) > div > span > span > div > button:nth-child(2)', $row);
+
+            $this->isNoInvoice = false;
+            
+            $this->exts->log('--------------------------');
             $this->exts->log('invoiceName: ' . $invoiceName);
             $this->exts->log('invoiceDate: ' . $invoiceDate);
             $this->exts->log('invoiceAmount: ' . $invoiceAmount);
             $this->exts->log('invoiceUrl: ' . $invoiceUrl);
 
-            $parse_date = $invoiceDate;
-            $invoiceDate = $this->exts->parse_date($parse_date, 'j. F Y', 'Y-m-d');
-            $invoiceDate == '' ? $this->exts->parse_date($parse_date, 'F j. Y', 'Y-m-d') : $invoiceDate;
-            if ($invoiceDate == '') {
-                try {
-                    $invoiceDate = date('Y-m-d', (new \DateTime($parse_date))->getTimestamp());
-                } catch (\Exception $ex) {
-                    $invoiceDate = '';
-                }
-            }
-            $this->exts->log('Date parsed: ' . $invoiceDate);
-
             $invoiceFileName = $invoiceName . '.pdf';
-            $downloaded_file = $this->exts->direct_download($invoiceUrl, 'pdf', $invoiceFileName);
+            $invoiceDate = $this->exts->parse_date($invoiceDate, 'd. F Y', 'Y-m-d');
+            $this->exts->log('Date parsed: ' . $invoiceDate);
+            
+            // Click the download button
+
+            $this->exts->execute_javascript("arguments[0].click();", [$downloadBtn]);
+            $this->exts->wait_and_check_download('pdf');
+            $downloaded_file = $this->exts->find_saved_file('pdf',$invoiceFileName);
+
             if (trim($downloaded_file) != '' && file_exists($downloaded_file)) {
                 $this->exts->new_invoice($invoiceName, $invoiceDate, $invoiceAmount, $invoiceFileName);
                 sleep(1);
             } else {
                 $this->exts->log(__FUNCTION__ . '::No download ' . $invoiceFileName);
             }
-            $this->isNoInvoice = false;
-        } else if (count($tags) >= 6 && $this->exts->getElement('button:has([d^="M17.64941,26.85645a.4999.4999,0,0,0,.70118,0l7"])', end($tags)) != null) {
+                
+        } else if (count($tags) >= 6 && $this->exts->getElement('button[data-e2e="download-invoices"]', end($tags)) != null) {
             $this->exts->log('--------------------------');
-            $invoiceBtn = $this->exts->getElement('button:has([d^="M17.64941,26.85645a.4999.4999,0,0,0,.70118,0l7"])', end($tags));
+            $invoiceBtn = $this->exts->getElement('button[data-e2e="download-invoices"]', end($tags));
             $invoiceDate = trim($tags[0]->getAttribute('innerText'));
             $invoiceName = trim($tags[2]->getAttribute('innerText')) . '_' . str_replace([' ', ','], '', $invoiceDate);
             $invoiceFileName = $invoiceName . '.pdf';
@@ -1440,7 +1485,7 @@ private function downloadInvoices()
                     $this->exts->log(__FUNCTION__ . "::Exception:: invoiceBtn is not visible, try js click");
                     $this->exts->execute_javascript('arguments[0].click()', [$invoiceBtn]);
                 }
-                sleep(7);
+                sleep(5);
                 // Wait for completion of file download
                 $this->exts->wait_and_check_download('pdf');
 
@@ -1456,11 +1501,12 @@ private function downloadInvoices()
         }
     }
 }
+
 private function downloadTeamInvoices()
 {
     sleep(10);
     $this->exts->capture("4-team-invoices-page");
-    $this->exts->switchToFrame('iframe#billingList');
+    $this->switchToFrame('iframe#billingList');
     for ($wait_count = 1; $wait_count <= 10 && !$this->exts->exists('tr a[href*="/billing/"]'); $wait_count++) {
         $this->exts->log('Waiting invoice loaded');
         sleep(10);

@@ -1,5 +1,5 @@
 <?php// updated login code and download code // updated login code and added extract zip code in invoice download
-// updated download code
+// updated download code // added active account code and updated baseurl and tested the script for multiple account 
 // Server-Portal-ID: 2798003 - Last modified: 07.02.2025 10:53:05 UTC - User: 1
 
 /*Define constants used in script*/
@@ -73,7 +73,7 @@ private function initPortal($count)
 
             $this->exts->log('Select Account');
 
-            $accountRows = $this->exts->querySelectorAll('table#cardProAccountList');
+            $accountRows = $this->exts->querySelectorAll('table#cardProAccountList tr');
 
             $this->exts->log('account count: '. count($accountRows));
 
