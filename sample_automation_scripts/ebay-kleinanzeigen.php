@@ -22,6 +22,9 @@ private function initPortal($count) {
 	$this->exts->openUrl($this->baseUrl);
     sleep(5);
 	$this->exts->capture('1-init-page');
+	
+	$this->exts->loadCookiesFromFile();
+
 
 	$this->exts->waitTillPresent('#consentBanner #gdpr-banner-accept', 10);
 	if ($this->exts->exists('#consentBanner #gdpr-banner-accept')) {
@@ -39,6 +42,11 @@ private function initPortal($count) {
 		}
 		
 		$this->checkFillLogin();
+		sleep(15);
+		if ($this->exts->exists($this->username_selector)) {
+			$this->checkFillLogin();
+			sleep(5);
+		}
 
 		$this->exts->waitTillPresent('img[src*="new-device-login"]', 10);
 		if($this->exts->exists('img[src*="new-device-login"]')){
@@ -55,6 +63,7 @@ private function initPortal($count) {
 			}
 		}
 	}
+
 
 	// then check user logged in or not
 	if($this->isLoggedin()) {
@@ -104,7 +113,10 @@ private function initPortal($count) {
 private function checkFillLogin() {
 
 	$this->exts->waitTillPresent($this->username_selector, 10);
+
+	
 	if($this->exts->exists($this->username_selector)) {
+		$this->exts->capture('login-page-found');
 		sleep(3);
 		$this->exts->capture("2-login-page");
 
@@ -120,8 +132,9 @@ private function checkFillLogin() {
 
 		if ($this->exts->exists($this->submit_login_selector)) {
 			$this->exts->moveToElementAndClick($this->submit_login_selector);
-			sleep(2);
+			sleep(5);
 		}
+		$this->exts->capture('login-page-submit');
 		
 	} else {
 		$this->exts->log(__FUNCTION__.'::Login page not found');

@@ -8,7 +8,7 @@ public $invoicePageUrl = 'https://app.convertkit.com/';
 public $username_selector = 'form#new_user input[name="user[email]"]';
 public $password_selector = 'form#new_user input[name="user[password]"]';
 public $remember_me_selector = 'form#new_user input#user_remember_me';
-public $submit_login_selector = 'form#new_user button[type="submit"], form#new_user button.rounded, form#new_user button.rounded-r';
+public $submit_login_selector = 'button#user_log_in, form#new_user button[type="submit"]';
 
 public $check_login_failed_selector = 'div.alert:not([style*="display: none"])';
 public $check_login_success_selector = 'a[href="/users/logout"]';
@@ -25,7 +25,7 @@ private function initPortal($count)
     sleep(1);
 
     // Load cookies
-    $this->exts->loadCookiesFromFile();
+    // $this->exts->loadCookiesFromFile();
     sleep(1);
     $this->exts->openUrl($this->baseUrl);
     sleep(10);
@@ -35,7 +35,7 @@ private function initPortal($count)
     if ($this->exts->getElement($this->check_login_success_selector) == null) {
         $this->exts->log('NOT logged via cookie');
         $this->exts->openUrl($this->loginUrl);
-        sleep(15);
+        sleep(5);
         $this->checkFillLogin();
         sleep(10);
 
@@ -105,6 +105,7 @@ private function initPortal($count)
 
 private function checkFillLogin()
 {
+    $this->exts->waitTillPresent($this->password_selector);
     if ($this->exts->getElement($this->password_selector) != null) {
         sleep(3);
         $this->exts->capture("2-login-page");
@@ -119,7 +120,7 @@ private function checkFillLogin()
 
         if ($this->remember_me_selector != '')
             $this->exts->moveToElementAndClick($this->remember_me_selector);
-        sleep(5);
+        sleep(2);
 
         $this->exts->capture("2-login-page-filled");
         if ($this->exts->exists($this->submit_login_selector)) {
