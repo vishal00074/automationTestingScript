@@ -1,7 +1,3 @@
-<?php // updated call again checklogin function according to script behaviour and  password failed selector added base url failed on test engine because login failed checked logs loginFailedConfirmed 
-// Server-Portal-ID: 10968 - Last modified: 12.02.2025 06:04:52 UTC - User: 1
-
-
 public $baseUrl = 'https://www.kleinanzeigen.de/';
 public $loginUrl = 'https://auth.kleinanzeigen.de/login/';
 public $invoicePageUrl = 'https://www.ebay-kleinanzeigen.de/m-rechnungen.html';
@@ -71,20 +67,10 @@ private function initPortal($count) {
 		$this->exts->log(__FUNCTION__.'::User logged in');
 		$this->exts->capture("3-login-success");
 
-		$this->exts->waitTillPresent('#consentBanner #gdpr-banner-accept', 10);
-		if ($this->exts->exists('#consentBanner #gdpr-banner-accept')) {
-			$this->exts->click_by_xdotool('#consentBanner #gdpr-banner-accept');
+		if (!empty($this->exts->config_array['allow_login_success_request'])) {
+			$this->exts->triggerLoginSuccess();
 		}
 
-		$this->exts->openUrl($this->invoicePageUrl);
-		$this->processInvoices();
-
-		// Final, check no invoice
-		if($this->isNoInvoice){
-			$this->exts->no_invoice();
-		}
-
-		$this->exts->success();
 	} else {
 		$this->exts->log(__FUNCTION__.'::Use login failed');
 
@@ -200,40 +186,4 @@ private function isLoggedin()
 {
 	$this->exts->waitTillPresent('#user-logout',10);
 	return $this->exts->exists('#user-logout');
-}
-
-private function processInvoices() {
-	$this->exts->waitTillPresent('.InvoicesList tr', 30);
-	$this->exts->capture("4-invoices-page");
-
-	$rows = $this->exts->count_elements('.InvoicesList tr');
-	for ($i=0; $i < $rows; $i++) { 
-		$row = $this->exts->getElements('.InvoicesList tr')[$i];
-		$invoice_button = $row->querySelector('a.downloadlink');
-		if($invoice_button != null){
-			$this->isNoInvoice = false;
-			$invoice_name = $invoice_button->getAttribute('innerText');
-			$invoice_date = $this->exts->extract('td:nth-child(5)', $row);
-			$invoice_amount = $this->exts->extract('td:nth-child(3)', $row);
-			$invoice_amount = preg_replace('/[^\d\.\,]/', '', $invoice_amount) . ' EUR';
-			$this->exts->log('--------------------------');
-			$this->exts->log('invoiceName: '.$invoice_name);
-			$this->exts->log('invoiceDate: '.$invoice_date);
-			$this->exts->log('invoiceAmount: '.$invoice_amount);
-
-			if($this->exts->invoice_exists($invoice_name)){
-				$this->exts->log('Invoice Existed: '.$invoice_name);
-			} else {
-				$this->exts->click_element($invoice_button);
-				sleep(5);
-				$this->exts->wait_and_check_download('pdf');
-				$downloaded_file = $this->exts->find_saved_file('pdf', $invoice_name. '.pdf');
-				if(trim($downloaded_file) != '' && file_exists($downloaded_file)){
-					$this->exts->new_invoice($invoice_name, $invoice_date, $invoice_amount, $downloaded_file);
-				} else {
-					$this->exts->log(__FUNCTION__.'::No download '.$invoice_name);
-				}
-			}
-		}
-	}
 }

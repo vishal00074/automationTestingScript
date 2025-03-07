@@ -1,4 +1,4 @@
-<?php // migrated script
+<?php // migrated script and added custom function for switch to frame
 // Server-Portal-ID: 18804 - Last modified: 02.08.2023 05:28:40 UTC - User: 1
 
 public $baseUrl = 'https://app.convertkit.com/';
