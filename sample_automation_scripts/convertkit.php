@@ -1,4 +1,4 @@
-<?php // migrated script and added custom function for switch to frame
+<?php // i have added the js code to find login failure code ia have tested with both scenerio 
 // Server-Portal-ID: 18804 - Last modified: 02.08.2023 05:28:40 UTC - User: 1
 
 public $baseUrl = 'https://app.convertkit.com/';
@@ -125,12 +125,22 @@ private function checkFillLogin()
         $this->exts->capture("2-login-page-filled");
         if ($this->exts->exists($this->submit_login_selector)) {
             $this->exts->moveToElementAndClick($this->submit_login_selector);
+            sleep(5);
+        }
+
+        $isErrorMessage = $this->exts->execute_javascript('document.body.innerHTML.includes("Failed to Login");');
+        $this->exts->log("isErrorMessage: ". $isErrorMessage);
+        if($isErrorMessage){
+            $this->exts->capture("login-failed-confirm-1");
+            $this->exts->loginFailure(1);
         }
 
         if(strpos(strtolower($this->exts->waitTillPresent('div.Toaster__message')), 'wait done') !== false){
             $this->exts->capture("login-failed-confirm");
             $this->exts->loginFailure(1);
         }
+
+        
 
     } else {
         $this->exts->log(__FUNCTION__ . '::Login page not found');

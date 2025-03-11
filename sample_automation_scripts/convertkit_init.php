@@ -48,12 +48,10 @@ private function initPortal($count)
         sleep(3);
         $this->exts->log(__FUNCTION__ . '::User logged in');
         $this->exts->capture("3-login-success");
-
         if (!empty($this->exts->config_array['allow_login_success_request'])) {
-
+ 
             $this->exts->triggerLoginSuccess();
         }
-
     } else {
         $this->exts->log(__FUNCTION__ . '::Use login failed');
         if ($this->exts->getElement($this->check_login_failed_selector) != null) {
@@ -86,12 +84,22 @@ private function checkFillLogin()
         $this->exts->capture("2-login-page-filled");
         if ($this->exts->exists($this->submit_login_selector)) {
             $this->exts->moveToElementAndClick($this->submit_login_selector);
+            sleep(5);
+        }
+
+        $isErrorMessage = $this->exts->execute_javascript('document.body.innerHTML.includes("Failed to Login");');
+        $this->exts->log("isErrorMessage: ". $isErrorMessage);
+        if($isErrorMessage){
+            $this->exts->capture("login-failed-confirm-1");
+            $this->exts->loginFailure(1);
         }
 
         if(strpos(strtolower($this->exts->waitTillPresent('div.Toaster__message')), 'wait done') !== false){
             $this->exts->capture("login-failed-confirm");
             $this->exts->loginFailure(1);
         }
+
+        
 
     } else {
         $this->exts->log(__FUNCTION__ . '::Login page not found');
@@ -166,24 +174,4 @@ private function checkFillTwoFactor()
     }
 }
 
-public function switchToFrame($query_string)
-{
-    $this->exts->log(__FUNCTION__ . " Begin with " . $query_string);
-    $frame = null;
-    if (is_string($query_string)) {
-        $frame = $this->exts->queryElement($query_string);
-    }
-
-    if ($frame != null) {
-        $frame_context = $this->exts->get_frame_excutable_context($frame);
-        if ($frame_context != null) {
-            $this->exts->current_context = $frame_context;
-            return true;
-        }
-    } else {
-        $this->exts->log(__FUNCTION__ . " Frame not found " . $query_string);
-    }
-
-    return false;
-}
 
