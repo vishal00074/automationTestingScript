@@ -33,17 +33,17 @@ class PortalScriptCDP
     }
 
     /*Define constants used in script*/
-    public $baseUrl = 'https://digimember.de/';
-    public $loginUrl = 'https://digimember.de/wp-login.php';
-    public $invoicePageUrl = '';
+    public $baseUrl = 'https://www.bookbeat.com/de/';
+    public $loginUrl = 'https://www.bookbeat.com/de/login';
+    public $invoicePageUrl = 'https://www.bookbeat.com/de/account/payment-history';
 
-    public $username_selector = 'input[id="user_login"]';
-    public $password_selector = 'input[id="user_pass"]';
-    public $remember_me_selector = 'input[id="rememberme"]';
-    public $submit_login_selector = 'input[id="wp-submit"]';
+    public $username_selector = 'input[name="username"]';
+    public $password_selector = 'input[name="password"]';
+    public $remember_me_selector = '';
+    public $submit_login_selector = 'button[type="submit"]:not(:disabled)';
 
-    public $check_login_failed_selector = 'div[class="ncore_msg ncore_msg_error"]';
-    public $check_login_success_selector = 'div[class*="treemenuitem"] a[href*="logout"]';
+    public $check_login_failed_selector = 'span[data-testid="login-credentials-error-message"]';
+    public $check_login_success_selector = 'a[href="/de/account/my-account"]';
 
     public $isNoInvoice = true;
 
@@ -56,10 +56,10 @@ class PortalScriptCDP
         $this->exts->log('Begin initPortal ' . $count);
         $this->exts->openUrl($this->baseUrl);
         sleep(2);
-        $this->exts->waitTillPresent('div[id="cookiescript_accept"]', 7);
+        $this->exts->waitTillPresent('button[id="onetrust-accept-btn-handler"]', 7);
 
-        if ($this->exts->exists('div[id="cookiescript_accept"]')) {
-            $this->exts->moveToElementAndClick('div[id="cookiescript_accept"]');
+        if ($this->exts->exists('button[id="onetrust-accept-btn-handler"]')) {
+            $this->exts->moveToElementAndClick('button[id="onetrust-accept-btn-handler"]');
             sleep(7);
         }
         $this->exts->loadCookiesFromFile();
@@ -75,32 +75,16 @@ class PortalScriptCDP
             $this->exts->log(">>>>>>>>>>>>>>>Login successful!!!!");
             $this->exts->capture("LoginSuccess");
 
-            if ($this->exts->exists('div[id="cookiescript_accept"]')) {
-                $this->exts->moveToElementAndClick('div[id="cookiescript_accept"]');
+            if ($this->exts->exists('button[id="onetrust-accept-btn-handler"]')) {
+                $this->exts->moveToElementAndClick('button[id="onetrust-accept-btn-handler"]');
                 sleep(7);
             }
-            $this->exts->openUrl('https://digimember.de/mitgliederbereich-account/');
-
-            $this->exts->waitTillPresent('a[href*="receipt"]');
-
-            $goToInvoice = $this->exts->getElement('a[href*="receipt"]');
-            if ($goToInvoice != null) {
-                $invoiceUrl = $goToInvoice->getAttribute("href");
-                $this->exts->openUrl($invoiceUrl);
-                $this->exts->waitTillPresent('div.receipt_page div[class="tglr_container"] button[class="tglr_label click-button small invoice toggler_open"]');
-
-                if ($this->exts->exists('div.receipt_page div[class="tglr_container"] button[class="tglr_label click-button small invoice toggler_open"]')) {
-                    $this->exts->moveToElementAndClick('div.receipt_page div[class="tglr_container"] button[class="tglr_label click-button small invoice toggler_open"]');
-                    sleep(2);
-                }
-            }
-
-
+            $this->exts->openUrl($this->invoicePageUrl);
             $this->downloadInvoices();
 
             $this->exts->success();
         } else {
-            if (stripos($this->exts->extract($this->check_login_failed_selector), 'Das Kennwort für') !== false) {
+            if (stripos($this->exts->extract($this->check_login_failed_selector), 'Falsche E-Mail Adresse oder falsches Passwort.') !== false) {
                 $this->exts->log("Wrong credential !!!!");
                 $this->exts->loginFailure(1);
             } else {
@@ -176,33 +160,37 @@ class PortalScriptCDP
     {
         $this->exts->log(__FUNCTION__);
 
-        $this->exts->waitTillPresent('div.tglr_container ul li');
+        $this->exts->waitTillPresent('table[class*="paymentHistory_table"] tbody tr');
         $this->exts->capture("4-invoices-classic");
 
+        $restrictPages = isset($this->exts->config_array["restrictPages"]) ? (int)@$this->exts->config_array["restrictPages"] : 3;
+
+        $this->exts->log('restrictPages count:: ' . $restrictPages);
+
+        while ($count < $restrictPages && $this->exts->exists('div[class*="paymentHistory"] button[class*="button_activeAnimation"]:nth-child(1)')) {
+            $this->exts->moveToElementAndClick('div[class*="paymentHistory"] button[class*="button_activeAnimation"]:nth-child(1)');
+            sleep(7);
+            $count++;
+        }
+
         $invoices = [];
-        $rows = $this->exts->getElements('div.tglr_container ul li');
+        $rows = $this->exts->getElements('table[class*="paymentHistory_table"] tbody tr');
         foreach ($rows as $key => $row) {
-            $download_link = $this->exts->getElement('a[href*="invoice"]:nth-child(1)', $row);
+            $download_link = $this->exts->getElement('td:nth-child(5) a', $row);
             if ($download_link != null) {
                 $invoiceUrl = $download_link->getAttribute("href");
-                preg_match('/invoice\/(\d+)\//', $invoiceUrl, $matches);
-
-                if (isset($matches[1])) {
-                    $invoiceName = $matches[1];
-                } else {
-                    $invoiceName = time();
-                }
-
-
-                $invoiceDate = $this->exts->extract('font:nth-child(2)', $row);
-                $invoiceAmount = '';
+                $path = parse_url($invoiceUrl, PHP_URL_PATH); 
+                $segments = explode("/", $path); 
+                $invoiceName = end($segments);
+                $invoiceName = $invoiceName ?? time();
+                $invoiceDate = $this->exts->extract('td:nth-child(3)', $row);
+                $invoiceAmount = $this->exts->extract('td:nth-child(2)', $row);;
 
                 array_push($invoices, array(
                     'invoiceName' => $invoiceName,
                     'invoiceDate' => $invoiceDate,
                     'invoiceAmount' => $invoiceAmount,
                     'invoiceUrl' => $invoiceUrl,
-                    'downloadBtn' => $download_link
                 ));
                 $this->isNoInvoice = false;
             }
@@ -221,8 +209,7 @@ class PortalScriptCDP
             $invoice['invoiceDate'] = $this->exts->parse_date($invoice['invoiceDate'], 'd.m.Y', 'Y-m-d');
             $this->exts->log('Date parsed: ' . $invoice['invoiceDate']);
 
-            $downloaded_file = $this->exts->click_and_download($invoice['downloadBtn'] 'pdf', $invoiceFileName);
-            
+            $downloaded_file = $this->exts->direct_download($invoice['invoiceUrl'], 'pdf', $invoiceFileName);
             if (trim($downloaded_file) != '' && file_exists($downloaded_file)) {
                 $this->exts->new_invoice($invoice['invoiceName'], $invoice['invoiceDate'], $invoice['invoiceAmount'], $invoiceFileName);
                 sleep(1);

@@ -1,54 +1,42 @@
-public $baseUrl = 'https://myoffice.lrworld.com/';
-public $loginUrl = 'https://sso.lrworld.com/cas/login?d=h&service=https%3A%2F%2Fmyoffice.lrworld.com%2Fsso';
-public $invoicePageUrl = '';
+public $baseUrl = 'https://www.bookbeat.com/de/';
+public $loginUrl = 'https://www.bookbeat.com/de/login';
+public $invoicePageUrl = 'https://www.bookbeat.com/de/account/payment-history';
 
-public $username_selector = 'input[id="username"]';
-public $password_selector = 'input[id="password"]';
+public $username_selector = 'input[name="username"]';
+public $password_selector = 'input[name="password"]';
 public $remember_me_selector = '';
-public $submit_login_selector = 'button[name="submit"]';
+public $submit_login_selector = 'button[type="submit"]:not(:disabled)';
 
-public $check_login_failed_selector = 'div#loginErrorsPanel p';
-public $check_login_success_selector = 'a[href="/logout"]';
+public $check_login_failed_selector = 'span[data-testid="login-credentials-error-message"]';
+public $check_login_success_selector = 'a[href="/de/account/my-account"]';
 
 public $isNoInvoice = true;
 
 /**
-* Entry Method thats called for a portal
-* @param Integer $count Number of times portal is retried.
-*/
+    * Entry Method thats called for a portal
+    * @param Integer $count Number of times portal is retried.
+    */
 private function initPortal($count)
 {
     $this->exts->log('Begin initPortal ' . $count);
     $this->exts->openUrl($this->baseUrl);
     sleep(2);
-    $this->exts->loadCookiesFromFile();
+    $this->exts->waitTillPresent('button[id="onetrust-accept-btn-handler"]', 7);
 
-    sleep(10);
-    // Accecpt cookies
-    if($this->exts->exists('div#ccc-notify button.ccc-button-solid')){
-        $this->exts->moveToElementAndClick('div#ccc-notify button.ccc-button-solid');
+    if ($this->exts->exists('button[id="onetrust-accept-btn-handler"]')) {
+        $this->exts->moveToElementAndClick('button[id="onetrust-accept-btn-handler"]');
         sleep(7);
     }
+    $this->exts->loadCookiesFromFile();
     if (!$this->checkLogin()) {
         $this->exts->log('NOT logged via cookie');
-        $this->exts->clearCookies();
-        $this->exts->openUrl($this->loginUrl);
-        sleep(10);
-        // Accecpt cookies
-        if($this->exts->exists('div#ccc-notify button.ccc-button-solid')){
-            $this->exts->moveToElementAndClick('div#ccc-notify button.ccc-button-solid');
-            sleep(7);
-        }
-        $this->fillForm(0);
 
+        $this->exts->clearCookies();
+        sleep(5);
+        $this->exts->openUrl($this->loginUrl);
+        $this->fillForm(0);
     }
     if ($this->checkLogin()) {
-
-        if($this->exts->exists('div#ccc-notify button.ccc-button-solid')){
-            $this->exts->moveToElementAndClick('div#ccc-notify button.ccc-button-solid');
-            sleep(7);
-        }
-
         $this->exts->log(">>>>>>>>>>>>>>>Login successful!!!!");
         $this->exts->capture("LoginSuccess");
 
@@ -56,8 +44,9 @@ private function initPortal($count)
             $this->exts->triggerLoginSuccess();
         }
 
+        $this->exts->success();
     } else {
-        if (stripos($this->exts->extract($this->check_login_failed_selector), 'Login failed. Please check your user name and/or password.') !== false) {
+        if (stripos($this->exts->extract($this->check_login_failed_selector), 'Falsche E-Mail Adresse oder falsches Passwort.') !== false) {
             $this->exts->log("Wrong credential !!!!");
             $this->exts->loginFailure(1);
         } else {
@@ -66,10 +55,10 @@ private function initPortal($count)
     }
 }
 
-
-function fillForm($count)
+public function fillForm($count)
 {
     $this->exts->log("Begin fillForm " . $count);
+
     $this->exts->waitTillPresent($this->username_selector);
     try {
         if ($this->exts->querySelector($this->username_selector) != null) {
@@ -88,10 +77,16 @@ function fillForm($count)
             }
 
             $this->exts->capture("1-login-page-filled");
-           
+
             if ($this->exts->exists($this->submit_login_selector)) {
-                $this->exts->click_by_xdotool($this->submit_login_selector);
+                $this->exts->moveToElementAndClick($this->submit_login_selector);
                 sleep(10);
+            }
+        } else {
+            $this->exts->log("Login page not found");
+            for ($i = 0; $i < 10; $i++) {
+                $this->exts->waitTillPresent('a[href*="login"][target="_self"]');
+                $this->exts->moveToElementAndClick('a[href*="login"][target="_self"]');
             }
         }
     } catch (\Exception $exception) {
@@ -99,21 +94,21 @@ function fillForm($count)
         $this->exts->log("Exception filling loginform " . $exception->getMessage());
     }
 }
-
 /**
-* Method to Check where user is logged in or not
-* return boolean true/false
-*/
-function checkLogin()
+    * Method to Check where user is logged in or not
+    * return boolean true/false
+    */
+public  function checkLogin()
 {
     $this->exts->log("Begin checkLogin ");
     $isLoggedIn = false;
     try {
-        $this->exts->waitTillPresent($this->check_login_success_selector);
+        for ($wait = 0; $wait < 2 && $this->exts->executeSafeScript("return !!document.querySelector('" . $this->check_login_success_selector . "');") != 1; $wait++) {
+            $this->exts->log('Waiting for login.....');
+            sleep(10);
+        }
         if ($this->exts->exists($this->check_login_success_selector)) {
-
             $this->exts->log(">>>>>>>>>>>>>>>Login successful!!!!");
-
             $isLoggedIn = true;
         }
     } catch (Exception $exception) {
