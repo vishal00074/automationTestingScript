@@ -1039,7 +1039,7 @@ Class Code {
             sleep(1);
         }
         $this->exts->type_key_by_xdotool('Return');
-        sleep(15);
+        sleep(10);
         $this->exts->capture("after-clear");
     }
 

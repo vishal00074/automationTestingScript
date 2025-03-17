@@ -1,3 +1,4 @@
+/*Define constants used in script*/
 public $baseUrl = 'https://www.optica.de/app-meinoptica#portalApi';
 public $loginUrl = 'https://www.optica.de/meinoptica-login';
 public $invoicePageUrl = 'https://www.optica.de/app-meinoptica#portalApi/rezepte';
@@ -13,9 +14,9 @@ public $check_login_success_selector = 'a[class*="topmenu__signout"]';
 public $isNoInvoice = true;
 
 /**
-* Entry Method thats called for a portal
-* @param Integer $count Number of times portal is retried.
-*/
+    * Entry Method thats called for a portal
+    * @param Integer $count Number of times portal is retried.
+    */
 private function initPortal($count)
 {
     $this->exts->log('Begin initPortal ' . $count);
@@ -23,7 +24,7 @@ private function initPortal($count)
     sleep(2);
     $this->exts->waitTillPresent('button#CybotCookiebotDialogBodyLevelButtonLevelOptinAllowAll');
 
-    if($this->exts->exists('button#CybotCookiebotDialogBodyLevelButtonLevelOptinAllowAll')){
+    if ($this->exts->exists('button#CybotCookiebotDialogBodyLevelButtonLevelOptinAllowAll')) {
         $this->exts->moveToElementAndClick('button#CybotCookiebotDialogBodyLevelButtonLevelOptinAllowAll');
         sleep(7);
     }
@@ -31,19 +32,18 @@ private function initPortal($count)
     $this->exts->loadCookiesFromFile();
 
     sleep(10);
-   
+
     if (!$this->checkLogin()) {
         $this->exts->log('NOT logged via cookie');
         $this->exts->clearCookies();
         $this->exts->openUrl($this->loginUrl);
         sleep(10);
         // Accecpt cookies
-        if($this->exts->exists('button#CybotCookiebotDialogBodyLevelButtonLevelOptinAllowAll')){
+        if ($this->exts->exists('button#CybotCookiebotDialogBodyLevelButtonLevelOptinAllowAll')) {
             $this->exts->moveToElementAndClick('button#CybotCookiebotDialogBodyLevelButtonLevelOptinAllowAll');
             sleep(7);
         }
         $this->fillForm(0);
-
     }
     if ($this->checkLogin()) {
         $this->exts->log(">>>>>>>>>>>>>>>Login successful!!!!");
@@ -54,6 +54,7 @@ private function initPortal($count)
             $this->exts->triggerLoginSuccess();
         }
 
+        $this->exts->success();
     } else {
         if (stripos($this->exts->extract($this->check_login_failed_selector), 'Ungültiger Benutzername oder Passwort.') !== false) {
             $this->exts->log("Wrong credential !!!!");
@@ -70,7 +71,7 @@ private function initPortal($count)
 function fillForm($count)
 {
     $this->exts->log("Begin fillForm " . $count);
-    
+
     $this->exts->waitTillPresent('iframe[src*="kuop.optica.de"]');
 
     $this->switchToFrame('iframe[src*="kuop.optica.de"]');
@@ -93,7 +94,7 @@ function fillForm($count)
             }
 
             $this->exts->capture("1-login-page-filled");
-           
+
             if ($this->exts->exists($this->submit_login_selector)) {
                 $this->exts->moveToElementAndClick($this->submit_login_selector);
                 sleep(10);
@@ -106,15 +107,18 @@ function fillForm($count)
 }
 
 /**
-* Method to Check where user is logged in or not
-* return boolean true/false
-*/
+    * Method to Check where user is logged in or not
+    * return boolean true/false
+    */
 function checkLogin()
 {
     $this->exts->log("Begin checkLogin ");
     $isLoggedIn = false;
     try {
-        $this->exts->waitTillPresent($this->check_login_success_selector);
+        for ($wait = 0; $wait < 15 && $this->exts->executeSafeScript("return !!document.querySelector('" . $this->check_login_success_selector . "');") != 1; $wait++) {
+            $this->exts->log('Waiting for login.....');
+            sleep(10);
+        }
         if ($this->exts->exists($this->check_login_success_selector)) {
 
             $this->exts->log(">>>>>>>>>>>>>>>Login successful!!!!");
