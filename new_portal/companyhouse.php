@@ -1,15 +1,15 @@
 <?php
 /*Define constants used in script*/
-public $baseUrl = 'https://www.odido.nl/zakelijk/';
-public $loginUrl = 'https://www.odido.nl/zakelijk/login';
-public $invoicePageUrl = 'https://www.odido.nl/my/facturen';
+public $baseUrl = 'https://www.companyhouse.de/';
+public $loginUrl = 'https://www.companyhouse.de/user/login';
+public $invoicePageUrl = '';
 
-public $username_selector = 'input[data-interaction-id="login-username"]';
-public $password_selector = 'input[data-interaction-id="login-password"]';
+public $username_selector = 'input#login-form-login';
+public $password_selector = '';
 public $remember_me_selector = '';
-public $submit_login_selector = 'button[type="submit"][class*="button-base"]';
+public $submit_login_selector = 'form#login-form button[type="submit"]';
 
-public $check_login_failed_selector = 'div.callout-danger';
+public $check_login_failed_selector = 'div#password-error-info p.help-block-error';
 public $check_login_success_selector = 'a[href="/logout"]';
 
 public $isNoInvoice = true;
@@ -26,9 +26,9 @@ private function initPortal($count)
     $this->exts->loadCookiesFromFile();
 
     sleep(10);
-    // Accecpt cookies
-    if($this->exts->exists('button[data-interaction-id="koekje-settings-save-button"]')){
-        $this->exts->moveToElementAndClick('button[data-interaction-id="koekje-settings-save-button"]');
+
+    if($this->exts->exists('div.cookie-banner-wrapper')){
+        $this->exts->moveToElementAndClick('div.cookies-banner-close');
         sleep(7);
     }
     if (!$this->checkLogin()) {
@@ -36,15 +36,14 @@ private function initPortal($count)
         $this->exts->clearCookies();
         $this->exts->openUrl($this->loginUrl);
         sleep(10);
-        // Accecpt cookies
-        if($this->exts->exists('button[data-interaction-id="koekje-settings-save-button"]')){
-            $this->exts->moveToElementAndClick('button[data-interaction-id="koekje-settings-save-button"]');
+        if($this->exts->exists('div.cookie-banner-wrapper')){
+            $this->exts->moveToElementAndClick('div.cookies-banner-close');
             sleep(7);
         }
         $this->fillForm(0);
 
 
-        if($this->exts->exists('div[data-interaction-id="verify-2fa-Pincode"]')){
+        if($this->exts->exists('div.verification-code-wrapper')){
             $this->checkFillTwoFactor();
         }
 
@@ -53,18 +52,13 @@ private function initPortal($count)
         $this->exts->log(">>>>>>>>>>>>>>>Login successful!!!!");
         $this->exts->capture("LoginSuccess");
 
-        $this->doAfterLogin();
-        sleep(5);
-
-        $this->exts->openUrl($this->invoicePageUrl);
-        $this->downloadInvoices();
         // Final, check no invoice
         if ($this->isNoInvoice) {
             $this->exts->no_invoice();
         }
         $this->exts->success();
     } else {
-        if (stripos(strtolower($this->exts->extract($this->check_login_failed_selector)), 'passwor') !== false) {
+        if (stripos($this->exts->extract($this->check_login_failed_selector), 'Ungültiger Code - bitte versuchen Sie es erneut oder senden Sie sich einen neuen Code.') !== false) {
             $this->exts->log("Wrong credential !!!!");
             $this->exts->loginFailure(1);
         } else {
@@ -85,14 +79,6 @@ function fillForm($count)
             $this->exts->log("Enter Username");
             $this->exts->moveToElementAndType($this->username_selector, $this->username);
             sleep(2);
-            $this->exts->log("Enter Password");
-            $this->exts->moveToElementAndType($this->password_selector, $this->password);
-            sleep(2);
-
-            if ($this->exts->exists($this->remember_me_selector)) {
-                $this->exts->click_by_xdotool($this->remember_me_selector);
-                sleep(2);
-            }
 
             $this->exts->capture("1-login-page-filled");
            
@@ -104,27 +90,6 @@ function fillForm($count)
     } catch (\Exception $exception) {
 
         $this->exts->log("Exception filling loginform " . $exception->getMessage());
-    }
-}
-
-function doAfterLogin()
-{
-    //  Select subscription after login
-
-    // Commented Selector for now script have different behaviour
-    // $rows = $this->exts->getElements('button[id*="SelectSubscriberAfterLogin"]');
-    $rows = $this->exts->getElements('button[name*="SwitchMobileSubscription"]');
-    
-    $this->exts->log("Subscription account count:: ". count($rows));
-
-    foreach($rows as $row)
-    {
-        try{
-            // Click on first Element
-            $row->click();
-        }catch(\Exception $e){
-            $this->exts->log("Subscription Error:: ". $e->getMessage());
-        }
     }
 }
 
@@ -153,8 +118,8 @@ function checkLogin()
 
 private function checkFillTwoFactor()
 {
-    $two_factor_selector = 'input[name="verification-code"]';
-    $two_factor_message_selector = 'div.invalid-feedback';
+    $two_factor_selector = 'input[name*="verification-code"]';
+    $two_factor_message_selector = 'div#password-error-info p.help-block-error';
     $two_factor_submit_selector = '';
     if ($this->exts->querySelector($two_factor_selector) != null && $this->exts->two_factor_attempts < 3) {
         $this->exts->log("Two factor page found.");
@@ -181,10 +146,13 @@ private function checkFillTwoFactor()
 
             $resultCodes = str_split($two_factor_code);
 
-            foreach($resultCodes as $inputVal){
+            foreach($resultCodes as  $key =>  $inputVal){
+                $selVal = $key + 1;
+                $inputSelector = 'input[name="verification-code-'.$selVal.'"]';
 				$this->exts->log("inputVal: " . $inputVal);
+				$this->exts->log("inputSel: " . $inputSelector);
+				$this->exts->moveToElementAndType($inputSelector, $inputVal);
 				sleep(2);
-				$this->exts->type_text_by_xdotool($inputVal);
 			}
 
             $this->exts->log("checkFillTwoFactor: Clicking submit button.");
@@ -210,63 +178,4 @@ private function checkFillTwoFactor()
             $this->exts->log("Not received two factor code");
         }
     }
-}
-private function downloadInvoices() {
-	$this->exts->log(__FUNCTION__);
-
-    $this->exts->waitTillPresent('div[id*="Invoices_Container"]');
-	$this->exts->capture("4-invoices-classic");
-	
-    $restrictPages = isset($this->exts->config_array["restrictPages"]) ? (int)@$this->exts->config_array["restrictPages"] : 3;
-
-    for($i= 0; $i < $restrictPages && $this->exts->exists('a[id*="Invoices_MoreOrLessIvoices"][class="button-outline-base toggle"]'); $i++) {
-        $this->exts->moveToElementAndClick('a[id*="Invoices_MoreOrLessIvoices"][class="button-outline-base toggle"]');
-        sleep(7);
-    }
-
-    $invoices = [];
-	$rows = $this->exts->getElements('div[id*="Invoices_Container"] ul.list-group-inset li');
-	foreach ($rows as $row) {
-		$download_link = $this->exts->getElement('div.column-tablet-7 a[href*="my/facturen"][class*="button-base"]', $row);
-		if($download_link != null) {
-			$invoiceUrl = $download_link->getAttribute("href");
-
-            parse_str(parse_url($invoiceUrl, PHP_URL_QUERY), $params);
-            $invoiceName = $params['id'] ?? time();
-			$invoiceName = trim($invoiceName);
-			$invoiceDate = $this->exts->extract('div.column-6 p', $row);
-			$invoiceAmount = $this->exts->extract('div.column-tablet-5 span', $row);;
-            
-			array_push($invoices, array(
-				'invoiceName'=>$invoiceName,
-				'invoiceDate'=>$invoiceDate,
-				'invoiceAmount'=>$invoiceAmount,
-				'invoiceUrl'=>$invoiceUrl
-			));
-			$this->isNoInvoice = false;
-		}
-	}
-
-    // Download all invoices
-    $this->exts->log('Invoices found: '.count($invoices));
-    foreach ($invoices as $invoice) {
-        $this->exts->log('--------------------------');
-        $this->exts->log('invoiceName: '.$invoice['invoiceName']);
-        $this->exts->log('invoiceDate: '.$invoice['invoiceDate']);
-        $this->exts->log('invoiceAmount: '.$invoice['invoiceAmount']);
-        $this->exts->log('invoiceUrl: '.$invoice['invoiceUrl']);
-
-        $invoiceFileName = $invoice['invoiceName'].'.pdf';
-        $invoice['invoiceDate'] = $this->exts->parse_date($invoice['invoiceDate'], 'd.m.Y','Y-m-d');
-        $this->exts->log('Date parsed: '.$invoice['invoiceDate']);
-        
-        $downloaded_file = $this->exts->direct_download($invoice['invoiceUrl'], 'pdf', $invoiceFileName);
-        if(trim($downloaded_file) != '' && file_exists($downloaded_file)){
-            $this->exts->new_invoice($invoice['invoiceName'], $invoice['invoiceDate'], $invoice['invoiceAmount'], $invoiceFileName);
-            sleep(1);
-        } else {
-            $this->exts->log(__FUNCTION__.'::No download '.$invoiceFileName);
-        }
-    }
-    
 }
