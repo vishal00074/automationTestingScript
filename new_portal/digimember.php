@@ -88,15 +88,22 @@ class PortalScriptCDP
 
             if ($this->exts->exists('a[href*="receipt"]')) {
                 $this->exts->moveToElementAndClick('a[href*="receipt"]');
-                sleep(2);
+                sleep(10);
             }
 
-            $this->exts->waitTillPresent('div.receipt_page div[class="tglr_container"] button[class="tglr_label click-button small invoice toggler_open"]');
+            $goToInvoice = $this->exts->getElement('a[href*="receipt"]');
+            if ($goToInvoice != null) {
+                $invoiceUrl = $goToInvoice->getAttribute("href");
+                $this->exts->openUrl($invoiceUrl);
+                $this->exts->waitTillPresent('div.receipt_page div[class="tglr_container"] button[class="tglr_label click-button small invoice toggler_open"]');
 
-            if ($this->exts->exists('div.receipt_page div[class="tglr_container"] button[class="tglr_label click-button small invoice toggler_open"]')) {
-                $this->exts->moveToElementAndClick('div.receipt_page div[class="tglr_container"] button[class="tglr_label click-button small invoice toggler_open"]');
-                sleep(2);
+                if ($this->exts->exists('div.receipt_page div[class="tglr_container"] button[class="tglr_label click-button small invoice toggler_open"]')) {
+                    $this->exts->moveToElementAndClick('div.receipt_page div[class="tglr_container"] button[class="tglr_label click-button small invoice toggler_open"]');
+                    sleep(2);
+                }
             }
+
+
             $this->downloadInvoices();
 
             $this->exts->success();
@@ -110,7 +117,7 @@ class PortalScriptCDP
         }
     }
 
-    function fillForm($count)
+    public function fillForm($count)
     {
         $this->exts->log("Begin fillForm " . $count);
 
@@ -153,7 +160,7 @@ class PortalScriptCDP
      * Method to Check where user is logged in or not
      * return boolean true/false
      */
-    function checkLogin()
+    public  function checkLogin()
     {
         $this->exts->log("Begin checkLogin ");
         $isLoggedIn = false;
@@ -162,11 +169,8 @@ class PortalScriptCDP
                 $this->exts->log('Waiting for login.....');
                 sleep(10);
             }
-
             if ($this->exts->exists($this->check_login_success_selector)) {
-
                 $this->exts->log(">>>>>>>>>>>>>>>Login successful!!!!");
-
                 $isLoggedIn = true;
             }
         } catch (Exception $exception) {
@@ -174,27 +178,6 @@ class PortalScriptCDP
             $this->exts->log("Exception checking loggedin " . $exception);
         }
         return $isLoggedIn;
-    }
-
-    public function switchToFrame($query_string)
-    {
-        $this->exts->log(__FUNCTION__ . " Begin with " . $query_string);
-        $frame = null;
-        if (is_string($query_string)) {
-            $frame = $this->exts->queryElement($query_string);
-        }
-
-        if ($frame != null) {
-            $frame_context = $this->exts->get_frame_excutable_context($frame);
-            if ($frame_context != null) {
-                $this->exts->current_context = $frame_context;
-                return true;
-            }
-        } else {
-            $this->exts->log(__FUNCTION__ . " Frame not found " . $query_string);
-        }
-
-        return false;
     }
 
     private function downloadInvoices($count = 0)

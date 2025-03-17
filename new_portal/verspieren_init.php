@@ -44,13 +44,9 @@ private function initPortal($count)
     if ($this->checkLogin()) {
         $this->exts->log(">>>>>>>>>>>>>>>Login successful!!!!");
         $this->exts->capture("LoginSuccess");
-
-    
         if (!empty($this->exts->config_array['allow_login_success_request'])) {
- 
             $this->exts->triggerLoginSuccess();
         }
-
         $this->exts->success();
     } else {
         if (stripos($this->exts->extract($this->check_login_failed_selector), "Le mot de passe saisi n'est pas valide.") !== false) {
@@ -63,7 +59,7 @@ private function initPortal($count)
 }
 
 
-function fillForm($count)
+public function fillForm($count)
 {
     $this->exts->log("Begin fillForm " . $count);
     $this->exts->waitTillPresent($this->username_selector);
@@ -100,16 +96,14 @@ function fillForm($count)
     * Method to Check where user is logged in or not
     * return boolean true/false
     */
-function checkLogin()
+public function checkLogin()
 {
     $this->exts->log("Begin checkLogin ");
     $isLoggedIn = false;
     try {
         $this->exts->waitTillPresent($this->check_login_success_selector);
         if ($this->exts->exists($this->check_login_success_selector)) {
-
             $this->exts->log(">>>>>>>>>>>>>>>Login successful!!!!");
-
             $isLoggedIn = true;
         }
     } catch (Exception $exception) {

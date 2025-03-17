@@ -109,7 +109,7 @@ class PortalScriptCDP
     }
 
 
-    function fillForm($count)
+    public function fillForm($count)
     {
         $this->exts->log("Begin fillForm " . $count);
         $this->exts->waitTillPresent($this->username_selector);
@@ -146,16 +146,14 @@ class PortalScriptCDP
      * Method to Check where user is logged in or not
      * return boolean true/false
      */
-    function checkLogin()
+    public function checkLogin()
     {
         $this->exts->log("Begin checkLogin ");
         $isLoggedIn = false;
         try {
             $this->exts->waitTillPresent($this->check_login_success_selector);
             if ($this->exts->exists($this->check_login_success_selector)) {
-
                 $this->exts->log(">>>>>>>>>>>>>>>Login successful!!!!");
-
                 $isLoggedIn = true;
             }
         } catch (Exception $exception) {
@@ -201,7 +199,6 @@ class PortalScriptCDP
                     $this->exts->log(__FUNCTION__ . '::No download ' . $invoiceFileName);
                 }
                 $this->isNoInvoice = false;
-    
             }
         }
     }
