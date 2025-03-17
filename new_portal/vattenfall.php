@@ -33,17 +33,17 @@ class PortalScriptCDP
     }
 
     /*Define constants used in script*/
-    public $baseUrl = 'https://digimember.de/';
-    public $loginUrl = 'https://digimember.de/wp-login.php';
+    public $baseUrl = 'https://portal.realestate.vattenfall.de/';
+    public $loginUrl = 'https://portal.realestate.vattenfall.de/auth/';
     public $invoicePageUrl = '';
 
-    public $username_selector = 'input[id="user_login"]';
-    public $password_selector = 'input[id="user_pass"]';
-    public $remember_me_selector = 'input[id="rememberme"]';
-    public $submit_login_selector = 'input[id="wp-submit"]';
+    public $username_selector = 'input[name="username"]';
+    public $password_selector = 'input[name="password"]';
+    public $remember_me_selector = '';
+    public $submit_login_selector = 'input[name="login"]';
 
-    public $check_login_failed_selector = 'div[class="ncore_msg ncore_msg_error"]';
-    public $check_login_success_selector = 'div[class*="treemenuitem"] a[href*="logout"]';
+    public $check_login_failed_selector = 'span[class*="kc-feedback-text"]';
+    public $check_login_success_selector = 'li a[href*="bundleCustomerNumber"]';
 
     public $isNoInvoice = true;
 
@@ -56,10 +56,10 @@ class PortalScriptCDP
         $this->exts->log('Begin initPortal ' . $count);
         $this->exts->openUrl($this->baseUrl);
         sleep(2);
-        $this->exts->waitTillPresent('div[id="cookiescript_accept"]', 7);
+        $this->exts->waitTillPresent('div.cookie-container button', 7);
 
-        if ($this->exts->exists('div[id="cookiescript_accept"]')) {
-            $this->exts->moveToElementAndClick('div[id="cookiescript_accept"]');
+        if ($this->exts->exists('div.cookie-container button')) {
+            $this->exts->moveToElementAndClick('div.cookie-container button');
             sleep(7);
         }
         $this->exts->loadCookiesFromFile();
@@ -70,37 +70,35 @@ class PortalScriptCDP
             sleep(5);
             $this->exts->openUrl($this->loginUrl);
             $this->fillForm(0);
+
+            $this->exts->waitTillPresent('div.MuiContainer-root button.MuiButtonBase-root', 10);
+
+            if ($this->exts->exists('div.MuiContainer-root button.MuiButtonBase-root')) {
+                $this->exts->moveToElementAndClick('div.MuiContainer-root button.MuiButtonBase-root');
+                sleep(10);
+            }
+
+            if ($this->exts->exists('div#kc-content a')) {
+                $this->exts->moveToElementAndClick('div#kc-content a');
+                sleep(10);
+            }
+
+            
         }
         if ($this->checkLogin()) {
             $this->exts->log(">>>>>>>>>>>>>>>Login successful!!!!");
             $this->exts->capture("LoginSuccess");
 
-            if ($this->exts->exists('div[id="cookiescript_accept"]')) {
-                $this->exts->moveToElementAndClick('div[id="cookiescript_accept"]');
+            if ($this->exts->exists('div.cookie-container button')) {
+                $this->exts->moveToElementAndClick('div.cookie-container button');
                 sleep(7);
             }
-            $this->exts->openUrl('https://digimember.de/mitgliederbereich-account/');
-
-            $this->exts->waitTillPresent('a[href*="receipt"]');
-
-            $goToInvoice = $this->exts->getElement('a[href*="receipt"]');
-            if ($goToInvoice != null) {
-                $invoiceUrl = $goToInvoice->getAttribute("href");
-                $this->exts->openUrl($invoiceUrl);
-                $this->exts->waitTillPresent('div.receipt_page div[class="tglr_container"] button[class="tglr_label click-button small invoice toggler_open"]');
-
-                if ($this->exts->exists('div.receipt_page div[class="tglr_container"] button[class="tglr_label click-button small invoice toggler_open"]')) {
-                    $this->exts->moveToElementAndClick('div.receipt_page div[class="tglr_container"] button[class="tglr_label click-button small invoice toggler_open"]');
-                    sleep(2);
-                }
-            }
-
 
             $this->downloadInvoices();
 
             $this->exts->success();
         } else {
-            if (stripos($this->exts->extract($this->check_login_failed_selector), 'Das Kennwort für') !== false) {
+            if (stripos($this->exts->extract($this->check_login_failed_selector), 'Der Zugriff wurde verweigert. Bitte überprüfen Sie Ihre Eingabedaten.') !== false) {
                 $this->exts->log("Wrong credential !!!!");
                 $this->exts->loginFailure(1);
             } else {
@@ -134,13 +132,7 @@ class PortalScriptCDP
 
                 if ($this->exts->exists($this->submit_login_selector)) {
                     $this->exts->moveToElementAndClick($this->submit_login_selector);
-                    sleep(10);
-                }
-            } else {
-                $this->exts->log("Login page not found");
-                for ($i = 0; $i < 10; $i++) {
-                    $this->exts->waitTillPresent('a[href*="login"][target="_self"]');
-                    $this->exts->moveToElementAndClick('a[href*="login"][target="_self"]');
+                    sleep(5);
                 }
             }
         } catch (\Exception $exception) {
