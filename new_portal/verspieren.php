@@ -79,7 +79,7 @@ class PortalScriptCDP
             $this->exts->log(">>>>>>>>>>>>>>>Login successful!!!!");
             $this->exts->capture("LoginSuccess");
 
-        
+
             $this->exts->waitTillPresent('span.closebtn', 10);
             if ($this->exts->exists('span.closebtn')) {
                 $this->exts->moveToElementAndClick('span.closebtn');
@@ -163,25 +163,26 @@ class PortalScriptCDP
         return $isLoggedIn;
     }
 
-    private function downloadInvoices() {
+    private function downloadInvoices()
+    {
         $this->exts->log(__FUNCTION__);
-    
+
         $this->exts->waitTillPresent('table[id*="tableAttribut"] tbody tr');
         $this->exts->capture("4-invoices-classic");
-    
+
         $rows = $this->exts->getElements('table[id*="tableAttribut"] tbody tr');
         foreach ($rows as $key => $row) {
             $downloadBtn = $this->exts->getElement('a', $row);
-            if($downloadBtn != null) {
-                
+            if ($downloadBtn != null) {
+
                 $invoiceName = time(); // create custome invoice name
                 $invoiceDate = $this->exts->extract('td[nowrap="nowrap"]', $row);
                 $invoiceAmount = $this->exts->extract('td:nth-child(3)', $row);
-    
+
                 sleep(15);
-                $captureName = "invoices-detail-".$key."";
+                $captureName = "invoices-detail-" . $key . "";
                 $this->exts->capture($captureName);
-    
+
                 $invoiceDate = $this->exts->parse_date($invoiceDate, 'd.m.Y', 'Y-m-d');
                 $this->exts->log('Date parsed: ' . $invoiceDate);
 
@@ -191,7 +192,7 @@ class PortalScriptCDP
                 $this->exts->log('invoiceName: ' . $invoiceName);
                 $this->exts->log('invoiceDate: ' . $invoiceDate);
                 $this->exts->log('invoiceAmount: ' . $invoiceAmount);
-    
+
                 $downloaded_file = $this->exts->click_and_download($downloadBtn, 'pdf', $invoiceFileName);
                 if (trim($downloaded_file) != '' && file_exists($downloaded_file)) {
                     $this->exts->new_invoice($invoiceName, $invoiceDate, $invoiceAmount, $invoiceFileName);
