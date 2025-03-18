@@ -33,17 +33,17 @@ class PortalScriptCDP
     }
 
     /*Define constants used in script*/
-    public $baseUrl = 'https://loader.io/tests';
-    public $loginUrl = 'https://loader.io/signin';
-    public $invoicePageUrl = 'https://loader.io/billing_subscription';
+    public $baseUrl = 'https://etepetete-bio.de/benutzermenue;userInfoTab=user-invoices';
+    public $loginUrl = 'https://etepetete-bio.de/';
+    public $invoicePageUrl = '';
 
-    public $username_selector = 'input[id="user_email"]';
-    public $password_selector = 'input[id="user_password"]';
-    public $remember_me_selector = 'input[id="user_remember_me"]';
-    public $submit_login_selector = 'input[id="sign-in"]';
+    public $username_selector = 'input[name="user"]';
+    public $password_selector = 'input[name="password"]';
+    public $remember_me_selector = 'input[id="keep-logged-in"]';
+    public $submit_login_selector = 'form[method="post"] button[type="submit"]';
 
-    public $check_login_failed_selector = 'div.center-alert a';
-    public $check_login_success_selector = 'a[href="/logout"]';
+    public $check_login_failed_selector = 'div.error';
+    public $check_login_success_selector = 'i.icon-logout';
 
     public $isNoInvoice = true;
 
@@ -56,36 +56,46 @@ class PortalScriptCDP
         $this->exts->log('Begin initPortal ' . $count);
         $this->exts->openUrl($this->baseUrl);
         sleep(2);
+        $this->exts->waitTillPresent('button#CybotCookiebotDialogBodyLevelButtonLevelOptinAllowAll', 7);
+
+        if ($this->exts->exists('button#CybotCookiebotDialogBodyLevelButtonLevelOptinAllowAll')) {
+            $this->exts->moveToElementAndClick('button#CybotCookiebotDialogBodyLevelButtonLevelOptinAllowAll');
+            sleep(5);
+        }
         $this->exts->loadCookiesFromFile();
         if (!$this->checkLogin()) {
             $this->exts->log('NOT logged via cookie');
 
             $this->exts->clearCookies();
             sleep(5);
-            if ($this->exts->querySelector($this->username_selector) != null) {
-                $this->fillForm(0);
-            } else {
-                $this->exts->openUrl($this->loginUrl);
-                $this->fillForm(0);
+            $this->exts->openUrl($this->loginUrl);
+
+            $this->exts->waitTillPresent('button.klaviyo-close-form', 5);
+
+            if ($this->exts->exists('button.klaviyo-close-form')) {
+                $this->exts->moveToElementAndClick('button.klaviyo-close-form');
+                sleep(5);
             }
+
+            if ($this->exts->exists('button[name="user-button"]')) {
+                $this->exts->moveToElementAndClick('button[name="user-button"]');
+                sleep(5);
+            }
+            $this->fillForm(0);
         }
         if ($this->checkLogin()) {
             $this->exts->log(">>>>>>>>>>>>>>>Login successful!!!!");
             $this->exts->capture("LoginSuccess");
 
-            $this->exts->openUrl($this->invoicePageUrl);
-
-            $this->exts->waitTillPresent('a[href="#payment-history"]');
-
-            if ($this->exts->exists('a[href="#payment-history"]')) {
-                $this->exts->moveToElementAndClick('a[href="#payment-history"]');
-                sleep(4);
+            if ($this->exts->exists('button#CybotCookiebotDialogBodyLevelButtonLevelOptinAllowAll')) {
+                $this->exts->moveToElementAndClick('button#CybotCookiebotDialogBodyLevelButtonLevelOptinAllowAll');
+                sleep(5);
             }
             $this->downloadInvoices();
 
             $this->exts->success();
         } else {
-            if (stripos($this->exts->extract($this->check_login_failed_selector), 'Invalid email or password.') !== false) {
+            if (stripos($this->exts->extract($this->check_login_failed_selector), 'Der angegebene Benutzer oder das Passwort ist nicht korrekt!') !== false) {
                 $this->exts->log("Wrong credential !!!!");
                 $this->exts->loginFailure(1);
             } else {
@@ -111,7 +121,7 @@ class PortalScriptCDP
                 sleep(2);
 
                 if ($this->exts->exists($this->remember_me_selector)) {
-                    $this->exts->moveToElementAndClick($this->remember_me_selector);
+                    $this->exts->click_by_xdotool($this->remember_me_selector);
                     sleep(2);
                 }
 
@@ -119,14 +129,7 @@ class PortalScriptCDP
 
                 if ($this->exts->exists($this->submit_login_selector)) {
                     $this->exts->moveToElementAndClick($this->submit_login_selector);
-                    sleep(5);
-                }
-                
-                $isErrorMessage = $this->exts->execute_javascript('document.body.innerHTML.includes("Invalid email or password.")');
-                if ($isErrorMessage) {
-                    $this->exts->capture("login-failed-confirmed");
-                    $this->exts->log("Wrong credential !!!!");
-                    $this->exts->loginFailure(1);
+                    sleep(10);
                 }
             }
         } catch (\Exception $exception) {
@@ -162,27 +165,24 @@ class PortalScriptCDP
     {
         $this->exts->log(__FUNCTION__);
 
-        $this->exts->waitTillPresent('table.payment-history tbody tr');
+        $this->exts->waitTillPresent('table tbody tr');
         $this->exts->capture("4-invoices-classic");
 
         $invoices = [];
-        $rows = $this->exts->getElements('table.payment-history tbody tr');
+        $rows = $this->exts->getElements('table tbody tr');
         foreach ($rows as $key => $row) {
-            $download_link = $this->exts->getElement('a[href*="invoice"]', $row);
-            if ($download_link != null) {
-                $invoiceUrl = $download_link->getAttribute("href");
-                $segments = explode("/", $invoiceUrl);
-                $transactionId = $segments[2];
-
-                $invoiceName = $transactionId ?? time(); // use custom name in case of null
-                $invoiceDate = $this->exts->extract('td:nth-child(1)', $row);
-                $invoiceAmount = $this->exts->extract('td:nth-child(4)', $row);;
+            $downloadBtn= $this->exts->getElement('td[guid="userinformation3_invoices_invoice_table_body_print"]', $row);
+            if ($downloadBtn != null) {
+                sleep(2);
+                $invoiceName = time(); // create custom invoice name
+                $invoiceDate = $this->exts->extract('td[guid="userinformation3_invoices_invoice_table_body_date"]', $row);
+                $invoiceAmount = $this->exts->extract('td[guid="userinformation3_invoices_invoice_table_body_sum"] span ', $row);;
 
                 array_push($invoices, array(
                     'invoiceName' => $invoiceName,
                     'invoiceDate' => $invoiceDate,
                     'invoiceAmount' => $invoiceAmount,
-                    'invoiceUrl' => $invoiceUrl,
+                    'downloadBtn' => $downloadBtn,
                 ));
                 $this->isNoInvoice = false;
             }
@@ -195,17 +195,12 @@ class PortalScriptCDP
             $this->exts->log('invoiceName: ' . $invoice['invoiceName']);
             $this->exts->log('invoiceDate: ' . $invoice['invoiceDate']);
             $this->exts->log('invoiceAmount: ' . $invoice['invoiceAmount']);
-            $this->exts->log('invoiceUrl: ' . $invoice['invoiceUrl']);
 
             $invoiceFileName = $invoice['invoiceName'] . '.pdf';
             $invoice['invoiceDate'] = $this->exts->parse_date($invoice['invoiceDate'], 'd.m.Y', 'Y-m-d');
             $this->exts->log('Date parsed: ' . $invoice['invoiceDate']);
 
-            $this->exts->openUrl($invoice['invoiceUrl']);
-            sleep(2);
-            $this->exts->waitTillPresent('div.no-print a');
-
-            $downloaded_file = $this->exts->click_and_print('div.no-print a', $invoiceFileName);
+            $downloaded_file = $this->exts->click_and_download($invoice['downloadBtn'], 'pdf', $invoiceFileName);
             if (trim($downloaded_file) != '' && file_exists($downloaded_file)) {
                 $this->exts->new_invoice($invoice['invoiceName'], $invoice['invoiceDate'], $invoice['invoiceAmount'], $invoiceFileName);
                 sleep(1);
