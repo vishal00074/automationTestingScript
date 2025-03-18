@@ -56,12 +56,6 @@ class PortalScriptCDP
         $this->exts->log('Begin initPortal ' . $count);
         $this->exts->openUrl($this->baseUrl);
         sleep(2);
-        $this->exts->waitTillPresent('button#CybotCookiebotDialogBodyLevelButtonLevelOptinAllowAll', 7);
-
-        if ($this->exts->exists('button#CybotCookiebotDialogBodyLevelButtonLevelOptinAllowAll')) {
-            $this->exts->moveToElementAndClick('button#CybotCookiebotDialogBodyLevelButtonLevelOptinAllowAll');
-            sleep(5);
-        }
         $this->exts->loadCookiesFromFile();
         if (!$this->checkLogin()) {
             $this->exts->log('NOT logged via cookie');
@@ -82,15 +76,13 @@ class PortalScriptCDP
                 sleep(5);
             }
             $this->fillForm(0);
+
+            $this->exts->openUrl($this->baseUrl);
         }
         if ($this->checkLogin()) {
             $this->exts->log(">>>>>>>>>>>>>>>Login successful!!!!");
             $this->exts->capture("LoginSuccess");
 
-            if ($this->exts->exists('button#CybotCookiebotDialogBodyLevelButtonLevelOptinAllowAll')) {
-                $this->exts->moveToElementAndClick('button#CybotCookiebotDialogBodyLevelButtonLevelOptinAllowAll');
-                sleep(5);
-            }
             $this->downloadInvoices();
 
             $this->exts->success();
@@ -171,41 +163,33 @@ class PortalScriptCDP
         $invoices = [];
         $rows = $this->exts->getElements('table tbody tr');
         foreach ($rows as $key => $row) {
-            $downloadBtn= $this->exts->getElement('td[guid="userinformation3_invoices_invoice_table_body_print"]', $row);
+            $downloadBtn= $this->exts->getElement('td[guid="userinformation3_invoices_invoice_table_body_print"] button', $row);
             if ($downloadBtn != null) {
                 sleep(2);
                 $invoiceName = time(); // create custom invoice name
                 $invoiceDate = $this->exts->extract('td[guid="userinformation3_invoices_invoice_table_body_date"]', $row);
                 $invoiceAmount = $this->exts->extract('td[guid="userinformation3_invoices_invoice_table_body_sum"] span ', $row);;
 
-                array_push($invoices, array(
-                    'invoiceName' => $invoiceName,
-                    'invoiceDate' => $invoiceDate,
-                    'invoiceAmount' => $invoiceAmount,
-                    'downloadBtn' => $downloadBtn,
-                ));
+                
                 $this->isNoInvoice = false;
-            }
-        }
 
-        // Download all invoices
-        $this->exts->log('Invoices found: ' . count($invoices));
-        foreach ($invoices as $invoice) {
-            $this->exts->log('--------------------------');
-            $this->exts->log('invoiceName: ' . $invoice['invoiceName']);
-            $this->exts->log('invoiceDate: ' . $invoice['invoiceDate']);
-            $this->exts->log('invoiceAmount: ' . $invoice['invoiceAmount']);
-
-            $invoiceFileName = $invoice['invoiceName'] . '.pdf';
-            $invoice['invoiceDate'] = $this->exts->parse_date($invoice['invoiceDate'], 'd.m.Y', 'Y-m-d');
-            $this->exts->log('Date parsed: ' . $invoice['invoiceDate']);
-
-            $downloaded_file = $this->exts->click_and_download($invoice['downloadBtn'], 'pdf', $invoiceFileName);
-            if (trim($downloaded_file) != '' && file_exists($downloaded_file)) {
-                $this->exts->new_invoice($invoice['invoiceName'], $invoice['invoiceDate'], $invoice['invoiceAmount'], $invoiceFileName);
-                sleep(1);
-            } else {
-                $this->exts->log(__FUNCTION__ . '::No download ' . $invoiceFileName);
+                $this->exts->log('--------------------------');
+                $this->exts->log('invoiceName: ' . $invoiceName);
+                $this->exts->log('invoiceDate: ' . $invoiceDate);
+                $this->exts->log('invoiceAmount: ' . $invoiceAmount);
+    
+                $invoiceFileName = $invoiceName . '.pdf';
+                $invoiceDate = $this->exts->parse_date($invoiceDate, 'd.m.Y', 'Y-m-d');
+                $this->exts->log('Date parsed: ' . $invoiceDate);
+    
+                $downloaded_file = $this->exts->click_and_download($downloadBtn, 'pdf', $invoiceFileName);
+                sleep(5);
+                if (trim($downloaded_file) != '' && file_exists($downloaded_file)) {
+                    $this->exts->new_invoice($invoiceName, $invoiceDate, $invoiceAmount, $invoiceFileName);
+                    sleep(1);
+                } else {
+                    $this->exts->log(__FUNCTION__ . '::No download ' . $invoiceFileName);
+                }
             }
         }
     }
