@@ -1,47 +1,39 @@
-public $baseUrl = 'https://app.markup.io/';
-public $loginUrl = 'https://app.markup.io/signin';
+public $baseUrl = 'https://portail-artis.dfm.fr/';
+public $loginUrl = 'https://portail-artis.dfm.fr/ArtisWeb/portail/login/auth/DO.action';
 public $invoicePageUrl = '';
 
-public $username_selector = 'input[name="email"]';
+public $username_selector = 'input[name="login"][type="text"]';
 public $password_selector = 'input[name="password"]';
 public $remember_me_selector = '';
-public $submit_login_selector = 'button[type="submit"]';
+public $submit_login_selector = 'button[id="b_Entrer"]';
 
-public $check_login_failed_selector = 'form p.error';
-public $check_login_success_selector = 'button.thin-header__profile';
+public $check_login_failed_selector = '';
+public $check_login_success_selector = 'i.mdi-logout';
 
 public $isNoInvoice = true;
 
 /**
-* Entry Method thats called for a portal
-* @param Integer $count Number of times portal is retried.
-*/
+    * Entry Method thats called for a portal
+    * @param Integer $count Number of times portal is retried.
+    */
 private function initPortal($count)
 {
     $this->exts->log('Begin initPortal ' . $count);
     $this->exts->openUrl($this->baseUrl);
     sleep(2);
     $this->exts->loadCookiesFromFile();
-
-    sleep(10);
-   
     if (!$this->checkLogin()) {
         $this->exts->log('NOT logged via cookie');
+
         $this->exts->clearCookies();
-        $this->exts->openUrl($this->loginUrl);
-        sleep(10);
-      
-        $this->fillForm(0);
-
-    }
-
-    $this->exts->waitTillPresent('button.sidebar-drawer__close', 10);
-
-    if($this->exts->exists('button.sidebar-drawer__close')){
-        $this->exts->moveToElementAndClick('button.sidebar-drawer__close');
         sleep(5);
+        if ($this->exts->querySelector($this->username_selector) != null) {
+            $this->fillForm(0);
+        } else {
+            $this->exts->openUrl($this->loginUrl);
+            $this->fillForm(0);
+        }
     }
-
     if ($this->checkLogin()) {
         $this->exts->log(">>>>>>>>>>>>>>>Login successful!!!!");
         $this->exts->capture("LoginSuccess");
@@ -50,20 +42,18 @@ private function initPortal($count)
             $this->exts->triggerLoginSuccess();
         }
 
+        $this->exts->success();
     } else {
-        if (stripos($this->exts->extract($this->check_login_failed_selector), 'The email address or password you entered is incorrect.') !== false) {
-            $this->exts->log("Wrong credential !!!!");
-            $this->exts->loginFailure(1);
-        } else {
-            $this->exts->loginFailure();
-        }
+        $this->exts->log("login-failed");
+        $this->exts->capture("login-failed-1");
+        $this->exts->loginFailure();
     }
 }
 
-
-function fillForm($count)
+public function fillForm($count)
 {
     $this->exts->log("Begin fillForm " . $count);
+
     $this->exts->waitTillPresent($this->username_selector);
     try {
         if ($this->exts->querySelector($this->username_selector) != null) {
@@ -72,12 +62,6 @@ function fillForm($count)
             $this->exts->log("Enter Username");
             $this->exts->moveToElementAndType($this->username_selector, $this->username);
             sleep(2);
-
-            if ($this->exts->exists($this->submit_login_selector)) {
-                $this->exts->moveToElementAndClick($this->submit_login_selector);
-                sleep(10);
-            }
-
             $this->exts->log("Enter Password");
             $this->exts->moveToElementAndType($this->password_selector, $this->password);
             sleep(2);
@@ -88,10 +72,17 @@ function fillForm($count)
             }
 
             $this->exts->capture("1-login-page-filled");
-           
+
             if ($this->exts->exists($this->submit_login_selector)) {
                 $this->exts->moveToElementAndClick($this->submit_login_selector);
-                sleep(10);
+                sleep(7);
+            }
+
+            $isErrorMessage = $this->exts->execute_javascript('document.body.innerHTML.includes("Identifiant ou mot de passe incorrect")');
+            if ($isErrorMessage) {
+                $this->exts->capture("login-failed-confirmed");
+                $this->exts->log("Wrong credential !!!!");
+                $this->exts->loginFailure(1);
             }
         }
     } catch (\Exception $exception) {
@@ -99,21 +90,21 @@ function fillForm($count)
         $this->exts->log("Exception filling loginform " . $exception->getMessage());
     }
 }
-
 /**
 * Method to Check where user is logged in or not
 * return boolean true/false
 */
-function checkLogin()
+public  function checkLogin()
 {
     $this->exts->log("Begin checkLogin ");
     $isLoggedIn = false;
     try {
-        $this->exts->waitTillPresent($this->check_login_success_selector);
+        for ($wait = 0; $wait < 2 && $this->exts->executeSafeScript("return !!document.querySelector('" . $this->check_login_success_selector . "');") != 1; $wait++) {
+            $this->exts->log('Waiting for login.....');
+            sleep(10);
+        }
         if ($this->exts->exists($this->check_login_success_selector)) {
-
             $this->exts->log(">>>>>>>>>>>>>>>Login successful!!!!");
-
             $isLoggedIn = true;
         }
     } catch (Exception $exception) {

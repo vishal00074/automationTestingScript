@@ -1021,7 +1021,7 @@ class GmiChromeManager
     /**
      * Trigger Account Not Required
      */
-    public function account_not_ready()
+    public function click()
     {
         $this->capture("account_not_ready");
         $this->sendRequestEx(
