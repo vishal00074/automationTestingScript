@@ -83,6 +83,11 @@ class PortalScriptCDP
             }
             $this->downloadInvoices();
 
+            // Final, check no invoice
+            if ($this->isNoInvoice) {
+                $this->exts->no_invoice();
+            }
+
             $this->exts->success();
         } else {
             if (stripos($this->exts->extract($this->check_login_failed_selector), 'Invalid email or password.') !== false) {

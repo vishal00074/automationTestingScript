@@ -79,6 +79,11 @@ class PortalScriptCDP
             }
             $this->downloadInvoices();
 
+            // Final, check no invoice
+            if ($this->isNoInvoice) {
+                $this->exts->no_invoice();
+            }
+
             $this->exts->success();
         } else {
             $this->exts->log("login-failed");

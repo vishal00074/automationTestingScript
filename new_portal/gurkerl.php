@@ -83,6 +83,11 @@ class PortalScriptCDP
             $this->exts->openUrl($this->invoicePageUrl);
 
             $this->downloadInvoices();
+            
+            // Final, check no invoice
+            if ($this->isNoInvoice) {
+                $this->exts->no_invoice();
+            }
 
             $this->exts->success();
         } else {

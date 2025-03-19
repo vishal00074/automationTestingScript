@@ -85,6 +85,11 @@ class PortalScriptCDP
 
             $this->downloadInvoices();
 
+            // Final, check no invoice
+            if ($this->isNoInvoice) {
+                $this->exts->no_invoice();
+            }
+
             $this->exts->success();
         } else {
             if (stripos($this->exts->extract($this->check_login_failed_selector), 'Der angegebene Benutzer oder das Passwort ist nicht korrekt!') !== false) {
@@ -163,25 +168,25 @@ class PortalScriptCDP
         $invoices = [];
         $rows = $this->exts->getElements('table tbody tr');
         foreach ($rows as $key => $row) {
-            $downloadBtn= $this->exts->getElement('td[guid="userinformation3_invoices_invoice_table_body_print"] button', $row);
+            $downloadBtn = $this->exts->getElement('td[guid="userinformation3_invoices_invoice_table_body_print"] button', $row);
             if ($downloadBtn != null) {
                 sleep(2);
                 $invoiceName = time(); // create custom invoice name
                 $invoiceDate = $this->exts->extract('td[guid="userinformation3_invoices_invoice_table_body_date"]', $row);
                 $invoiceAmount = $this->exts->extract('td[guid="userinformation3_invoices_invoice_table_body_sum"] span ', $row);;
 
-                
+
                 $this->isNoInvoice = false;
 
                 $this->exts->log('--------------------------');
                 $this->exts->log('invoiceName: ' . $invoiceName);
                 $this->exts->log('invoiceDate: ' . $invoiceDate);
                 $this->exts->log('invoiceAmount: ' . $invoiceAmount);
-    
+
                 $invoiceFileName = $invoiceName . '.pdf';
                 $invoiceDate = $this->exts->parse_date($invoiceDate, 'd.m.Y', 'Y-m-d');
                 $this->exts->log('Date parsed: ' . $invoiceDate);
-    
+
                 $downloaded_file = $this->exts->click_and_download($downloadBtn, 'pdf', $invoiceFileName);
                 sleep(5);
                 if (trim($downloaded_file) != '' && file_exists($downloaded_file)) {

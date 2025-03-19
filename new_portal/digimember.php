@@ -95,8 +95,12 @@ class PortalScriptCDP
                 }
             }
 
-
             $this->downloadInvoices();
+
+            // Final, check no invoice
+            if ($this->isNoInvoice) {
+                $this->exts->no_invoice();
+            }
 
             $this->exts->success();
         } else {
@@ -144,7 +148,6 @@ class PortalScriptCDP
                 }
             }
         } catch (\Exception $exception) {
-
             $this->exts->log("Exception filling loginform " . $exception->getMessage());
         }
     }
