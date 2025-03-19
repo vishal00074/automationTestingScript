@@ -126,12 +126,17 @@ class PortalScriptCDP
                     $this->exts->moveToElementAndClick($this->submit_login_selector);
                     sleep(5);
                 }
-                
+
                 $isErrorMessage = $this->exts->execute_javascript('document.body.innerHTML.includes("Invalid email or password.")');
                 if ($isErrorMessage) {
                     $this->exts->capture("login-failed-confirmed");
                     $this->exts->log("Wrong credential !!!!");
                     $this->exts->loginFailure(1);
+                } else {
+                    if ($this->exts->exists($this->username_selector)) {
+                        $count++;
+                        $this->fillForm($count);
+                    }
                 }
             }
         } catch (\Exception $exception) {
@@ -176,12 +181,10 @@ class PortalScriptCDP
             $download_link = $this->exts->getElement('a[href*="invoice"]', $row);
             if ($download_link != null) {
                 $invoiceUrl = $download_link->getAttribute("href");
-                $segments = explode("/", $invoiceUrl);
-                $transactionId = $segments[2];
-
-                $invoiceName = $transactionId ?? time(); // use custom name in case of null
+                sleep(2);
+                $invoiceName =  time(); 
                 $invoiceDate = $this->exts->extract('td:nth-child(1)', $row);
-                $invoiceAmount = $this->exts->extract('td:nth-child(4)', $row);;
+                $invoiceAmount = $this->exts->extract('td:nth-child(4)', $row);
 
                 array_push($invoices, array(
                     'invoiceName' => $invoiceName,

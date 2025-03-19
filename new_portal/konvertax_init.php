@@ -42,7 +42,7 @@ private function initPortal($count)
         $this->exts->log(__FUNCTION__ . '::Use login failed');
         $this->exts->log(__FUNCTION__ . '::Last URL: ' . $this->exts->getUrl());
 
-        $error_text = strtolower($this->exts->extract($this->check_login_failed_selector));
+        $error_text = $this->exts->extract($this->check_login_failed_selector);
         if (stripos($error_text, 'E-Mail-Adresse und / oder Passwort falsch.') !== false) {
             $this->exts->loginFailure(1);
         } else {

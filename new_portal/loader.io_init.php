@@ -41,6 +41,7 @@ private function initPortal($count)
         if (!empty($this->exts->config_array['allow_login_success_request'])) {
             $this->exts->triggerLoginSuccess();
         }
+
         $this->exts->success();
     } else {
         if (stripos($this->exts->extract($this->check_login_failed_selector), 'Invalid email or password.') !== false) {
@@ -79,12 +80,17 @@ public function fillForm($count)
                 $this->exts->moveToElementAndClick($this->submit_login_selector);
                 sleep(5);
             }
-            
+
             $isErrorMessage = $this->exts->execute_javascript('document.body.innerHTML.includes("Invalid email or password.")');
             if ($isErrorMessage) {
                 $this->exts->capture("login-failed-confirmed");
                 $this->exts->log("Wrong credential !!!!");
                 $this->exts->loginFailure(1);
+            } else {
+                if ($this->exts->exists($this->username_selector)) {
+                    $count++;
+                    $this->fillForm($count);
+                }
             }
         }
     } catch (\Exception $exception) {
