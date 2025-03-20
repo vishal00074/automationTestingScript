@@ -19,13 +19,9 @@ private function initPortal($count)
 {
     $this->exts->log('Begin initPortal ' . $count);
     $this->exts->openUrl($this->baseUrl);
-    sleep(1);
-
-    // Load cookies
-    // $this->exts->loadCookiesFromFile();
-    sleep(1);
-    $this->exts->openUrl($this->baseUrl);
     sleep(10);
+    // Load cookies
+    $this->exts->loadCookiesFromFile();
     $this->exts->capture('1-init-page');
 
     // If user hase not logged in from cookie, clear cookie, open the login url and do login
@@ -48,14 +44,22 @@ private function initPortal($count)
         sleep(3);
         $this->exts->log(__FUNCTION__ . '::User logged in');
         $this->exts->capture("3-login-success");
+
         if (!empty($this->exts->config_array['allow_login_success_request'])) {
- 
             $this->exts->triggerLoginSuccess();
         }
+
+        $this->exts->success();
     } else {
         $this->exts->log(__FUNCTION__ . '::Use login failed');
+        $error_text = strtolower($this->exts->extract('p[class="text-xl"]'));
+
+        $this->exts->log(__FUNCTION__ . 'Error text ::' . $error_text);
+
         if ($this->exts->getElement($this->check_login_failed_selector) != null) {
             $this->exts->loginFailure(1);
+        } else if (stripos($error_text, 'the account you’re trying to access, dreadfactory gmbh, has been closed.') !== false) {
+            $this->exts->account_not_ready();
         } else {
             $this->exts->loginFailure();
         }
@@ -88,25 +92,21 @@ private function checkFillLogin()
         }
 
         $isErrorMessage = $this->exts->execute_javascript('document.body.innerHTML.includes("Failed to Login");');
-        $this->exts->log("isErrorMessage: ". $isErrorMessage);
-        if($isErrorMessage){
+        $this->exts->log("isErrorMessage: " . $isErrorMessage);
+        if ($isErrorMessage) {
             $this->exts->capture("login-failed-confirm-1");
             $this->exts->loginFailure(1);
         }
 
-        if(strpos(strtolower($this->exts->waitTillPresent('div.Toaster__message')), 'wait done') !== false){
+        if (strpos(strtolower($this->exts->waitTillPresent('div.Toaster__message')), 'wait done') !== false) {
             $this->exts->capture("login-failed-confirm");
             $this->exts->loginFailure(1);
         }
-
-        
-
     } else {
         $this->exts->log(__FUNCTION__ . '::Login page not found');
         $this->exts->capture("2-login-page-not-found");
     }
 }
-
 private function checkFillTwoFactor()
 {
     $two_factor_selector = 'form#devise_authy input#token, input#token_input';
@@ -173,5 +173,3 @@ private function checkFillTwoFactor()
         }
     }
 }
-
-

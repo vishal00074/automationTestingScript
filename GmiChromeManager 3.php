@@ -362,7 +362,6 @@ class GmiChromeManager
      * Get all the cookies for the current domain and print it in logs with COOKIES_DUMP Header
      *
      * @param bool $only_save
-     * @param null|string $list_urls
      *
      * @return    void
      */
@@ -1021,7 +1020,7 @@ class GmiChromeManager
     /**
      * Trigger Account Not Required
      */
-    public function click()
+    public function account_not_ready()
     {
         $this->capture("account_not_ready");
         $this->sendRequestEx(
