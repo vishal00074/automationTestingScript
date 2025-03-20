@@ -826,8 +826,8 @@ class PortalScriptCDP
         }
         $this->exts->log('restrictPages count:: ' . $this->restrictPages);
 
-        while ($count <  $this->restrictPages && $this->exts->exists('ul.pagination a[aria-label="Nächste Seite"]')) {
-            $this->exts->moveToElementAndClick('ul.pagination a[aria-label="Nächste Seite"]');
+        while ($count <  $this->restrictPages && $this->exts->exists('ul.pagination a.pagination__arrow-page.pf-rounded-left')) {
+            $this->exts->moveToElementAndClick('ul.pagination a.pagination__arrow-page.pf-rounded-left');
             sleep(7);
             $count++;
             $this->processInvoices($count);
