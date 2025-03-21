@@ -219,6 +219,12 @@ class PortalScriptCDP
                 }
             }
             $this->doAfterLogin();
+
+            // Final, check no invoice
+            if ($this->isNoInvoice) {
+                $this->exts->no_invoice();
+            }
+            $this->exts->success();
         } else {
             $this->exts->log(__FUNCTION__ . '::Use login failed ' . $this->exts->getUrl());
             if ($this->isIncorrectCredential()) {
@@ -486,8 +492,8 @@ class PortalScriptCDP
     }
     private function isLoginSuccess()
     {
-        $this->exts->waitTillPresent("a[data-page-id='seller-your-account']");
-        return $this->exts->exists("a[data-page-id='seller-your-account']") && !$this->exts->exists($this->password_selector);
+        $this->exts->waitTillPresent('a[href="/messaging/inbox"]');
+        return $this->exts->exists('a[href="/messaging/inbox"]');
     }
 
     private function doAfterLogin()
@@ -829,10 +835,6 @@ class PortalScriptCDP
 
         $this->exts->openUrl('https://sellercentral.amazon.de/home');
         sleep(15);
-        // Final, check no invoice
-        if ($this->isNoInvoice) {
-            $this->exts->no_invoice();
-        }
     }
     private function downloadTransaction($pageCount = 1)
     {

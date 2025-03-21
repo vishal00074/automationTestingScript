@@ -69,6 +69,7 @@ class PortalScriptCDP
     public $totalFiles = 0;
     public $check_login_failed_selector = 'p[class="text-danger"]';
     public $check_login_success_selector = 'a[href*="/logout"]';
+    public $isNoInvoice = true;
 
 
     /**
@@ -85,6 +86,8 @@ class PortalScriptCDP
         sleep(5);
         $this->exts->capture("Home-page-without-cookie");
         if (!$this->checkLogin()) {
+            $this->exts->clearCookies();
+            sleep(2);
             $this->clearChrome();
             $this->exts->openUrl($this->loginUrl);
             sleep(2);
@@ -92,7 +95,13 @@ class PortalScriptCDP
             $this->check_solve_blocked_page();
 
             // try again for form submission
-            if ($this->exts->exists($this->username_selector)) {
+            $loginPage = $this->exts->findTabMatchedUrl(['login']);
+            if ($loginPage != null) {
+                $this->exts->clearCookies();
+                sleep(2);
+                $this->clearChrome();
+                $this->exts->openUrl($this->loginUrl);
+                sleep(2);
                 $this->fillform(1);
             }
         }
@@ -152,8 +161,12 @@ class PortalScriptCDP
 
                 $this->exts->log("Enter Password");
                 $this->exts->moveToElementAndType($this->password_selector, $this->password);
-                sleep(20); // added wait before form submission 
+                sleep(5);
 
+                // fill hidden captcha only first time
+                if ($count == 0) {
+                    $this->checkFillRecaptcha();
+                }
                 $this->exts->capture("login-fill-form");
 
                 if ($this->exts->exists($this->submit_button_selector)) {
@@ -170,6 +183,67 @@ class PortalScriptCDP
             }
         } catch (\Exception $exception) {
             $this->exts->log("Exception filling loginform " . $exception->getMessage());
+        }
+    }
+    private function checkFillRecaptcha($count = 1)
+    {
+        $this->exts->log(__FUNCTION__);
+        $recaptcha_iframe_selector = 'iframe[src*="google.com/recaptcha/api2/anchor?ar"]';
+        $recaptcha_textarea_selector = 'textarea[name="g-recaptcha-response"]';
+        $this->exts->waitTillPresent($recaptcha_iframe_selector, 20);
+        if ($this->exts->exists($recaptcha_iframe_selector)) {
+            $iframeUrl = $this->exts->extract($recaptcha_iframe_selector, null, 'src');
+            $data_siteKey = explode('&', end(explode("&k=", $iframeUrl)))[0];
+            $this->exts->log("iframe url  - " . $iframeUrl);
+            $this->exts->log("SiteKey - " . $data_siteKey);
+
+            $isCaptchaSolved = $this->exts->processRecaptcha($this->exts->getUrl(), $data_siteKey, false);
+            $this->exts->log("isCaptchaSolved - " . $isCaptchaSolved);
+
+            if ($isCaptchaSolved) {
+                // Step 1 fill answer to textarea
+                $this->exts->log(__FUNCTION__ . "::filling reCaptcha response..");
+                $recaptcha_textareas =  $this->exts->getElements($recaptcha_textarea_selector);
+                for ($i = 0; $i < count($recaptcha_textareas); $i++) {
+                    $this->exts->execute_javascript("arguments[0].innerHTML = '" . $this->exts->recaptcha_answer . "';", [$recaptcha_textareas[$i]]);
+                }
+                sleep(2);
+                $this->exts->capture('recaptcha-filled');
+
+                // Step 2, check if callback function need executed
+                $gcallbackFunction = $this->exts->execute_javascript('
+				if(document.querySelector("[data-callback]") != null){
+					return document.querySelector("[data-callback]").getAttribute("data-callback");
+				}
+
+				var result = ""; var found = false;
+				function recurse (cur, prop, deep) {
+					if(deep > 5 || found){ return;}console.log(prop);
+					try {
+						if(cur == undefined || cur == null || cur instanceof Element || Object(cur) !== cur || Array.isArray(cur)){ return;}
+						if(prop.indexOf(".callback") > -1){result = prop; found = true; return;
+						} else { deep++;
+							for (var p in cur) { recurse(cur[p], prop ? prop + "." + p : p, deep);}
+						}
+					} catch(ex) { console.log("ERROR in function: " + ex); return; }
+				}
+
+				recurse(___grecaptcha_cfg.clients[0], "", 0);
+				return found ? "___grecaptcha_cfg.clients[0]." + result : null;
+			');
+                $this->exts->log('Callback function: ' . $gcallbackFunction);
+                if ($gcallbackFunction != null) {
+                    $this->exts->execute_javascript($gcallbackFunction . '("' . $this->exts->recaptcha_answer . '");');
+                    sleep(10);
+                }
+            } else {
+                if ($count < 3) {
+                    $count++;
+                    $this->checkFillRecaptcha($count);
+                }
+            }
+        } else {
+            $this->exts->log(__FUNCTION__ . '::Not found reCaptcha');
         }
     }
     public function checkLogin()
@@ -254,13 +328,19 @@ class PortalScriptCDP
     private function processInvoices($paging_count = 1)
     {
         $this->exts->waitTillPresent('table#js-data-tables-invoices tbody tr', 25);
+        // for scroll down
+        for ($i = 0; $i < 25; $i++) {
+            $this->exts->type_key_by_xdotool('Tab');
+            sleep(1);
+        }
+
         $this->exts->capture("4-invoices-page");
         $invoices = [];
-
-        $rows = $this->exts->querySelectorAll('table#js-data-tables-invoices tbody tr ');
+        $rows = $this->exts->getElements('table#js-data-tables-invoices tbody tr');
         foreach ($rows as $row) {
-            if ($this->exts->querySelector('td:nth-child(5) a', $row) != null) {
-                $invoiceUrl = $this->exts->querySelector('td:nth-child(5) a', $row)->getAttribute('href');
+            $invoiceUrlSel = $this->exts->getElement('td:nth-child(5) a', $row);
+            if ($invoiceUrlSel != null) {
+                $invoiceUrl = $invoiceUrlSel->getAttribute('href');
                 $invoiceName = $this->exts->extract('tr td:nth-child(3)', $row);
                 $invoiceAmount = $this->exts->extract('tr td:nth-child(4)', $row);
                 $invoiceDate = $this->exts->extract('tr td:nth-child(2)', $row);
