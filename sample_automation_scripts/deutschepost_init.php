@@ -96,7 +96,6 @@ private function initPortal($count)
         $this->exts->log(__FUNCTION__ . '::User logged in');
         $this->exts->capture('3-login-success');
 
-
         if (!empty($this->exts->config_array['allow_login_success_request'])) {
             $this->exts->triggerLoginSuccess();
         }
@@ -172,12 +171,26 @@ private function checkFillLogin($count = 1)
 
         $this->exts->capture('2-login-page-filled-' . $count);
         $this->exts->click_by_xdotool($this->submit_login_selector);
-        sleep(7);
+        sleep(10);
+        $this->exts->capture('submit-login-page');
+
+
+        $error_text = strtolower($this->exts->extract('div.clue__message'));
+        $this->exts->log('Error text:: '.$error_text);
+
+        if (strpos($error_text, 'fehler bei der eingabe des logins oder passwortes.') !== false) {
+            $this->exts->loginFailure(1);
+        } 
+
+        if (strpos($error_text, 'ihr account ist gesperrt. bitte verwenden sie unsere "passwort-vergessen" funktionalität, um ihren account wieder freizuschalten.') !== false) {
+            $this->exts->loginFailure(1);
+        } 
 
         $this->checkFillTwoFactor();
-
         sleep(7);
 
+        $this->exts->type_key_by_xdotool('Tab');
+        sleep(1);
         $this->exts->type_key_by_xdotool('Tab');
         sleep(1);
         $this->exts->type_key_by_xdotool('Tab');
