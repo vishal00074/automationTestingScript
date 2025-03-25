@@ -33,17 +33,17 @@ class PortalScriptCDP
     }
 
     /*Define constants used in script*/
-    public $baseUrl = 'https://myaccount.corel.com/';
-    public $loginUrl = 'https://myaccount.corel.com/';
-    public $invoicePageUrl = 'https://myaccount.corel.com/order-history';
+    public $baseUrl = 'https://bbvpfalz.co.crm-now.de/kundenportal/index.php';
+    public $loginUrl = 'https://bbvpfalz.co.crm-now.de/kundenportal/login.php';
+    public $invoicePageUrl = 'https://bbvpfalz.co.crm-now.de/kundenportal/index.php?module=Documents&action=index&onlymine=true';
 
-    public $username_selector = 'form#detectUser input[name="emailAddress"]';
-    public $password_selector = 'input[id="j_password"]';
+    public $username_selector = 'input[id="username"]';
+    public $password_selector = 'input[id="pw"]';
     public $remember_me_selector = '';
-    public $submit_login_selector = 'form#detectUser a#signInBtn_j';
+    public $submit_login_selector = 'button[type="submit"]';
 
-    public $check_login_failed_selector = 'span#login_errLoginFailed';
-    public $check_login_success_selector = 'div.navbar-nav button.icon-signout';
+    public $check_login_failed_selector = '';
+    public $check_login_success_selector = 'li a[href="index.php?logout=true"]';
 
     public $isNoInvoice = true;
 
@@ -69,8 +69,8 @@ class PortalScriptCDP
             $this->exts->capture("LoginSuccess");
 
             $this->exts->openUrl($this->invoicePageUrl);
-            $this->downloadInvoices();
 
+            $this->downloadInvoices();
             // Final, check no invoice
             if ($this->isNoInvoice) {
                 $this->exts->no_invoice();
@@ -80,16 +80,7 @@ class PortalScriptCDP
         } else {
             $this->exts->log(__FUNCTION__ . '::Use login failed');
             $this->exts->log(__FUNCTION__ . '::Last URL: ' . $this->exts->getUrl());
-
-            $error_text = strtolower($this->exts->extract($this->check_login_failed_selector));
-            if (
-                stripos($error_text, 'the email address and password do not match. If you forgot your password please click on the link below to reset your password.') !== false
-            ) {
-
-                $this->exts->loginFailure(1);
-            } else {
-                $this->exts->loginFailure();
-            }
+            $this->exts->loginFailure();
         }
     }
 
@@ -104,12 +95,6 @@ class PortalScriptCDP
             $this->exts->log("Enter Username");
             $this->exts->moveToElementAndType($this->username_selector, $this->username);
             sleep(2);
-
-            if ($this->exts->exists($this->submit_login_selector)) {
-                $this->exts->moveToElementAndClick($this->submit_login_selector);
-                sleep(5);
-            }
-            $this->exts->waitTillPresent($this->password_selector);
             $this->exts->log("Enter Password");
             $this->exts->moveToElementAndType($this->password_selector, $this->password);
             sleep(2);
@@ -120,9 +105,19 @@ class PortalScriptCDP
             }
 
             $this->exts->capture("1-login-page-filled");
-            if ($this->exts->exists('form#login a#signInBtn_j')) {
-                $this->exts->moveToElementAndClick('form#login a#signInBtn_j');
-                sleep(5);
+            if ($this->exts->exists($this->submit_login_selector)) {
+                $this->exts->moveToElementAndClick($this->submit_login_selector);
+                sleep(10);
+            }
+
+            // No selector found in case of wrong credentials
+            $loginFailed = $this->exts->findTabMatchedUrl(['login.php?login_error']);
+            if ($loginFailed != null) {
+                $this->exts->capture("login-failed");
+                $this->exts->log(__FUNCTION__ . '::Incorrect Credentials');
+                $this->exts->log(__FUNCTION__ . '::Last URL: ' . $this->exts->getUrl());
+                $this->exts->loginFailure(1);
+
             }
         }
     }
@@ -160,12 +155,15 @@ class PortalScriptCDP
         $invoices = [];
         $rows = $this->exts->getElements('table tbody tr');
         foreach ($rows as $key => $row) {
-            $invoiceLink = $this->exts->getElement('a', $row);
+            $invoiceLink = $this->exts->getElement('td:nth-child(1) a', $row);
             if ($invoiceLink != null) {
                 sleep(2);
                 $invoiceUrl = $invoiceLink->getAttribute("href");
-                $invoiceName = $this->exts->extract('td:nth-child(1)', $row);
-                $invoiceName =  $invoiceName ?? time();
+
+                $filename = $this->exts->extract('td:nth-child(1) a', $row);
+                $filenameWithoutExtension = str_replace(".pdf", "", $filename);
+                
+                $invoiceName =  $filenameWithoutExtension ?? time();
                 $invoiceDate = $this->exts->extract('td:nth-child(2)', $row);
                 $invoiceAmount = '';
 
@@ -190,34 +188,13 @@ class PortalScriptCDP
             $invoice['invoiceDate'] = $this->exts->parse_date($invoice['invoiceDate'], 'd.m.Y', 'Y-m-d');
             $this->exts->log('Date parsed: ' . $invoice['invoiceDate']);
 
-            $this->exts->openUrl($invoice['invoiceUrl']);
-            sleep(5);
-            $this->exts->waitTillPresent('span.CBInvoiceDocumentDownload a.CBHyperLink');
-
-            $downloaded_file = $this->exts->click_and_download('span.CBInvoiceDocumentDownload a.CBHyperLink', 'pdf', $invoiceFileName);
+            $downloaded_file = $this->exts->direct_download($invoice['invoiceUrl'], 'pdf', $invoiceFileName);
             if (trim($downloaded_file) != '' && file_exists($downloaded_file)) {
                 $this->exts->new_invoice($invoiceUrl, $invoice['invoiceDate'], $invoice['invoiceAmount'], $downloaded_file);
                 sleep(1);
             } else {
                 $this->exts->log(__FUNCTION__ . '::No download ' . $invoiceFileName);
             }
-        }
-        // pagination
-        $restrictPages = isset($this->exts->config_array["restrictPages"]) ? (int)@$this->exts->config_array["restrictPages"] : 3;
-        $this->exts->openUrl($this->invoicePageUrl);
-
-        $this->exts->waitTillPresent('nz-pagination li.ant-pagination-next');
-        $nextCount = $count + 1;
-        if($nextCount == 1){
-            $nextCount = 2; // by default 1st page invoices is already downloaded
-        }
-        $nextPage =  'nz-pagination li.ant-pagination-item[title="'.$nextCount .'"]';
-
-        while ($count < $restrictPages && $this->exts->exists('nz-pagination li.ant-pagination-next') && !$this->exts->exists('nz-pagination li.ant-pagination-disabled[title="Next Page"]')) {
-            $this->exts->moveToElementAndClick($nextPage);
-            sleep(7);
-            $count++; 
-            $this->downloadInvoices($count);
         }
     }
 }
