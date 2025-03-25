@@ -43,7 +43,7 @@ class PortalScriptCDP
     public $submit_login_selector = 'div[class*="login-form"] button[type="submit"]';
 
     public $check_login_failed_selector = 'div.InfoBox_Error span[class*="BasicIcons-Error"]';
-    public $check_login_success_selector = 'a[href="/customer/account/logout/"]';
+    public $check_login_success_selector = 'ul.account_submenu a[href="/customer/account/logout/"]';
 
     public $isNoInvoice = true;
 
