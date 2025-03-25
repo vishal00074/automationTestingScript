@@ -33,17 +33,17 @@ class PortalScriptCDP
     }
 
     /*Define constants used in script*/
-    public $baseUrl = 'https://mein.ewr-internett.de/';
-    public $loginUrl = 'https://mein.ewr-internett.de/#{1}';
-    public $invoicePageUrl = '';
+    public $baseUrl = 'https://www.tink.de/';
+    public $loginUrl = 'https://www.tink.de/customer/account/login';
+    public $invoicePageUrl = 'https://www.tink.de/sales/order/history/';
 
-    public $username_selector = 'input[id="ID_USERNAME"]';
-    public $password_selector = 'input[id="ID_PASSWORD"]';
+    public $username_selector = 'div[class*="login-form"] input[name="email"]';
+    public $password_selector = 'div[class*="login-form"] input[name="password"]';
     public $remember_me_selector = '';
-    public $submit_login_selector = 'input[id="ID_LOGIN"]';
+    public $submit_login_selector = 'div[class*="login-form"] button[type="submit"]';
 
     public $check_login_failed_selector = 'div.InfoBox_Error span[class*="BasicIcons-Error"]';
-    public $check_login_success_selector = 'a[id="ID_LogoutAction"]';
+    public $check_login_success_selector = 'a[href="/customer/account/logout/"]';
 
     public $isNoInvoice = true;
 
@@ -55,7 +55,14 @@ class PortalScriptCDP
     {
         $this->exts->log('Begin initPortal ' . $count);
         $this->exts->openUrl($this->baseUrl);
+        sleep(5);
         $this->exts->loadCookiesFromFile();
+
+        $this->exts->waitTillPresent('div.uc-banner-content button#uc-btn-deny-banner');
+        if ($this->exts->exists('div.uc-banner-content button#uc-btn-deny-banner')) {
+            $this->exts->moveToElementAndClick('div.uc-banner-content button#uc-btn-deny-banner');
+            sleep(5);
+        }
 
         if (!$this->checkLogin()) {
             $this->exts->log('NOT logged via cookie');
@@ -63,18 +70,23 @@ class PortalScriptCDP
             $this->exts->clearCookies();
             $this->exts->openUrl($this->loginUrl);
             $this->fillForm(0);
+            sleep(10);
+
+            if ($this->exts->exists('button[class*="TopBrand__CloseWidgetButton"]')) {
+                $this->exts->moveToElementAndClick('button[class*="TopBrand__CloseWidgetButton"]');
+                sleep(5);
+            }
         }
         if ($this->checkLogin()) {
             $this->exts->log(">>>>>>>>>>>>>>>Login successful!!!!");
             $this->exts->capture("LoginSuccess");
-            $elements = $this->exts->getElements('a[id*="ID_textactioncontrol"]');
-            try {
-                // Click on first element
-                $elements[0]->click();
-            } catch (\Exception $e) {
-                $this->exts->log(__FUNCTION__ . '::Invoice button Error ' . $e->getMessage());
+
+            if ($this->exts->exists('button[class*="TopBrand__CloseWidgetButton"]')) {
+                $this->exts->moveToElementAndClick('button[class*="TopBrand__CloseWidgetButton"]');
+                sleep(5);
             }
 
+            $this->exts->openUrl($this->invoicePageUrl);
             $this->downloadInvoices();
             // Final, check no invoice
             if ($this->isNoInvoice) {
@@ -85,18 +97,7 @@ class PortalScriptCDP
         } else {
             $this->exts->log(__FUNCTION__ . '::Use login failed');
             $this->exts->log(__FUNCTION__ . '::Last URL: ' . $this->exts->getUrl());
-
-            $error_text = strtolower($this->exts->extract($this->check_login_failed_selector));
-            if (
-                stripos($error_text, 'ihre benutzername/passwortkombination ist nicht gültig.') !== false ||
-                stripos($error_text, 'ihre benutzername/passwortkombination ist nicht gültig. bitte versuchen sie es erneut.') !== false ||
-                stripos($error_text, 'your username/password combination is invalid.') !== false
-            ) {
-
-                $this->exts->loginFailure(1);
-            } else {
-                $this->exts->loginFailure();
-            }
+            $this->exts->loginFailure();
         }
     }
 
@@ -114,6 +115,10 @@ class PortalScriptCDP
             $this->exts->log("Enter Password");
             $this->exts->moveToElementAndType($this->password_selector, $this->password);
             sleep(2);
+            if ($this->exts->exists('button[class*="TopBrand__CloseWidgetButton"]')) {
+                $this->exts->moveToElementAndClick('button[class*="TopBrand__CloseWidgetButton"]');
+                sleep(5);
+            }
 
             if ($this->exts->exists($this->remember_me_selector)) {
                 $this->exts->click_by_xdotool($this->remember_me_selector);
@@ -123,7 +128,14 @@ class PortalScriptCDP
             $this->exts->capture("1-login-page-filled");
             if ($this->exts->exists($this->submit_login_selector)) {
                 $this->exts->moveToElementAndClick($this->submit_login_selector);
-                sleep(5);
+                sleep(3);
+            }
+            $isErrorMessage = $this->exts->execute_javascript('document.body.innerHTML.includes("Invalid username or password.");');
+            if ($isErrorMessage) {
+                $this->exts->capture("login-failed-confirmed-1");
+                $this->exts->log(__FUNCTION__ . '::Use login failed');
+                $this->exts->log(__FUNCTION__ . '::Last URL: ' . $this->exts->getUrl());
+                $this->exts->loginFailure(1);
             }
         } else {
             $this->exts->log(__FUNCTION__ . '::Login page not found');
@@ -158,20 +170,20 @@ class PortalScriptCDP
     {
         $this->exts->log(__FUNCTION__);
 
-        $this->exts->waitTillPresent('table.Table_Standard tbody tr');
+        $this->exts->waitTillPresent('div.my-orders ul.my-orders__list li');
         $this->exts->capture("4-invoices-classic");
 
         $invoices = [];
-        $rows = $this->exts->getElements('table.Table_Standard tbody tr');
+        $rows = $this->exts->getElements('div.my-orders ul.my-orders__list li');
         foreach ($rows as $key => $row) {
-            $invoiceLink = $this->exts->getElement('a[href*="/?qs_servlet=downloadIxServlet&"]:nth-child(2)', $row);
+            $invoiceLink = $this->exts->getElement('a[href*="sales/order/view/order_id"]', $row);
             if ($invoiceLink != null) {
                 sleep(2);
                 $invoiceUrl = $invoiceLink->getAttribute("href");
-                $invoiceName = $this->exts->extract('td:nth-child(1)', $row);
+                $invoiceName = $this->exts->extract('div.my-orders__order-number', $row);
                 $invoiceName =  $invoiceName ?? time();
-                $invoiceDate = $this->exts->extract('td:nth-child(2)', $row);
-                $invoiceAmount = '';
+                $invoiceDate = $this->exts->extract('div.my-orders__date', $row);
+                $invoiceAmount = $this->exts->extract('div.my-orders__sum', $row);
 
                 array_push($invoices, array(
                     'invoiceName' => $invoiceName,
@@ -194,9 +206,14 @@ class PortalScriptCDP
             $invoice['invoiceDate'] = $this->exts->parse_date($invoice['invoiceDate'], 'd.m.Y', 'Y-m-d');
             $this->exts->log('Date parsed: ' . $invoice['invoiceDate']);
 
-            $downloaded_file = $this->exts->direct_download($invoice['invoiceUrl'], 'pdf', $invoiceFileName);
+            $this->exts->openUrl($invoice['invoiceUrl']);
+            sleep(2);
+            $this->exts->waitTillPresent('div.middle-buttons a[href*="invoicepdf/index/invoicepdf/order_id"]');
+
+            $downloaded_file = $this->exts->click_and_download('div.middle-buttons a[href*="invoicepdf/index/invoicepdf/order_id"]', 'pdf', $invoiceFileName);
+            sleep(2);
             if (trim($downloaded_file) != '' && file_exists($downloaded_file)) {
-                $this->exts->new_invoice($invoiceUrl, $invoice['invoiceDate'], $invoice['invoiceAmount'], $downloaded_file);
+                $this->exts->new_invoice($invoiceUrl,  $invoiceDate, $invoiceAmount, $downloaded_file);
                 sleep(1);
             } else {
                 $this->exts->log(__FUNCTION__ . '::No download ' . $invoiceFileName);
