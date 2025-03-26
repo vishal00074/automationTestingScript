@@ -210,6 +210,13 @@ class PortalScriptCDP
             sleep(2);
             $this->exts->waitTillPresent('div.middle-buttons a[href*="invoicepdf/index/invoicepdf/order_id"]');
 
+            $invoiceBlockedText = strtolower($this->exts->extract('div.page-title h1'));
+            $this->exts->log('invoiceBlockedText: ' . $invoiceBlockedText);
+
+            if (stripos($invoiceBlockedText, 'there has been an error processing your request') !== false) {
+                continue;
+            }
+
             $downloaded_file = $this->exts->click_and_download('div.middle-buttons a[href*="invoicepdf/index/invoicepdf/order_id"]', 'pdf', $invoiceFileName);
             sleep(2);
             if (trim($downloaded_file) != '' && file_exists($downloaded_file)) {

@@ -13,9 +13,9 @@ public $check_login_success_selector = 'ul.account_submenu a[href="/customer/acc
 public $isNoInvoice = true;
 
 /**
-    * Entry Method thats called for a portal
-    * @param Integer $count Number of times portal is retried.
-    */
+ * Entry Method thats called for a portal
+ * @param Integer $count Number of times portal is retried.
+ */
 private function initPortal($count)
 {
     $this->exts->log('Begin initPortal ' . $count);
@@ -100,9 +100,9 @@ public function fillForm($count)
     }
 }
 /**
-    * Method to Check where user is logged in or not
-    * return boolean true/false
-    */
+ * Method to Check where user is logged in or not
+ * return boolean true/false
+ */
 public  function checkLogin()
 {
     $this->exts->log("Begin checkLogin ");
