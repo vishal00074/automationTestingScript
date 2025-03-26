@@ -134,8 +134,8 @@ private function initPortal($count)
         $this->exts->capture("3-login-success");
 
         if (!empty($this->exts->config_array['allow_login_success_request'])) {
-			$this->exts->triggerLoginSuccess();
-		}
+            $this->exts->triggerLoginSuccess();
+        }
 
         $this->exts->success();
     } else {
@@ -246,6 +246,11 @@ private function checkFillTwoFactor()
         $two_factor_code = trim($this->exts->fetchTwoFactorCode());
         if (!empty($two_factor_code) && trim($two_factor_code) != '') {
             $this->exts->log("checkFillTwoFactor: Entering two_factor_code." . $two_factor_code);
+            
+            // Press enter sometimes get change your password popup
+            $this->exts->type_key_by_xdotool('Return');
+            sleep(8);
+
             if ($this->exts->exists('input[name="otpCode"]:not([type="hidden"]), input[id="input-box-otp"]')) {
                 $this->exts->moveToElementAndType('input[name="otpCode"]:not([type="hidden"]), input[id="input-box-otp"]', $two_factor_code);
             } else if ($this->exts->exists('input[name="otc-1"]')) {
@@ -259,6 +264,7 @@ private function checkFillTwoFactor()
 
             $this->exts->log("checkFillTwoFactor: Clicking submit button.");
             sleep(1);
+
             if ($this->exts->exists('#cvf-submit-otp-button input[type="submit"]')) {
                 $this->exts->moveToElementAndClick('#cvf-submit-otp-button input[type="submit"]');
             } else {
@@ -331,7 +337,8 @@ private function isIncorrectCredential()
         'Votre mot de passe est incorrect',
         'Je wachtwoord is onjuist',
         'La tua password non',
-        'a no es correcta'
+        'a no es correcta',
+        'The credentials you provided were incorrect. Check them and try again.'
     ];
     $error_message = $this->exts->extract('#auth-error-message-box');
     foreach ($incorrect_credential_keys as $incorrect_credential_key) {
