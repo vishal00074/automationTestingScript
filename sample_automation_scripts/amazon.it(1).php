@@ -230,6 +230,10 @@ class PortalScriptCDP
             $this->exts->log(__FUNCTION__ . '::Use login failed');
             $this->exts->log('::URL login failure:: ' . $this->exts->getUrl());
 
+            $wrongEmail = strtolower($this->exts->extract('div#auth-email-invalid-claim-alert div.a-alert-content'));
+
+            $this->exts->log('::Wrong email text' . $wrongEmail);
+
             $error_text = strtolower($this->exts->extract($this->check_login_failed_selector));
             $this->exts->log('::error_text:: ' . $error_text);
 
@@ -244,7 +248,12 @@ class PortalScriptCDP
             } elseif (
                 stripos($error_text, 'la tua password non è corretta') !== false ||
                 stripos($error_text, "non riusciamo a trovare un account con quell'indirizzo e-mail") !== false ||
-                stripos($error_text, 'your password is incorrect') !== false 
+                stripos($error_text, 'your password is incorrect') !== false
+            ) {
+                $this->exts->loginFailure(1);
+            } else if (
+                stripos($wrongEmail, strtolower('Indirizzo e-mail o numero di cellulare errato o non valido. Correggi e riprova.')) !== false ||
+                stripos($wrongEmail, strtolower('Invalid or incorrect email address or mobile number. Please correct and try again.')) !== false
             ) {
                 $this->exts->loginFailure(1);
             } else {

@@ -134,13 +134,19 @@ private function initPortal($count)
         $this->exts->capture("3-login-success");
 
         if (!empty($this->exts->config_array['allow_login_success_request'])) {
-            $this->exts->triggerLoginSuccess();
-        }
+			$this->exts->triggerLoginSuccess();
+		}
 
         $this->exts->success();
     } else {
         $this->exts->log(__FUNCTION__ . '::Use login failed ' . $this->exts->getUrl());
+        $error_text = strtolower($this->exts->extract('div#auth-email-invalid-claim-alert div.a-alert-content'));
+
+        $this->exts->log('::Error text' . $error_text);
+
         if ($this->isIncorrectCredential()) {
+            $this->exts->loginFailure(1);
+        } else if (stripos($error_text, strtolower('Wrong or Invalid e-mail address or mobile phone number. Please correct and try again.')) !== false) {
             $this->exts->loginFailure(1);
         } else if ($this->exts->exists('form[name="forgotPassword"]')) {
             $this->exts->account_not_ready();
@@ -246,7 +252,7 @@ private function checkFillTwoFactor()
         $two_factor_code = trim($this->exts->fetchTwoFactorCode());
         if (!empty($two_factor_code) && trim($two_factor_code) != '') {
             $this->exts->log("checkFillTwoFactor: Entering two_factor_code." . $two_factor_code);
-            
+
             // Press enter sometimes get change your password popup
             $this->exts->type_key_by_xdotool('Return');
             sleep(8);
