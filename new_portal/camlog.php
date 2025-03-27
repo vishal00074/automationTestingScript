@@ -56,17 +56,6 @@ class PortalScriptCDP
         $this->exts->log('Begin initPortal ' . $count);
         $this->exts->openUrl($this->baseUrl);
         sleep(2);
-        $this->exts->waitTillPresent('div#usercentrics-root', 10);
-
-        if ($this->exts->exists('div#usercentrics-root')) {
-            $this->exts->switchToFrame('div#usercentrics-root');
-            sleep(2);
-        }
-        // accecpt cookies
-        if ($this->exts->exists('div[data-testid="uc-accept-all-button"]')) {
-            $this->exts->moveToElementAndClick('div[data-testid="uc-accept-all-button"]');
-            sleep(2);
-        }
         $this->exts->loadCookiesFromFile();
 
         if (!$this->checkLogin()) {
@@ -162,28 +151,7 @@ class PortalScriptCDP
         return $isLoggedIn;
     }
 
-    public function switchToFrame($query_string)
-    {
-        $this->exts->log(__FUNCTION__ . " Begin with " . $query_string);
-        $frame = null;
-        if (is_string($query_string)) {
-            $frame = $this->exts->queryElement($query_string);
-        }
-
-        if ($frame != null) {
-            $frame_context = $this->exts->get_frame_excutable_context($frame);
-            if ($frame_context != null) {
-                $this->exts->current_context = $frame_context;
-                return true;
-            }
-        } else {
-            $this->exts->log(__FUNCTION__ . " Frame not found " . $query_string);
-        }
-
-        return false;
-    }
-
-    private function downloadInvoices($count = 1)
+    private function downloadInvoices($count = 0)
     {
         $this->exts->log(__FUNCTION__);
 
@@ -222,6 +190,20 @@ class PortalScriptCDP
                     $this->exts->log(__FUNCTION__ . '::No download ' . $invoiceFileName);
                 }
             }
+        }
+        // switch back to oldest tab 
+        $this->exts->switchToOldestActiveTab();
+
+        // close all new tabs
+        $this->exts->closeAllTabsButThis();
+        sleep(4);
+        $restrictPages = isset($this->exts->config_array["restrictPages"]) ? (int)@$this->exts->config_array["restrictPages"] : 3;
+
+        if ($count < $restrictPages && $this->exts->exists('ul.pagination li[class="paginate_button next"]')) {
+            $count++;
+            $this->exts->moveToElementAndClick('ul.pagination li[class="paginate_button next"]');
+            sleep(7);
+            $this->downloadInvoices($count);
         }
     }
 }
