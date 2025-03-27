@@ -1,14 +1,14 @@
-public $baseUrl = 'https://service.trebono.de/admin/index.php';
-public $loginUrl = 'https://service.trebono.de/admin/index.php';
-public $invoicePageUrl = 'https://service.trebono.de/admin/module.php?load=billing&Section=invoice&ActiveTab=1&PageExportInvoice=1&Page=1';
+public $baseUrl = 'https://neurapix.com/webui/dashboard/profile/invoices';
+public $loginUrl = 'https://neurapix.com/webui/dashboard/';
+public $invoicePageUrl = 'https://neurapix.com/webui/dashboard/profile/invoices';
 
-public $username_selector = 'input[id="email"]';
-public $password_selector = 'input[id="password"]';
-public $remember_me_selector = 'input[name="RememberMe"]';
-public $submit_login_selector = 'input[type="submit"]';
+public $username_selector = 'input[name="email"]';
+public $password_selector = 'input[name="password"]';
+public $remember_me_selector = '';
+public $submit_login_selector = 'button[type="submit"]';
 
-public $check_login_failed_selector = 'div[class="alert alert-error"]';
-public $check_login_success_selector = 'a[href="/admin/index.php?Logout=Y"]';
+public $check_login_failed_selector = 'p.text-dark';
+public $check_login_success_selector = 'a[href="/webui/dashboard/profile/"]';
 
 public $isNoInvoice = true;
 
@@ -44,7 +44,7 @@ private function initPortal($count)
         $this->exts->log(__FUNCTION__ . '::Last URL: ' . $this->exts->getUrl());
 
         $error_text = strtolower($this->exts->extract($this->check_login_failed_selector));
-        if (stripos($error_text, 'incorrect login/password!') !== false) {
+        if (stripos($error_text, 'fehlerhafter login') !== false) {
             $this->exts->loginFailure(1);
         } else {
             $this->exts->loginFailure();
