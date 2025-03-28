@@ -1,4 +1,4 @@
-<?php
+<?php //add accecpt cookies after login and removed invoicePageProUrl(not in use) added waitTillPresent on download button and successfully tested with mutiple connection
 
 /**
  * Chrome Remote via Chrome devtool protocol script, for specific process/portal
@@ -62,7 +62,6 @@ class PortalScriptCDP
     public $baseUrl = 'https://my.izettle.com';
     public $loginUrl = 'https://my.izettle.com';
     public $invoicePageUrl = 'https://my.zettle.com/invoices/orders?status=PAID';
-    public $invoicePageProUrl = 'https://backoffice.intelligentpos.com/profile/invoices';
     public $username_selector = 'form input[name="username"]';
     public $password_selector = 'form input[name="password"], input[name="login_password"]';
     public $remember_me_selector = '';
@@ -116,7 +115,6 @@ class PortalScriptCDP
             if ($this->exts->exists('div[data-nemo="twofactorPage"] button')) {
                 $this->exts->click_by_xdotool('div[data-nemo="twofactorPage"] button');
             }
-
             $this->checkFillTwoFactor();
         }
 
@@ -124,7 +122,12 @@ class PortalScriptCDP
         if ($this->checkLogin()) {
             $this->exts->log(">>>>>>>>>>>>>>>Login successful!!!!");
             $this->exts->capture("LoginSuccess");
-            sleep(5);
+
+            // accecpt cookies
+            if ($this->exts->exists('button#onetrust-accept-btn-handler')) {
+                $this->exts->moveToElementAndClick('button#onetrust-accept-btn-handler');
+                sleep(2);
+            }
             $this->exts->openUrl($this->invoicePageUrl);
             sleep(10);
             $this->exts->capture("invoicePageUrl");
@@ -132,8 +135,6 @@ class PortalScriptCDP
                 $this->exts->click_element('div[role="table"] button[type="button"]');
                 sleep(10);
             }
-
-
             $this->processInvoices();
 
             if ($this->isNoInvoice) {
@@ -142,8 +143,8 @@ class PortalScriptCDP
             $this->exts->success();
         } else {
             if (
-                stripos(strtolower($this->exts->extract($this->check_login_failed_selector)), 'passwor') !== false
-                || stripos(strtolower($this->exts->extract($this->check_login_failed_selector)), 'correct') !== false
+                stripos(strtolower($this->exts->extract($this->check_login_failed_selector)), 'passwor') !== false ||
+                stripos(strtolower($this->exts->extract($this->check_login_failed_selector)), 'correct') !== false
             ) {
                 $this->exts->log("Wrong credential !!!!");
                 $this->exts->loginFailure(1);
@@ -214,6 +215,20 @@ class PortalScriptCDP
                 sleep(5);
                 if ($this->exts->exists($this->submit_login_selector)) {
                     $this->exts->moveToElementAndClick($this->submit_login_selector);
+                    sleep(10);
+                }
+
+                $error_text = strtolower($this->exts->extract('p#inputError'));
+                $this->exts->log("Error text:: " . $error_text);
+                if (
+                    stripos(strtolower($error_text), strtolower('Check your email and password and try again.')) !== false ||
+                    stripos(strtolower($error_text), strtolower('Please type a valid email address.')) !== false
+
+                ) {
+                    $this->exts->log(__FUNCTION__ . '::Use login failed');
+                    $this->exts->log(__FUNCTION__ . '::Last URL: ' . $this->exts->getUrl());
+                    $this->exts->log("Wrong credential !!!!");
+                    $this->exts->loginFailure(1);
                 }
             }
         } catch (\Exception $exception) {
@@ -467,8 +482,7 @@ class PortalScriptCDP
                 sleep(2);
                 $this->exts->capture('recaptcha-filled');
 
-                $gcallbackFunction = $this->exts->execute_javascript('
-            (function() { 
+                $gcallbackFunction = $this->exts->execute_javascript('(function() { 
                 if(document.querySelector("[data-callback]") != null){
                     return document.querySelector("[data-callback]").getAttribute("data-callback");
                 }
@@ -635,8 +649,9 @@ class PortalScriptCDP
             $invoice['invoiceDate'] = $this->exts->parse_date($invoice['invoiceDate'], 'M d, Y', 'Y-m-d');
             $this->exts->log('Date parsed: ' . $invoice['invoiceDate']);
             $this->exts->openUrl($invoice['invoiceUrl']);
-            sleep(10);
-            $this->exts->log('invoiceUrl');
+            sleep(2);
+            $this->exts->waitTillPresent('div[class*="layout__Container-zettle"] button[type="button"]:nth-child(3)', 20);
+
             $downloadBtn = $this->exts->querySelector('div[class*="layout__Container-zettle"] button[type="button"]:nth-child(3)');
             $downloaded_file = $this->exts->click_and_download($downloadBtn, 'pdf', $invoiceFileName);
 
