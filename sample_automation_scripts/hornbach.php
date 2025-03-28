@@ -109,7 +109,7 @@ class PortalScriptCDP
                 $this->exts->click_element('button[data-testid="uc-accept-all-button"]');
             }
             $this->exts->openUrl($this->invoicePageUrl);
-            $this->processInvoices();
+            $this->downloadInvoices();
             // Final, check no invoice
             if ($this->isNoInvoice) {
                 $this->exts->no_invoice();
@@ -185,59 +185,70 @@ class PortalScriptCDP
         return $isLoggedIn;
     }
 
-    private function processInvoices($paging_count = 1)
+    private function downloadInvoices($count = 0)
     {
-        $this->exts->waitTillPresent('div.ebui-MerchantGroupWrapper-3-1-20', 30); // Wait for the main wrapper
-        $this->exts->capture("4-orders-page");
-        $orders = [];
+        $this->exts->log(__FUNCTION__);
 
-        // Query for each order block (based on the provided HTML structure)
-        $orderRows = $this->exts->querySelectorAll('div.ebui-MerchantGroupWrapper-3-1-20');
-        foreach ($orderRows as $row) {
-            // Extract Order Details
-            $orderStatus = $this->exts->extract("//p[contains(., 'Status:')]//span[@class='ebui-T-text-3-1-40']//span[contains(., 'completed')]", $row); // e.g., "zugestellt"
-            $orderNumber = $this->exts->extract('//p[contains(span[1], "Order:")]/span[2]', $row);
-            $orderTotalAmount = $this->exts->extract("//div[contains(@class, 'ebui-T-totalPrice-3-1-35')]//span[contains(@class, 'ebui-price_main-3-1-14')]", $row); // e.g., "51,75 €"
+        $this->exts->waitTillPresent('div[class*="ebui-MerchantGroupWrapper"]');
+        $this->exts->capture("4-invoices-classic");
 
-            // Extract "Sendung Verfolgen" link (Tracking URL)x
-            $trackingUrl = '';
-            $trackingLink = 'https://www.hornbach.de/customer/account/purchases/#/details/orders/' . $orderNumber . '?archived=true';
+        $invoices = [];
+        $rows = $this->exts->getElements('div[class*="ebui-MerchantGroupWrapper"]');
+        foreach ($rows as $key => $row) {
+            $invoiceStatus =  $this->exts->extract('span[class*="ebui-T-connected"]', $row);
+            $this->exts->log('invoiceStatus:: ' . $invoiceStatus);
+            if ($invoiceStatus == 'completed' || $invoiceStatus == 'abgeschlossen') {
 
-            // Product Image(s) (optional, for additional context if necessary) 55506082502220222119
-            $productImages = [];
-            $images = $this->exts->querySelectorAll('.ebui-T-imageContainer-3-1-28 img', $row);
-            foreach ($images as $img) {
-                $productImages[] = $img->getAttribute('src');
+
+                $orderNumber =  $this->exts->extract('p > span[class*="ebui-T-text"]:not([class*="ebui-T-textBold"]):not(:has(span))', $row);
+                $this->exts->log('orderNumber:: ' . $orderNumber);
+                if (is_numeric($orderNumber)) {
+                    $invoiceUrl = '';
+                    $invoiceName =  $orderNumber;
+                    $invoiceDate = $this->exts->extract('h1[class*="ebui-clearMargin"]:not([class*="ebui-titleHeadline"])', $row);
+                    $invoiceAmount = '';
+
+                    array_push($invoices, array(
+                        'invoiceName' => $invoiceName,
+                        'orderNumber' => $orderNumber,
+                        'invoiceAmount' => $invoiceAmount,
+                        'invoiceUrl' => $invoiceUrl,
+                        'invoiceDate' => $invoiceDate
+                    ));
+                    $this->isNoInvoice = false;
+                }
             }
-
-            // Construct order data
-            array_push($orders, array(
-                'orderNumber' => $orderNumber,
-                'orderStatus' => $orderStatus,
-                'orderTotalAmount' => $orderTotalAmount,
-                'trackingUrl' => $trackingUrl,
-                'productImages' => $productImages
-            ));
-
-            $this->isNoInvoice = false;
         }
 
-        // Log orders
-        $this->exts->log('Orders found: ' . count($orders));
-        foreach ($orders as $order) {
+        $this->exts->log('Invoices found: ' . count($invoices));
+        foreach ($invoices as $invoice) {
             $this->exts->log('--------------------------');
-            $this->exts->log('Order Number: ' . $order['orderNumber']);
-            $this->exts->log('Order Status: ' . $order['orderStatus']);
-            $this->exts->log('Order Total Amount: ' . $order['orderTotalAmount']);
-            $this->exts->log('Tracking URL: ' . $order['trackingUrl']);
+            $this->exts->log('invoiceName: ' . $invoice['invoiceName']);
+            $this->exts->log('invoiceDate: ' . $invoice['invoiceDate']);
+            $this->exts->log('invoiceAmount: ' . $invoice['invoiceAmount']);
+            $this->exts->log('invoiceUrl: ' . $invoice['invoiceUrl']);
+            $this->exts->log('orderNumber: ' . $invoice['orderNumber']);
+            $invoiceFileName = $invoice['invoiceName'] . '.pdf';
+            $invoice['invoiceDate'] = $this->exts->parse_date($invoice['invoiceDate'], 'd.m.Y', 'Y-m-d');
+            $this->exts->log('Date parsed: ' . $invoice['invoiceDate']);
 
-            // If you want to download invoices, this part needs to be adapted accordingly:
-            // You can replace this section with downloading actions based on your business logic
-            // Example: $this->exts->click_and_download('button[data-qa="h-payment-history-download-invoice"]', 'pdf', $order['orderNumber']);
+            $orderDetail = 'https://www.hornbach.de/customer/account/purchases/#/details/orders/'.$invoice['orderNumber'];
+            $this->exts->openUrl($orderDetail);
+            sleep(4);
+            $this->exts->waitTillPresent('div#PurchasePage');
+            $this->exts->execute_javascript('window.print();');
+            sleep(4);
+            $file_ext = $this->exts->get_file_extension($invoiceFileName);
 
-            // Just a placeholder if downloading is needed:
-            // $downloaded_file = $this->exts->click_and_download('button[data-qa="h-payment-history-download-invoice"]', 'pdf', $invoiceFileName);
-            sleep(1);
+            $this->exts->wait_and_check_download($file_ext);
+            
+            $downloaded_file = $this->exts->find_saved_file($file_ext, $invoiceFileName);
+            if (trim($downloaded_file) != '' && file_exists($downloaded_file)) {
+                $this->exts->new_invoice($invoice['invoiceName'], $invoice['invoiceDate'], $invoice['invoiceAmount'], $invoiceFileName);
+                sleep(1);
+            } else {
+                $this->exts->log(__FUNCTION__ . '::No download ' . $invoiceFileName);
+            }
         }
     }
 }
