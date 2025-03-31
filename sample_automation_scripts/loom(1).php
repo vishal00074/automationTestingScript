@@ -191,9 +191,11 @@ class PortalScriptCDP
             $this->exts->moveToElementAndType($this->username_selector, $this->username);
             sleep(4);
             $this->exts->capture("2-email-filled");
-            if ($this->exts->exists('button#email-signup-button:not(:disabled)')) {
-                $this->exts->moveToElementAndClick('button#email-signup-button:not(:disabled)');
-                sleep(10);
+
+            if (stripos($this->exts->extract('#email-signup-button[type="submit"]', null, 'innerText'), 'Atlassian') !== false) {
+                $this->exts->log('inside Atlassian Login');
+                $this->exts->moveToElementAndClick('#email-signup-button[type="submit"]');
+                sleep(7);
             }
 
             $loginTab = $this->exts->findTabMatchedUrl(['id.atlassian.com/login?']);
@@ -221,10 +223,10 @@ class PortalScriptCDP
                 $this->exts->capture("2-after-password-submit");
 
                 $error_text = strtolower($this->exts->extract('div[data-testid="form-error--content"] div'));
-                
-                $this->exts->log('error text:: '. $error_text);
 
-                if (stripos($error_text, strtolower('Incorrect email address and/or password. Try again or')) !== false){
+                $this->exts->log('error text:: ' . $error_text);
+
+                if (stripos($error_text, strtolower('Incorrect email address and/or password. Try again or')) !== false) {
                     $this->exts->loginFailure(1);
                 }
             } else if (stripos($this->exts->extract('#email-signup-button[type="submit"]', null, 'innerText'), 'Google') !== false) {

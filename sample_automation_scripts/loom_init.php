@@ -14,9 +14,9 @@ public $login_with_apple = 0;
 
 public $isNoInvoice = true;
 /**
- * Entry Method thats called for a portal
- * @param Integer $count Number of times portal is retried.
- */
+    * Entry Method thats called for a portal
+    * @param Integer $count Number of times portal is retried.
+    */
 private function initPortal($count)
 {
     $this->exts->log('Begin initPortal ' . $count);
@@ -60,8 +60,8 @@ private function initPortal($count)
         $this->exts->capture("3-login-success");
 
         if (!empty($this->exts->config_array['allow_login_success_request'])) {
-			$this->exts->triggerLoginSuccess();
-		}
+            $this->exts->triggerLoginSuccess();
+        }
 
         $this->exts->success();
     } else {
@@ -126,9 +126,11 @@ private function checkFillLogin()
         $this->exts->moveToElementAndType($this->username_selector, $this->username);
         sleep(4);
         $this->exts->capture("2-email-filled");
-        if ($this->exts->exists('button#email-signup-button:not(:disabled)')) {
-            $this->exts->moveToElementAndClick('button#email-signup-button:not(:disabled)');
-            sleep(10);
+
+        if (stripos($this->exts->extract('#email-signup-button[type="submit"]', null, 'innerText'), 'Atlassian') !== false) {
+            $this->exts->log('inside Atlassian Login');
+            $this->exts->moveToElementAndClick('#email-signup-button[type="submit"]');
+            sleep(7);
         }
 
         $loginTab = $this->exts->findTabMatchedUrl(['id.atlassian.com/login?']);
@@ -156,10 +158,10 @@ private function checkFillLogin()
             $this->exts->capture("2-after-password-submit");
 
             $error_text = strtolower($this->exts->extract('div[data-testid="form-error--content"] div'));
-            
-            $this->exts->log('error text:: '. $error_text);
 
-            if (stripos($error_text, strtolower('Incorrect email address and/or password. Try again or')) !== false){
+            $this->exts->log('error text:: ' . $error_text);
+
+            if (stripos($error_text, strtolower('Incorrect email address and/or password. Try again or')) !== false) {
                 $this->exts->loginFailure(1);
             }
         } else if (stripos($this->exts->extract('#email-signup-button[type="submit"]', null, 'innerText'), 'Google') !== false) {
