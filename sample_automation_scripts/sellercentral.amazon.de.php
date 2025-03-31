@@ -157,6 +157,22 @@ class PortalScriptCDP
             // End handling login form
             $this->checkFillTwoFactor();
 
+            $isOtpExpired =  $this->exts->extract('div.a-alert-content');
+            $this->exts->log('::Otp Expired Message:: ' . $isOtpExpired);
+
+            if (stripos($isOtpExpired, strtolower("Your One Time Password (OTP) has expired. Please request another from the ‘Didn't receive the One Time Password?’ link below.")) !== false) {
+
+                $this->exts->moveToElementAndClick('a[id="auth-get-new-otp-link"]');
+                sleep(4);
+                $this->exts->waitTillPresent('input[id="auth-send-code"]');
+                $this->exts->moveToElementAndClick('input[id="auth-send-code"]');
+                sleep(10);
+
+                $this->checkFillTwoFactor();
+            }
+
+
+
 
             if ($this->exts->exists('form#auth-account-fixup-phone-form a#ap-account-fixup-phone-skip-link')) {
                 $this->exts->moveToElementAndClick('form#auth-account-fixup-phone-form a#ap-account-fixup-phone-skip-link');
@@ -237,7 +253,11 @@ class PortalScriptCDP
                 $this->exts->loginFailure(1);
             } else if (stripos($error_text, strtolower('Wrong or Invalid e-mail address or mobile phone number. Please correct and try again.')) !== false) {
                 $this->exts->loginFailure(1);
-            } else if (stripos($OtpPageError, strtolower('Die von dir angegebenen Anmeldeinformationen waren inkorrekt. Überprüfe sie und versuche es erneut.')) !== false) {
+            } else if (
+                stripos($OtpPageError, strtolower('Die von dir angegebenen Anmeldeinformationen waren inkorrekt. Überprüfe sie und versuche es erneut.')) !== false ||
+                stripos($OtpPageError, strtolower('The credentials you provided were incorrect. Check them and try again.')) !== false ||
+                stripos($OtpPageError, strtolower("Your One Time Password (OTP) has expired. Please request another from the ‘Didn't receive the One Time Password?’ link below.")) !== false
+            ) {
                 $this->exts->loginFailure(1);
             } else if ($this->exts->exists('form[name="forgotPassword"]')) {
                 $this->exts->account_not_ready();
