@@ -1,4 +1,4 @@
-<?php
+<?php // added selector on otpscreen to trigger loginFailedConfirmed 
 
 /**
  * Chrome Remote via Chrome devtool protocol script, for specific process/portal
@@ -228,12 +228,16 @@ class PortalScriptCDP
         } else {
             $this->exts->log(__FUNCTION__ . '::Use login failed ' . $this->exts->getUrl());
             $error_text = strtolower($this->exts->extract('div#auth-email-invalid-claim-alert div.a-alert-content'));
+            $OtpPageError =  $this->exts->extract('div.a-alert-content');
 
-            $this->exts->log('::Error text' . $error_text);
+            $this->exts->log('::Error text ' . $error_text);
+            $this->exts->log('::Error text Otp Page ' . $OtpPageError);
 
             if ($this->isIncorrectCredential()) {
                 $this->exts->loginFailure(1);
             } else if (stripos($error_text, strtolower('Wrong or Invalid e-mail address or mobile phone number. Please correct and try again.')) !== false) {
+                $this->exts->loginFailure(1);
+            } else if (stripos($OtpPageError, strtolower('Die von dir angegebenen Anmeldeinformationen waren inkorrekt. Überprüfe sie und versuche es erneut.')) !== false) {
                 $this->exts->loginFailure(1);
             } else if ($this->exts->exists('form[name="forgotPassword"]')) {
                 $this->exts->account_not_ready();
