@@ -33,17 +33,17 @@ class PortalScriptCDP
     }
 
     /*Define constants used in script*/
-    public $baseUrl = 'https://dashboard-1.edesk.com/home';
-    public $loginUrl = 'https://dashboard.edesk.com/login';
-    public $invoicePageUrl = 'https://dashboard-1.edesk.com/payments';
+    public $baseUrl = 'https://www.gdata.de/mygdata';
+    public $loginUrl = 'https://www.gdata.de/mygdata';
+    public $invoicePageUrl = 'https://www.gdata.de/mygdata#invoices';
 
-    public $username_selector = 'input[name="username"]';
-    public $password_selector = 'input[name="password"]';
+    public $username_selector = 'input[name="user"]';
+    public $password_selector = 'input[name="pass"]';
     public $remember_me_selector = '';
-    public $submit_login_selector = 'button[type="submit"]';
+    public $submit_login_selector = 'button#uc-login-btn';
 
-    public $check_login_failed_selector = 'div.alert-danger';
-    public $check_login_success_selector = 'a[href="/logout"]';
+    public $check_login_failed_selector = 'div.flash-notifications div.item-content';
+    public $check_login_success_selector = 'nav a[title="Logout"]';
 
     public $isNoInvoice = true;
 
@@ -55,8 +55,18 @@ class PortalScriptCDP
     {
         $this->exts->log('Begin initPortal ' . $count);
         $this->exts->openUrl($this->baseUrl);
-        sleep(2);
+        sleep(10);
         $this->exts->loadCookiesFromFile();
+
+        if ($this->exts->exists('div.cmpwrapper#cmpwrapper')) {
+            $this->switchToFrame('div.cmpwrapper#cmpwrapper');
+            sleep(2);
+        }
+
+        if ($this->exts->exists('a.cmptxt_btn_yes')) {
+            $this->exts->moveToElementAndClick('a.cmptxt_btn_yes');
+            sleep(7);
+        }
 
         if (!$this->checkLogin()) {
             $this->exts->log('NOT logged via cookie');
@@ -69,12 +79,13 @@ class PortalScriptCDP
             $this->exts->log(">>>>>>>>>>>>>>>Login successful!!!!");
             $this->exts->capture("LoginSuccess");
 
-            if ($this->exts->exists('div.modal-header button[class="close"]')) {
-                $this->exts->moveToElementAndClick('div.modal-header button[class="close"]');
-                sleep(2);
+            if ($this->exts->exists('a.introjs-skipbutton')) {
+                $this->exts->moveToElementAndClick('a.introjs-skipbutton');
+                sleep(5);
             }
 
             $this->exts->openUrl($this->invoicePageUrl);
+            sleep(10);
             $this->downloadInvoices();
             // Final, check no invoice
             if ($this->isNoInvoice) {
@@ -89,7 +100,9 @@ class PortalScriptCDP
             $error_text = strtolower($this->exts->extract($this->check_login_failed_selector));
 
             $this->exts->log(__FUNCTION__ . '::Error text: ' . $error_text);
-            if (stripos($error_text, strtolower('Invalid username/email or password. Please try again.')) !== false ) {
+            if (stripos($error_text, strtolower('Bitte geben Sie einen gültigen Benutzernamen ein. Bitte geben Sie ein gültiges Passwort ein.')) !== false ||
+            stripos($error_text, strtolower('Please enter a valid username. Please enter a valid password.')) !== false
+            ) {
                 $this->exts->loginFailure(1);
             } else {
                 $this->exts->loginFailure();
@@ -151,22 +164,41 @@ class PortalScriptCDP
         return $isLoggedIn;
     }
 
+    public function switchToFrame($query_string)
+    {
+        $this->exts->log(__FUNCTION__ . " Begin with " . $query_string);
+        $frame = null;
+        if (is_string($query_string)) {
+            $frame = $this->exts->queryElement($query_string);
+        }
+
+        if ($frame != null) {
+            $frame_context = $this->exts->get_frame_excutable_context($frame);
+            if ($frame_context != null) {
+                $this->exts->current_context = $frame_context;
+                return true;
+            }
+        } else {
+            $this->exts->log(__FUNCTION__ . " Frame not found " . $query_string);
+        }
+
+        return false;
+    }
+
     private function downloadInvoices($count = 1)
     {
         $this->exts->log(__FUNCTION__);
-
-        $this->exts->waitTillPresent('table tbody tr');
         $this->exts->capture("4-invoices-classic");
 
         $invoices = [];
-        $rows = $this->exts->getElements('table tbody tr');
+        $rows = $this->exts->getElements('div.invoice-list table tbody tr');
         foreach ($rows as $key => $row) {
             $invoiceLink = $this->exts->getElement('a', $row);
             if ($invoiceLink != null) {
                 $invoiceUrl = $invoiceLink->getAttribute("href");
-                $invoiceName = $this->exts->extract('td a', $row);
+                $invoiceName = $this->exts->extract('td:nth-child(2)', $row);
                 $invoiceDate = $this->exts->extract('td:nth-child(1)', $row);
-                $invoiceAmount = $this->exts->extract('td:nth-child(4)', $row);
+                $invoiceAmount = $this->exts->extract('td:nth-child(3)', $row);
 
                 array_push($invoices, array(
                     'invoiceName' => $invoiceName,
@@ -197,15 +229,6 @@ class PortalScriptCDP
             } else {
                 $this->exts->log(__FUNCTION__ . '::No download ' . $invoiceFileName);
             }
-        }
-
-        $restrictPages = isset($this->exts->config_array["restrictPages"]) ? (int)@$this->exts->config_array["restrictPages"] : 3;
-
-        if ($count < $restrictPages && $this->exts->exists('div.paginator-box-footer a i.ff-chevron-right')) {
-            $this->exts->click_by_xdotool('div.paginator-box-footer a i.ff-chevron-right');
-            sleep(7);
-            $count++;
-            $this->downloadInvoices($count);
         }
     }
 }

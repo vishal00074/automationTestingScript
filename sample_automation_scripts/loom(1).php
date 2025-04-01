@@ -232,6 +232,7 @@ class PortalScriptCDP
             } else if (stripos($this->exts->extract('#email-signup-button[type="submit"]', null, 'innerText'), 'Google') !== false) {
                 $this->exts->moveToElementAndClick('#email-signup-button[type="submit"]');
                 sleep(5);
+                $this->exts->switchToNewestActiveTab();
                 $this->exts->log('inside google Login');
                 $this->loginGoogleIfRequired();
             } else if (stripos($this->exts->extract('#email-signup-button[type="submit"]', null, 'innerText'), 'Slack') !== false) {
