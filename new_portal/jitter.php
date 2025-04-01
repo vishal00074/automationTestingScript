@@ -95,7 +95,7 @@ class PortalScriptCDP
             $error_text = strtolower($this->exts->extract($this->check_login_failed_selector));
 
             $this->exts->log(__FUNCTION__ . '::Error text: ' . $error_text);
-            if (stripos($error_text, strtolower('Bad request. Invalid password.')) !== false ) {
+            if (stripos($error_text, strtolower('Bad request. Invalid password.')) !== false) {
                 $this->exts->loginFailure(1);
             } else {
                 $this->exts->loginFailure();
@@ -162,8 +162,17 @@ class PortalScriptCDP
         return $isLoggedIn;
     }
 
+    public function waitFor($selector = null)
+    {
+        for ($wait = 0; $wait < 2 && $this->exts->executeSafeScript("return !!document.querySelector('" . $selector . "');") != 1; $wait++) {
+            $this->exts->log('Waiting for login.....');
+            sleep(10);
+        }
+    }
+
     private function downloadInvoices($count = 0)
     {
+        sleep(10);
         $this->exts->log(__FUNCTION__);
         // download stripe billing
         $restrictPages = isset($this->exts->config_array["restrictPages"]) ? (int)@$this->exts->config_array["restrictPages"] : 3;
@@ -174,7 +183,7 @@ class PortalScriptCDP
             $i++;
         }
 
-        $this->exts->waitTillPresent('div.Box-root a[href*="invoice.stripe.com"]');
+        $this->waitFor('div.Box-root a[href*="invoice.stripe.com"]');
         $this->exts->capture("4-invoices-classic");
 
         $invoices = [];
@@ -186,7 +195,7 @@ class PortalScriptCDP
             ));
             $this->isNoInvoice = false;
         }
-        
+
         $this->exts->log('Invoices found: ' . count($invoices));
         foreach ($invoices as $invoice) {
             $this->exts->openUrl($invoice['invoiceUrl']);
@@ -196,7 +205,7 @@ class PortalScriptCDP
             $invoiceAmount = $this->exts->extract('div.InvoiceSummaryPostPayment span.CurrencyAmount');
             $this->exts->waitTillPresent('table.InvoiceDetails-table tbody tr.LabeledTableRow--wide');
             $invoiceRows = $this->exts->getElements('table.InvoiceDetails-table tbody tr.LabeledTableRow--wide');
-            if(count($invoiceRows) >= 3){
+            if (count($invoiceRows) >= 3) {
                 $invoiceName = $this->exts->extract('td[style*="right"] span', $invoiceRows[0]);
                 $invoiceDate = $this->exts->extract('td[style*="right"] span', $invoiceRows[1]);
             }

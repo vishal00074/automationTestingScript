@@ -34,9 +34,11 @@ private function initPortal($count)
     $this->exts->capture("Home-page-with-cookie");
 
     if ($this->exts->exists("button#truste-consent-button")) {
+
         $this->exts->moveToElementAndClick("button#truste-consent-button");
     }
     sleep(5);
+
 
     if (!$this->checkLogin()) {
         $this->exts->openUrl($this->baseUrl);
@@ -60,6 +62,7 @@ private function initPortal($count)
 
         if ($this->exts->urlContains('challenge=/login')) {
             $this->check_solve_blocked_page();
+            $this->check_solve_cloudflare_login();
         }
         sleep(10);
 
@@ -69,6 +72,7 @@ private function initPortal($count)
 
         if ($this->exts->urlContains('challenge=/login')) {
             $this->check_solve_blocked_page();
+            $this->check_solve_cloudflare_login();
         }
         sleep(10);
     }
@@ -217,6 +221,44 @@ function fillForm($count = 0)
         }
     } catch (\Exception $exception) {
         $this->exts->log("Exception filling loginform " . $exception->getMessage());
+    }
+}
+
+private function check_solve_cloudflare_login($refresh_page = false)
+{
+    $unsolved_cloudflare_input_xpath = '//input[starts-with(@name, "cf") and contains(@name, "response") and string-length(@value) <= 0]';
+    $solved_cloudflare_input_xpath = '//input[starts-with(@name, "cf") and contains(@name, "response") and string-length(@value) > 0]';
+    $this->exts->capture("cloudflare-checking");
+    if (
+        !$this->exts->oneExists([$solved_cloudflare_input_xpath, $unsolved_cloudflare_input_xpath]) &&
+        $this->exts->exists('#cf-please-wait > p:not([style*="display: none"]):not([style*="display:none"])')
+    ) {
+        for ($waiting = 0; $waiting < 10; $waiting++) {
+            sleep(2);
+            if ($this->exts->oneExists([$solved_cloudflare_input_xpath, $unsolved_cloudflare_input_xpath])) {
+                sleep(3);
+                break;
+            }
+        }
+    }
+
+    if ($this->exts->exists($unsolved_cloudflare_input_xpath)) {
+        $this->exts->click_by_xdotool('div:has(>input[name^="cf"][name$="response"])', 30, 28);
+        sleep(5);
+        $this->exts->capture("cloudflare-clicked-1", true);
+        sleep(3);
+        if ($this->exts->exists($unsolved_cloudflare_input_xpath)) {
+            $this->exts->click_by_xdotool('div:has(>input[name^="cf"][name$="response"])', 30, 28);
+            sleep(5);
+            $this->exts->capture("cloudflare-clicked-2", true);
+            sleep(15);
+        }
+        if ($this->exts->exists($unsolved_cloudflare_input_xpath)) {
+            $this->exts->click_by_xdotool('div:has(>input[name^="cf"][name$="response"])', 30, 28);
+            sleep(5);
+            $this->exts->capture("cloudflare-clicked-3", true);
+            sleep(15);
+        }
     }
 }
 

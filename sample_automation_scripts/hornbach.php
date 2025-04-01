@@ -1,4 +1,4 @@
-<?php
+<?php // added remember selector and retry to login in case page not working after submitting form
 
 /**
  * Chrome Remote via Chrome devtool protocol script, for specific process/portal
@@ -67,7 +67,7 @@ class PortalScriptCDP
 
     public $username_selector = 'input[type="email"]';
     public $password_selector = 'input[type="password"]';
-    public $remember_me_selector = '';
+    public $remember_me_selector = 'input[id="rememberMe"]';
     public $submit_login_selector = '.submit-buttons.one-button input[type="submit"]';
 
     public $check_login_failed_selector = 'label.notification-type-error';
@@ -103,7 +103,6 @@ class PortalScriptCDP
         if ($this->checkLogin()) {
             $this->exts->log(">>>>>>>>>>>>>>>Login successful!!!!");
             $this->exts->capture("LoginSuccess");
-            $this->exts->success();
             sleep(2);
             if ($this->exts->exists('button[data-testid="uc-accept-all-button"]')) {
                 $this->exts->click_element('button[data-testid="uc-accept-all-button"]');
@@ -149,7 +148,20 @@ class PortalScriptCDP
                 sleep(5);
                 if ($this->exts->exists($this->submit_login_selector)) {
                     $this->exts->click_by_xdotool($this->submit_login_selector);
+                    sleep(15);
                 }
+            }
+
+            // try again in case page isn’t working
+            $errorMessage = $this->exts->extract('div#main-frame-error h1 span');
+
+            $this->exts->log("::error message " . $errorMessage);
+
+            if (stripos($errorMessage, 'This page isn’t working') !== false && $count < 3) {
+                $count++;
+                $this->exts->openUrl($this->loginUrl);
+                sleep(4);
+                $this->fillForm($count);
             }
         } catch (\Exception $exception) {
 
@@ -159,11 +171,8 @@ class PortalScriptCDP
 
 
     /**
-
      * Method to Check where user is logged in or not
-
      * return boolean true/false
-
      */
     function checkLogin()
     {
@@ -232,7 +241,7 @@ class PortalScriptCDP
             $invoice['invoiceDate'] = $this->exts->parse_date($invoice['invoiceDate'], 'd.m.Y', 'Y-m-d');
             $this->exts->log('Date parsed: ' . $invoice['invoiceDate']);
 
-            $orderDetail = 'https://www.hornbach.de/customer/account/purchases/#/details/orders/'.$invoice['orderNumber'];
+            $orderDetail = 'https://www.hornbach.de/customer/account/purchases/#/details/orders/' . $invoice['orderNumber'];
             $this->exts->openUrl($orderDetail);
             sleep(4);
             $this->exts->waitTillPresent('div#PurchasePage');
@@ -241,7 +250,7 @@ class PortalScriptCDP
             $file_ext = $this->exts->get_file_extension($invoiceFileName);
 
             $this->exts->wait_and_check_download($file_ext);
-            
+
             $downloaded_file = $this->exts->find_saved_file($file_ext, $invoiceFileName);
             if (trim($downloaded_file) != '' && file_exists($downloaded_file)) {
                 $this->exts->new_invoice($invoice['invoiceName'], $invoice['invoiceDate'], $invoice['invoiceAmount'], $invoiceFileName);

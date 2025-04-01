@@ -1,5 +1,4 @@
-<?php // migrated added switchtoframe updated remove undefined variable  $filename from download code added loginfailedConfirmed 
-// add final check of  no_invoice
+<?php // added solve cloud flare login function  remove return from billing page function stop download invoice 
 /**
  * Chrome Remote via Chrome devtool protocol script, for specific process/portal
  *
@@ -124,6 +123,7 @@ class PortalScriptCDP
 
             if ($this->exts->urlContains('challenge=/login')) {
                 $this->check_solve_blocked_page();
+                $this->check_solve_cloudflare_login();
             }
             sleep(10);
 
@@ -133,6 +133,7 @@ class PortalScriptCDP
 
             if ($this->exts->urlContains('challenge=/login')) {
                 $this->check_solve_blocked_page();
+                $this->check_solve_cloudflare_login();
             }
             sleep(10);
         }
@@ -286,6 +287,44 @@ class PortalScriptCDP
         }
     }
 
+    private function check_solve_cloudflare_login($refresh_page = false)
+    {
+        $unsolved_cloudflare_input_xpath = '//input[starts-with(@name, "cf") and contains(@name, "response") and string-length(@value) <= 0]';
+        $solved_cloudflare_input_xpath = '//input[starts-with(@name, "cf") and contains(@name, "response") and string-length(@value) > 0]';
+        $this->exts->capture("cloudflare-checking");
+        if (
+            !$this->exts->oneExists([$solved_cloudflare_input_xpath, $unsolved_cloudflare_input_xpath]) &&
+            $this->exts->exists('#cf-please-wait > p:not([style*="display: none"]):not([style*="display:none"])')
+        ) {
+            for ($waiting = 0; $waiting < 10; $waiting++) {
+                sleep(2);
+                if ($this->exts->oneExists([$solved_cloudflare_input_xpath, $unsolved_cloudflare_input_xpath])) {
+                    sleep(3);
+                    break;
+                }
+            }
+        }
+
+        if ($this->exts->exists($unsolved_cloudflare_input_xpath)) {
+            $this->exts->click_by_xdotool('div:has(>input[name^="cf"][name$="response"])', 30, 28);
+            sleep(5);
+            $this->exts->capture("cloudflare-clicked-1", true);
+            sleep(3);
+            if ($this->exts->exists($unsolved_cloudflare_input_xpath)) {
+                $this->exts->click_by_xdotool('div:has(>input[name^="cf"][name$="response"])', 30, 28);
+                sleep(5);
+                $this->exts->capture("cloudflare-clicked-2", true);
+                sleep(15);
+            }
+            if ($this->exts->exists($unsolved_cloudflare_input_xpath)) {
+                $this->exts->click_by_xdotool('div:has(>input[name^="cf"][name$="response"])', 30, 28);
+                sleep(5);
+                $this->exts->capture("cloudflare-clicked-3", true);
+                sleep(15);
+            }
+        }
+    }
+
     private function checkFillTwoFactor($two_factor_selector, $two_factor_message_selector, $two_factor_submit_selector)
     {
         if ($this->exts->getElement($two_factor_selector) != null && $this->exts->two_factor_attempts < 3) {
@@ -399,7 +438,6 @@ class PortalScriptCDP
                     return;
                 }
             }
-            return;
         }
 
         $accounts = $this->exts->getElements($account_list_selector);

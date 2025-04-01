@@ -4,7 +4,7 @@ public $invoicePageUrl = 'https://www.hornbach.de/customer/account/purchases/';
 
 public $username_selector = 'input[type="email"]';
 public $password_selector = 'input[type="password"]';
-public $remember_me_selector = '';
+public $remember_me_selector = 'input[id="rememberMe"]';
 public $submit_login_selector = '.submit-buttons.one-button input[type="submit"]';
 
 public $check_login_failed_selector = 'label.notification-type-error';
@@ -13,12 +13,9 @@ public $check_login_success_selector = 'a[data-testid="logout-customer" ]';
 public $isNoInvoice = true;
 
 /**
-
-    * Entry Method thats called for a portal
-
-    * @param Integer $count Number of times portal is retried.
-
-    */
+ * Entry Method thats called for a portal
+ * @param Integer $count Number of times portal is retried.
+ */
 private function initPortal($count)
 {
 
@@ -40,11 +37,10 @@ private function initPortal($count)
     if ($this->checkLogin()) {
         $this->exts->log(">>>>>>>>>>>>>>>Login successful!!!!");
         $this->exts->capture("LoginSuccess");
-      
-        if (!empty($this->exts->config_array['allow_login_success_request'])) {
-                $this->exts->triggerLoginSuccess();
-        }
 
+        if (!empty($this->exts->config_array['allow_login_success_request'])) {
+            $this->exts->triggerLoginSuccess();
+        }
         $this->exts->success();
     } else {
         if (stripos(strtolower($this->exts->extract($this->check_login_failed_selector)), 'passwor') !== false) {
@@ -80,10 +76,22 @@ function fillForm($count)
             sleep(5);
             if ($this->exts->exists($this->submit_login_selector)) {
                 $this->exts->click_by_xdotool($this->submit_login_selector);
+                sleep(15);
             }
         }
-    } catch (\Exception $exception) {
 
+        // try again in case page isn’t working
+        $errorMessage = $this->exts->extract('div#main-frame-error h1 span');
+
+        $this->exts->log("::error message ". $errorMessage);
+
+        if (stripos($errorMessage, 'This page isn’t working') !== false && $count < 3) {
+            $count++;
+            $this->exts->openUrl($this->loginUrl);
+            sleep(4);
+            $this->fillForm($count);
+        }
+    } catch (\Exception $exception) {
         $this->exts->log("Exception filling loginform " . $exception->getMessage());
     }
 }
