@@ -82,24 +82,25 @@ class PortalScriptCDP
         $this->exts->log('Begin initPortal ' . $count);
         $this->exts->openUrl($this->baseUrl);
         sleep(1);
-
         // Load cookies
         $this->exts->loadCookiesFromFile();
         sleep(1);
         $this->exts->openUrl($this->baseUrl);
-        sleep(10);
         $this->exts->capture('1-init-page');
 
         // If user hase not logged in from cookie, clear cookie, open the login url and do login
-        if ($this->exts->getElement($this->check_login_success_selector) == null) {
+        if (!$this->checkLogin()) {
             $this->exts->log('NOT logged via cookie');
             $this->exts->clearCookies();
             $this->exts->openUrl($this->loginUrl);
             sleep(15);
             if ($this->exts->exists('#tarteaucitronPersonalize')) {
                 $this->exts->moveToElementAndClick('#tarteaucitronPersonalize');
-                sleep(5);
             }
+            if ($this->exts->exists('button#onetrust-accept-btn-handler')) {
+                $this->exts->moveToElementAndClick('button#onetrust-accept-btn-handler');
+            }
+            
             $this->checkFillLogin();
             $mesg = strtolower($this->exts->extract($this->check_login_failed_selector, null, 'innerText'));
             $this->exts->log($mesg);
@@ -111,20 +112,22 @@ class PortalScriptCDP
             } else if (strpos($mesg, 'ltige anmeldedaten') !== false) {
                 $this->exts->loginFailure(1);
             }
-            if (!$this->exts->exists($this->check_login_success_selector) && strpos($mesg, 'ou mot de passe inexact') === false) {
+            if (!$this->checkLogin() && strpos($mesg, 'ou mot de passe inexact') === false) {
                 $this->exts->log('must refresh page');
                 $this->exts->openUrl($this->baseUrl);
                 sleep(10);
             }
             sleep(10);
+
+            // Connect to your online services
+            if ($this->exts->exists('a[href*="site=eGourmet"]')) {
+                $this->exts->moveToElementAndClick('a[href*="site=eGourmet"]');
+                sleep(5);
+            }
+            
         }
 
-        // then check user logged in or not
-        // for ($wait_count = 1; $wait_count <= 10 && $this->exts->getElement($this->check_login_success_selector) == null; $wait_count++) {
-        // 	$this->exts->log('Waiting for login...');
-        // 	sleep(5);
-        // }
-        if ($this->exts->getElement($this->check_login_success_selector) != null) {
+        if ($this->checkLogin()) {
             sleep(3);
             $this->exts->log(__FUNCTION__ . '::User logged in');
             $this->exts->capture("3-login-success");
@@ -151,6 +154,13 @@ class PortalScriptCDP
                     $this->exts->moveToElementAndClick('a[href="/portail/mes-factures"].btn-account');
                     sleep(10);
                     $this->processInvoicesfactures();
+                }
+
+                $this->exts->waitTillPresent('a[href*="site=espaceclient"]');
+                
+                if($this->exts->exists('a[href*="site=espaceclient"]')){
+                    $this->exts->moveToElementAndClick('a[href*="site=espaceclient"]');
+                    sleep(5);
                 }
             }
 
@@ -181,6 +191,8 @@ class PortalScriptCDP
 
     private function checkFillLogin()
     {
+        $this->exts->waitTillPresent($this->password_selector);
+
         if ($this->exts->getElement($this->password_selector) != null) {
             sleep(3);
             $this->exts->capture("2-login-page");
@@ -204,6 +216,30 @@ class PortalScriptCDP
             $this->exts->log(__FUNCTION__ . '::Login page not found');
             $this->exts->capture("2-login-page-not-found");
         }
+    }
+
+    /**
+     * Method to Check where user is logged in or not
+     * return boolean true/false
+     */
+    public  function checkLogin()
+    {
+        $this->exts->log("Begin checkLogin ");
+        $isLoggedIn = false;
+        try {
+            for ($wait = 0; $wait < 2 && $this->exts->executeSafeScript("return !!document.querySelector('" . $this->check_login_success_selector . "');") != 1; $wait++) {
+                $this->exts->log('Waiting for login.....');
+                sleep(10);
+            }
+            if ($this->exts->exists($this->check_login_success_selector)) {
+                $this->exts->log(">>>>>>>>>>>>>>>Login successful!!!!");
+                $isLoggedIn = true;
+            }
+        } catch (Exception $exception) {
+
+            $this->exts->log("Exception checking loggedin " . $exception);
+        }
+        return $isLoggedIn;
     }
 
     private function processInvoices($pageCount = 1)

@@ -373,7 +373,6 @@ public function checkAndSolveHumanCaptcha()
             $solved = true;
         }
     }
-
     $this->exts->log("Human captcha solved: " . var_export($solved, true));
 }
 
