@@ -742,7 +742,6 @@ private function checkLoggedIn() {
         $this->exts->capture("3-login-success");
 
         if (!empty($this->exts->config_array['allow_login_success_request'])) {
-
             $this->exts->triggerLoginSuccess();
         }
 

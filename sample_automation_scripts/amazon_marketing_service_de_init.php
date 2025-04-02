@@ -57,6 +57,16 @@ private function initPortal($count)
         if ($this->isIncorrectCredential()) {
             $this->exts->loginFailure(1);
         }
+
+        $error_text = strtolower($this->exts->extract('div#auth-email-invalid-claim-alert div.a-alert-content'));
+
+        $this->exts->log("::Email Error Message :" . $error_text);
+        if (
+            stripos($error_text, strtolower('Ungültige E-Mail-Adresse oder Mobiltelefonnummer Korrigiere das Problem, und wiederhole den Vorgang.')) !== false ||
+            stripos($error_text, strtolower('Invalid email address or mobile number. Correct the problem and try again.')) !== false
+        ) {
+            $this->exts->loginFailure(1);
+        }
         $this->exts->loginFailure();
     }
 }
@@ -123,19 +133,6 @@ private function beforeLogin($isCookieLoginSuccess)
             return true;
         } else {
             //Captcha and Two Factor Check
-            // if($this->checkCaptcha() || stripos($this->exts->webdriver->getCurrentUrl(), "/ap/cvf/request") !== false) {
-            // 	if($this->exts->getElement("form[name=\"claimspicker\"]") != null) {
-            // 		$this->exts->moveToElementAndClick("form[name=\"claimspicker\"] input#continue[type=\"submit\"]");
-            // 		$this->processTwoFactorAuth();
-            // 	} else {
-            // 		$this->processImageCaptcha();
-            // 	}
-            // } else if($this->checkMultiFactorAuth() && stripos($this->exts->webdriver->getCurrentUrl(), "/ap/mfa?") !== false) {
-            // 	$this->processTwoFactorAuth();
-            // } else if($this->exts->getElement("form.cvf-widget-form[action=\"verify\"] input[name=\"code\"]") != null && stripos($this->exts->webdriver->getCurrentUrl(), "/ap/cvf/verify") !== false) {
-            // 	$this->processTwoFactorAuth();
-            // }
-
             $this->processImageCaptcha();
 
             $this->exts->moveToElementAndClick('a#ap-account-fixup-phone-skip-link');
@@ -263,8 +260,10 @@ private function fillForm($count)
                 sleep(2);
 
                 $this->exts->log("Username form button click");
-                $this->exts->click_by_xdotool($this->continue_button_selector);
-                sleep(2);
+                $this->exts->moveToElementAndClick($this->continue_button_selector);
+                sleep(7);
+                $this->exts->capture("username-filled-2");
+                $this->exts->waitTillPresent($this->password_selector);
 
                 if ($this->exts->getElement($this->password_selector) != null) {
                     $this->exts->log("Enter Password");
@@ -275,8 +274,16 @@ private function fillForm($count)
                     $this->exts->capture("1-filled-login");
                     $this->exts->click_by_xdotool($this->submit_button_selector);
                 } else {
+                    $error_text = strtolower($this->exts->extract('div#auth-email-invalid-claim-alert div.a-alert-content'));
                     $this->exts->capture("login-failed");
-                    $this->exts->exitFailure();
+                    $this->exts->log("::Email Error Message :" . $error_text);
+                    if (
+                        stripos($error_text, strtolower('Ungültige E-Mail-Adresse oder Mobiltelefonnummer Korrigiere das Problem, und wiederhole den Vorgang.')) !== false ||
+                        stripos($error_text, strtolower('Invalid email address or mobile number. Correct the problem and try again.')) !== false
+                    ) {
+                        $this->exts->loginFailure(1);
+                    }
+                    
                 }
             } else {
                 if ($this->exts->getElement($this->remember_me) != null && $this->exts->getElement($this->remember_me)->isDisplayed()) {
@@ -317,30 +324,6 @@ private function fillForm($count)
     } catch (\Exception $exception) {
         $this->exts->log("Exception filling loginform " . $exception->getMessage());
     }
-}
-private function checkCaptcha()
-{
-    $this->exts->capture("check-captcha");
-
-    $isCaptchaFound = false;
-    if ($this->exts->getElement("input#ap_captcha_guess") != null || $this->exts->getElement("input#auth-captcha-guess") != null) {
-        $isCaptchaFound = true;
-    }
-
-    return $isCaptchaFound;
-}
-private function checkMultiFactorAuth()
-{
-    $this->exts->capture("check-two-factor");
-
-    $isTwoFactorFound = false;
-    if ($this->exts->getElement("form#auth-mfa-form") != null && $this->exts->getElement("form#auth-mfa-form")->isDisplayed()) {
-        $isTwoFactorFound = true;
-    } else if ($this->exts->getElement("form.cvf-widget-form[action=\"verify\"]") != null && $this->exts->getElement("form.cvf-widget-form[action=\"verify\"]")->isDisplayed()) {
-        $isTwoFactorFound = true;
-    }
-
-    return $isTwoFactorFound;
 }
 private function checkLogin()
 {

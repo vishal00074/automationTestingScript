@@ -85,7 +85,7 @@ class PortalScriptCDP
         // If user hase not logged in from cookie, clear cookie, open the login url and do login
         if (!$this->exts->exists($this->check_login_success_selector)) {
             $this->exts->log('NOT logged via cookie');
-            //$this->exts->openUrl($this->baseUrl);
+            $this->exts->clearCookies();
             sleep(8);
             $this->check_solve_blocked_page();
             $this->checkFillLogin();
@@ -131,7 +131,7 @@ class PortalScriptCDP
             }
         }
     }
-    private function checkFillLogin()
+    private function checkFillLogin($count = 0)
     {
         if ($this->exts->exists('form[action*="account/switch"] button.w-full')) {
             $this->exts->moveToElementAndClick('form[action*="account/switch"] button.w-full');
@@ -147,9 +147,9 @@ class PortalScriptCDP
             $this->exts->moveToElementAndClick('button[type="submit"]');
             sleep(3);
         }
-
         $this->check_solve_blocked_page();
         sleep(15);
+
         // Sometimes after cloudflare user is redirected to username page again.
         if ($this->exts->exists($this->username_selector)) {
             sleep(1);
@@ -159,18 +159,85 @@ class PortalScriptCDP
             $this->exts->capture("2-username-filled");
             $this->exts->moveToElementAndClick('button[type="submit"]');
             sleep(3);
+            $this->check_solve_blocked_page();
+            sleep(15);
         }
-        $this->check_solve_blocked_page();
-        sleep(15);
+
         if ($this->exts->exists($this->password_selector)) {
             $this->exts->log("Enter Password");
             $this->exts->moveToElementAndType($this->password_selector, $this->password);
             sleep(1);
             $this->exts->capture("2-password-filled");
             $this->exts->moveToElementAndClick('button[type="submit"]');
+            sleep(10);
         } else {
             $this->exts->capture("2-password-not-found");
         }
+
+        if ($this->exts->exists($this->password_selector)) {
+            $this->exts->log("Enter Password");
+            $this->exts->moveToElementAndType($this->password_selector, $this->password);
+            sleep(1);
+            $this->exts->capture("2-password-filled");
+            $this->exts->moveToElementAndClick('button[type="submit"]');
+            sleep(10);
+        }
+
+        if ($this->exts->exists('a[data-ga-slug="Back to login"]') && $count < 3) {
+            sleep(7);
+            $this->clearChrome();
+            $count++;
+            $this->exts->openUrl($this->baseUrl);
+            sleep(10);
+            $this->checkFillLogin();
+        }
+        $this->exts->capture("filled-password-page");
+    }
+
+    private function clearChrome()
+    {
+        $this->exts->log("Clearing browser history, cookies, and cache");
+
+        $this->exts->openUrl('chrome://settings/clearBrowserData');
+        sleep(10); // Wait for the page to load
+
+        // Capture screenshot of the clear browsing data page
+        $this->exts->capture("clear-page");
+
+        // Navigate using tab key (moving through UI elements)
+        for ($i = 0; $i < 2; $i++) {
+            $this->exts->type_key_by_xdotool('Tab');
+            sleep(1);
+        }
+
+        // Press Tab again to focus on the dropdown menu (Time range)
+        $this->exts->type_key_by_xdotool('Tab');
+        sleep(1);
+
+        // Press Enter to open the dropdown
+        $this->exts->type_key_by_xdotool('Return');
+        sleep(1);
+
+        // Select "All time" option by pressing 'a' (assuming shortcut selection)
+        $this->exts->type_key_by_xdotool('a');
+        sleep(1);
+
+        // Confirm selection by pressing Enter
+        $this->exts->type_key_by_xdotool('Return');
+        sleep(3);
+
+        // Capture screenshot after selection
+        $this->exts->capture("clear-page");
+
+        // Navigate further using Tab to reach the "Clear Data" button
+        for ($i = 0; $i < 5; $i++) {
+            $this->exts->type_key_by_xdotool('Tab');
+            sleep(1);
+        }
+        // Press Enter to confirm and clear the browsing data
+        $this->exts->type_key_by_xdotool('Return');
+        sleep(10);
+        $this->exts->capture("after-clear");
     }
     private function checkFillTwoFactor()
     {
