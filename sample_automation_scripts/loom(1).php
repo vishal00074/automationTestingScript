@@ -58,7 +58,6 @@ class PortalScriptCDP
     }
 
     // Server-Portal-ID: 202977 - Last modified: 17.01.2025 03:18:13 UTC - User: 1
-
     public $baseUrl = 'https://www.loom.com/';
     public $loginUrl = 'https://www.loom.com/login';
     public $invoicePageUrl = 'https://www.loom.com/settings/workspace#plans';
@@ -978,6 +977,8 @@ class PortalScriptCDP
         }
     }
     // -------------------- GOOGLE login END
+
+
 
     // ================================== BEGIN LOGIN WITH APPLE ==================================
     public $apple_username_selector = 'input#account_name_text_field';
