@@ -120,7 +120,7 @@ class PortalScriptCDP
         }
     }
 
-    function fillForm($count = 1)
+    public function fillForm($count = 1)
     {
         $this->exts->log("Begin fillForm " . $count);
         $this->exts->waitTillPresent($this->username_selector);
@@ -182,7 +182,7 @@ class PortalScriptCDP
 
     private function reLogin($paging_count)
     {
-        $this->waitFor('.vn-modal--footer .buttonsContainer button', 5);
+        $this->waitFor('.vn-modal--footer .buttonsContainer button', 2);
         $relogin_button = $this->exts->getElementByText('.vn-modal--footer .buttonsContainer button', 'Anmelden', null, false);
         if ($relogin_button != null || $this->exts->exists($this->username_selector)) {
             if ($relogin_button != null) {
@@ -196,108 +196,72 @@ class PortalScriptCDP
 
     private function processInvoices($paging_count = 1)
     {
-        $this->waitFor('[data-testid*="side-menu-item-HP"]', 3);
-        $this->exts->moveToElementAndClick('[data-testid*="side-menu-item-HP"]');
-        sleep(5);
-        $this->waitFor('li[data-testid*="Payment History"]');
-        $this->exts->moveToElementAndClick('li[data-testid*="Payment History"]');
+        $this->waitFor('li[data-testid*="side-menu-item-HP Instant Ink"] > a', 3);
+        $this->exts->moveToElementAndClick('li[data-testid*="HP Instant Ink"] > a');
+        sleep(2);
+        $this->waitFor('li[data-testid*="side-menu-item-HP"] li[data-testid*="side-menu-item-Print"]');
+        $this->exts->moveToElementAndClick('li[data-testid*="side-menu-item-HP"] li[data-testid*="side-menu-item-Print"]');
+        sleep(25);
 
-        $this->waitFor('iv[id="Druck--und Zahlungsverlauf"][aria-expanded="false"]', 5);
-        if ($this->exts->exists('div[id="Druck--und Zahlungsverlauf"][aria-expanded="false"]')) {
-            $this->exts->moveToElementAndClick("div#history-table-section > div > div > div[role='button']");
-        }
-        // $this->exts->waitTillPresent('table[data-testid="veneer-print-hitory-table"] tbody tr', 50);
-
-        $invoices = [];
-
-        $this->waitFor('table[data-testid=\'veneer-print-hitory-table\'] tbody tr', 5);
-        $rows = $this->exts->getElements('table[data-testid="veneer-print-hitory-table"] tbody tr');
-        if (count($rows) > 0) {
-            $this->exts->execute_javascript("arguments[0].click()", [$rows[0]]);
-            $this->reLogin($paging_count);
-        }
-
-        // If user is on 3 page and user is prompted to re-login than after relogin start downloading invoices from 3 page only
-        for ($i = 1; $i < $paging_count; $i++) {
-            if (
-                $this->exts->querySelector('nav[aria-label="Pagination Navigation"] button[aria-label="Next"]:not([disabled])') != null
-            ) {
-                $this->exts->log($paging_count);
-                $this->exts->click_by_xdotool('nav[aria-label="Pagination Navigation"] button[aria-label="Next"]:not([disabled])');
-                sleep(5);
+        $this->waitFor('div[id="Druck--und Zahlungsverlauf"][role="button"]', 5);
+        if ($this->exts->exists('div[id="Druck--und Zahlungsverlauf"][role="button"][aria-expanded="false"]')) {
+            for ($i = 0; $i < 27; $i++) {
+                $this->exts->type_key_by_xdotool('Tab');
+                sleep(1);
+            }
+            $this->exts->moveToElementAndClick('div[id="Druck--und Zahlungsverlauf"][role="button"][aria-expanded="false"]');
+            sleep(5);
+            for ($i = 0; $i < 5; $i++) {
+                $this->exts->type_key_by_xdotool('Tab');
+                sleep(1);
             }
         }
 
-        $this->waitFor('table[data-testid=\'veneer-print-hitory-table\'] tbody tr', 5);
+
+        $this->waitFor('table[data-testid="veneer-print-hitory-table"] tbody tr', 5);
         $rows = $this->exts->getElements('table[data-testid="veneer-print-hitory-table"] tbody tr');
         $this->exts->capture("4-invoices-page");
         foreach ($rows as $row) {
-            if ($this->exts->querySelector('td:nth-child(3) a', $row) != null) {
+            if ($this->exts->querySelector('td:nth-child(3) a', $row) != null && !$this->exts->exists('.vn-modal--footer .buttonsContainer button:nth-child(2)')) {
                 $invoiceUrl = '';
-                $invoiceName = preg_replace("/\//", "-", $this->exts->extract('td:nth-child(1)', $row));
-
+                $invoiceName = time(); // create custom name no relevant name found 
+                sleep(1);
                 $invoiceAmount = '';
                 $invoiceDate = $this->exts->extract('td:nth-child(1)', $row);
-
                 $downloadBtn = $this->exts->querySelector('td:nth-child(3) a', $row);
 
-                array_push($invoices, array(
-                    'invoiceName' => $invoiceName,
-                    'invoiceDate' => $invoiceDate,
-                    'invoiceAmount' => $invoiceAmount,
-                    'invoiceUrl' => $invoiceUrl,
-                    'downloadBtn' => $downloadBtn
-                ));
+                $this->exts->log('--------------------------');
+                $this->exts->log('invoiceName: ' . $invoiceName);
+                $this->exts->log('invoiceDate: ' . $invoiceDate);
+                $this->exts->log('invoiceAmount: ' .  $invoiceAmount);
+                $this->exts->log('invoiceUrl: ' . $invoiceUrl);
                 $this->isNoInvoice = false;
-            }
-        }
 
-        // Download all invoices
-        $this->exts->log('Invoices found: ' . count($invoices));
-        foreach ($invoices as $invoice) {
-            $this->exts->log('--------------------------');
-            $this->exts->log('invoiceName: ' . $invoice['invoiceName']);
-            $this->exts->log('invoiceDate: ' . $invoice['invoiceDate']);
-            $this->exts->log('invoiceAmount: ' . $invoice['invoiceAmount']);
-            $this->exts->log('invoiceUrl: ' . $invoice['invoiceUrl']);
-
-            $invoiceFileName = !empty($invoice['invoiceName']) ? $invoice['invoiceName'] . '.pdf' : "";
-            $invoice['invoiceDate'] = $this->exts->parse_date($invoice['invoiceDate'], 'd/m/y', 'Y-m-d');
-            $this->exts->log('Date parsed: ' . $invoice['invoiceDate']);
-
-            if (file_exists($invoiceFileName)) {
-                $this->exts->log('Invoice already exists');
-            } else {
-                // $downloaded_file = $this->exts->direct_download($invoice['invoiceUrl'], 'pdf', $invoiceFileName);
-                $this->reLogin($paging_count);
-                $this->exts->execute_javascript("arguments[0].click()", [$invoice['downloadBtn']]);
-                $this->exts->wait_and_check_download('pdf');
-                $downloaded_file = $this->exts->find_saved_file('pdf', $invoiceFileName);
-                $this->reLogin($paging_count);
-
-                if (trim($downloaded_file) != '' && file_exists($downloaded_file)) {
-                    $this->exts->new_invoice($invoice['invoiceName'], $invoice['invoiceDate'], $invoice['invoiceAmount'], $invoiceFileName);
-                    sleep(1);
+                $invoiceFileName = !empty($invoiceName) ? $invoiceName . '.pdf' : '';
+                if (file_exists($invoiceFileName)) {
+                    $this->exts->log('Invoice already exists');
                 } else {
-                    $this->exts->log(__FUNCTION__ . '::No download ' . $invoiceFileName);
+                    $invoiceDate = $this->exts->parse_date($invoiceDate, 'd.m.Y', 'Y-m-d');
+                    $this->exts->log('Date parsed: ' .  $invoiceDate);
+                    $downloaded_file = $this->exts->click_and_download($downloadBtn, 'pdf', $invoiceFileName);
+                    if (trim($downloaded_file) != '' && file_exists($downloaded_file)) {
+                        $this->exts->new_invoice($invoiceUrl,  $invoiceDate, $invoiceAmount, $downloaded_file);
+                        sleep(1);
+                    } else {
+                        $this->exts->log(__FUNCTION__ . '::No download ' . $invoiceFileName);
+                    }
                 }
             }
         }
-
+        sleep(2);
+        $this->reLogin($paging_count);
         // next page
-        $restrictPages = isset($this->exts->config_array["restrictPages"]) ? (int) @$this->exts->config_array["restrictPages"] : 3;
-        if (
-            $restrictPages == 0 && $paging_count < 50 &&
-            $this->exts->querySelector('nav[aria-label="Pagination Navigation"] button[aria-label="Next"]:not([disabled])') != null
-        ) {
+        $restrictPages = isset($this->exts->config_array["restrictPages"]) ? (int)@$this->exts->config_array["restrictPages"] : 3;
+
+        if ($paging_count < $restrictPages && $this->exts->exists('nav[aria-label="Pagination Navigation"] button.next:not(:disabled)')) {
             $paging_count++;
-            $this->exts->click_by_xdotool('nav[aria-label="Pagination Navigation"] button[aria-label="Next"]:not([disabled])');
-            sleep(5);
-            $this->processInvoices($paging_count);
-        } else if ($restrictPages > 0 && $paging_count <= $restrictPages && $this->exts->querySelector('nav[aria-label="Pagination Navigation"] button[aria-label="Next"]:not([disabled])') != null) {
-            $paging_count++;
-            $this->exts->click_by_xdotool('nav[aria-label="Pagination Navigation"] button[aria-label="Next"]:not([disabled])');
-            sleep(5);
+            $this->exts->moveToElementAndClick('nav[aria-label="Pagination Navigation"] button.next:not(:disabled)');
+            sleep(7);
             $this->processInvoices($paging_count);
         }
     }

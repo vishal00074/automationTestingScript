@@ -325,10 +325,9 @@ class PortalScriptCDP
                     }
 
                     $this->exts->moveToElementAndClick($this->submit_button_selector);
-
                     sleep(10);
 
-                    if ($this->exts->exists($this->password_selector)) {
+                    if ($this->checkIfExists($this->password_selector)) {
                         $this->exts->moveToElementAndType($this->password_selector, $this->password);
                         sleep(2);
 
@@ -423,6 +422,11 @@ class PortalScriptCDP
         } catch (\Exception $exception) {
             $this->exts->log("Exception filling loginform " . $exception->getMessage());
         }
+    }
+
+    private function checkIfExists($selector)
+    {
+        return $this->exts->execute_javascript("document.body.innerHTML.includes('$selector');");
     }
 
     private function checkFillTwoFactor()
@@ -1314,8 +1318,9 @@ class PortalScriptCDP
     private function selectTabInvoiceYears()
     {
         $this->exts->capture('3-tab-year');
+        $restrictPages = isset($this->exts->config_array["restrictPages"]) ? (int)@$this->exts->config_array["restrictPages"] : 3;
         $year_buttons = $this->exts->getElements('div#bill-archive nav ul li a');
-        if ($this->restrictPages == 0) {
+        if ($restrictPages == 0) {
             foreach ($year_buttons as $key => $year_button) {
                 $this->exts->click_element($year_button);
                 $this->processProAccInvoice();

@@ -57,9 +57,8 @@ class PortalScriptCDP
         }
     }
 
-    // Server-Portal-ID: 916 - Last modified: 11.03.2025 14:05:49 UTC - User: 1
+    // Server-Portal-ID: 916 - Last modified: 02.04.2025 14:10:16 UTC - User: 1
 
-    // Script here
     public $baseUrl = 'https://sellercentral.amazon.de/home';
     public $username_selector = 'form[name="signIn"] input[name="email"]:not([type="hidden"])';
     public $password_selector = 'form[name="signIn"] input[name="password"]';
@@ -592,8 +591,8 @@ class PortalScriptCDP
                 sleep(15);
                 //$this->exts->changeSelectbox('select#sc-mkt-picker-switcher-select', $marketplace_option);
                 $this->exts->execute_javascript('
-                            $("select#sc-mkt-picker-switcher-select").val("' . $marketplace_option . '");
-                            $("select#sc-mkt-picker-switcher-select").change();');
+                        $("select#sc-mkt-picker-switcher-select").val("' . $marketplace_option . '");
+                        $("select#sc-mkt-picker-switcher-select").change();');
                 sleep(15);
 
                 if ($this->exts->getElement($this->password_selector) == null) {
@@ -660,8 +659,6 @@ class PortalScriptCDP
                             $this->exts->moveToElementAndClick('a[href*="/gp/advertiser/transactions/transactions.html"]');
                             $this->downloadAdvertiserInvoices();
                         } else {
-                            //$this->exts->openUrl('https://'.$Urldomain.'/gp/advertiser/transactions/transactions.html');
-                            //$this->downloadAdvertiserInvoices();
                             $this->exts->log('No Advertising Billing page found');
                         }
                     }
@@ -782,12 +779,6 @@ class PortalScriptCDP
 
                 // Download from advertiser invoices
                 if ((int)@$this->no_advertising_bills != 1) {
-                    // $this->exts->openUrl($market_place_homepage);
-                    // sleep(5);
-                    // $this->exts->openUrl('https://'.$Urldomain.'/payments/reports/summary');
-                    // if(!$this->exts->exists('a[href*="/advertiser/transactions/"][role="tab"]')) {
-                    //     sleep(10);
-                    // }
                     $this->exts->openUrl('https://' . $Urldomain . '/payments/dashboard/index.html');
                     sleep(10);
                     if ($this->exts->exists('a[href*="/advertiser/transactions/"][role="tab"], [tab-id="ADS"]')) {
@@ -805,8 +796,6 @@ class PortalScriptCDP
 
                         $this->downloadAdvertiserInvoices($merchant['partner_id'] . $merchant['merchant_id']);
                     } else {
-                        //$this->exts->openUrl('https://'.$Urldomain.'/gp/advertiser/transactions/transactions.html');
-                        //$this->downloadAdvertiserInvoices();
                         $this->exts->capture("No-advertising-Bill-" . $merchant['partner_id'] . $merchant['merchant_id']);
                         $this->exts->log('No Advertising Billing page found');
                     }
@@ -914,6 +903,12 @@ class PortalScriptCDP
                     if ($invoiceAltName == "---" || empty($checkText) || trim($checkText) == "") {
                         $invoiceAltName = $invoiceName;
                     }
+
+                    if ($invoiceName == '' || $invoiceName == null) {
+                        $invoiceName = time(); // create custom name in case no name found for this invoice
+                        sleep(2);
+                    }
+
                     if (!$this->exts->invoice_exists($invoiceName) || !$this->exts->invoice_exists($invoiceAltName)) {
                         array_push($invoices, array(
                             'invoiceName' => ($invoiceAltName != "" && $invoiceAltName != "---") ? $invoiceAltName : $invoiceName,
@@ -937,7 +932,9 @@ class PortalScriptCDP
                 $this->exts->log('invoiceAmount: ' . $invoice['invoiceAmount']);
                 $this->exts->log('invoiceUrl: ' . $invoice['invoiceUrl']);
 
-                $invoiceFileName = $invoice['invoiceName'] . '.pdf';
+
+                $invoiceFileName =  !empty($invoice['invoiceName']) ? $invoice['invoiceName'] . '.pdf' : "";
+
                 $parsed_date = $this->exts->parse_date($invoice['invoiceDate'], 'd M Y', 'Y-m-d');
                 if ($parsed_date == '') {
                     $parsed_date = $this->exts->parse_date($invoice['invoiceDate'], 'd#m#Y', 'Y-m-d');
@@ -969,11 +966,11 @@ class PortalScriptCDP
                 }
                 sleep(5);
                 $this->exts->executeSafeScript('
-                document.querySelectorAll(\'div#container div#predictive-help\')[0].remove();
-                document.querySelectorAll(\'div#sc-top-nav\')[0].remove();
-                document.querySelectorAll(\'div#sc-footer-container\')[0].remove();
-                document.querySelectorAll(\'div#left-side\')[0].setAttribute("style","float:left; text-align:left; width:100%;");
-            ');
+            document.querySelectorAll(\'div#container div#predictive-help\')[0].remove();
+            document.querySelectorAll(\'div#sc-top-nav\')[0].remove();
+            document.querySelectorAll(\'div#sc-footer-container\')[0].remove();
+            document.querySelectorAll(\'div#left-side\')[0].setAttribute("style","float:left; text-align:left; width:100%;");
+        ');
 
                 $downloaded_file = $this->exts->download_current($invoiceFileName, 3);
                 if (trim($downloaded_file) != '' && file_exists($downloaded_file)) {
@@ -1002,8 +999,8 @@ class PortalScriptCDP
                 }
                 $pageCount++;
                 $this->exts->executeSafeScript('
-                document.querySelectorAll(\'.currentpagination + a\')[0].click();
-            ');
+            document.querySelectorAll(\'.currentpagination + a\')[0].click();
+        ');
                 //$this->exts->moveToElementAndClick('.currentpagination + a');
                 sleep(5);
                 $this->downloadTransaction($pageCount);
@@ -1020,7 +1017,7 @@ class PortalScriptCDP
                         $this->isNoInvoice = false;
                         $invoiceName =  $this->exts->extract('[role="cell"]:nth-child(4)', $row);
                         $invoiceName = trim($invoiceName);
-                        $invoiceFileName = $invoiceName . '.pdf';
+                        $invoiceFileName = !empty($invoiceName) ? $invoiceName . '.pdf' : '';
                         $invoiceDate = $this->exts->extract('[role="cell"]:nth-child(1)', $row);
                         $amountText = $this->exts->extract('a#link-target', $row);
                         $invoiceAmount = preg_replace('/[^\d\.\,]/', '', $amountText);
@@ -1065,20 +1062,20 @@ class PortalScriptCDP
                             if ($this->exts->exists('#sc-content-container .transaction-details-body-section .event-details-body')) {
                                 // Clear some alert, popup..etc
                                 $this->exts->executeSafeScript('
-                                if(document.querySelector("kat-alert") != null){
-                                document.querySelector("kat-alert").shadowRoot.querySelector("[part=alert-dismiss-button]").click();
-                                }
-                            ');
+                            if(document.querySelector("kat-alert") != null){
+                            document.querySelector("kat-alert").shadowRoot.querySelector("[part=alert-dismiss-button]").click();
+                            }
+                        ');
                                 $this->exts->moveToElementAndClick('.katHmdCancelBtn');
                                 // END clearing alert..
 
                                 // Capture page if detail displayed
                                 $this->exts->executeSafeScript('
-                                var divs = document.querySelectorAll("body > div > *:not(#sc-content-container)");
-                                for( var i = 0; i < divs.length; i++){
-                                    divs[i].style.display = "none";
-                                }
-                            ');
+                            var divs = document.querySelectorAll("body > div > *:not(#sc-content-container)");
+                            for( var i = 0; i < divs.length; i++){
+                                divs[i].style.display = "none";
+                            }
+                        ');
 
                                 $downloaded_file = $this->exts->download_current($invoiceFileName, 0);
                                 if (trim($downloaded_file) != '' && file_exists($downloaded_file)) {
@@ -1101,13 +1098,13 @@ class PortalScriptCDP
                 // Process next page
                 // This page using shadow element, We must process via JS
                 $is_next = $this->exts->executeSafeScript('
-                try {
-                document.querySelector("kat-pagination").shadowRoot.querySelector("[part=pagination-nav-right]:not(.end)").click();
-                return true;
-                } catch(ex){
-                return false;
-                }
-            ');
+            try {
+            document.querySelector("kat-pagination").shadowRoot.querySelector("[part=pagination-nav-right]:not(.end)").click();
+            return true;
+            } catch(ex){
+            return false;
+            }
+        ');
                 if ($is_next && $this->exts->config_array["restrictPages"] == '0') {
                     sleep(7);
                 } else {
@@ -1129,9 +1126,9 @@ class PortalScriptCDP
         foreach ($rows as $row) {
             $invoice_button = $this->exts->getElement('button[data-invoice]', $row);
             if ($invoice_button != null) {
-                $invoiceName = $invoice_button->getAttribute('data-invoice');
-                $invoiceFileName = $invoiceName . '.pdf';
-                $invoiceDate = '';
+                $invoiceName = $this->exts->extract('td:nth-child(6)', $row);
+                $invoiceFileName = !empty($invoiceName) ? $invoiceName . '.pdf' : '';
+                $invoiceDate = $this->exts->extract('td:nth-child(13)', $row);;
                 $invoiceAmount = '';
 
                 $this->exts->log('--------------------------');
@@ -1180,8 +1177,8 @@ class PortalScriptCDP
         if ($this->exts->exists('select[name="reportType"]') && $pageCount == 1) {
             //$this->exts->changeSelectbox('select[name="reportType"]', "VAT Invoices");
             $this->exts->execute_javascript('
-                            $("select[name=\'reportType\']").val("VAT Invoices");
-                            $("select[name=\'reportType\']").change();');
+                        $("select[name=\'reportType\']").val("VAT Invoices");
+                        $("select[name=\'reportType\']").change();');
             sleep(10);
             if ($this->exts->exists('li#vtr-start-date2 input#vtr-start-date-calendar2')) {
                 $currentStart_date = $this->exts->getElement('li#vtr-start-date2 input#vtr-start-date-calendar2')->getAttribute('aria-label');
@@ -1227,6 +1224,11 @@ class PortalScriptCDP
 
                 $downloadBtn = $this->exts->getElement('a[href*="/invoice/download/id/"]', $tags[3]);
 
+                if ($invoiceName == '' || $invoiceName == null) {
+                    $invoiceName = time(); // create custom name in case no name found for this invoice
+                    sleep(2);
+                }
+
                 array_push($invoices, array(
                     'invoiceName' => $invoiceName,
                     'invoiceDate' => $invoiceDate,
@@ -1247,7 +1249,9 @@ class PortalScriptCDP
             $this->exts->log('invoiceAmount: ' . $invoice['invoiceAmount']);
             $this->exts->log('invoiceUrl: ' . $invoice['invoiceUrl']);
 
-            $invoiceFileName = $invoice['invoiceName'] . '.zip';
+            // $invoiceFileName = $invoice['invoiceName'] . '.zip';
+
+            $invoiceFileName = !empty($invoice['invoiceName']) ? $invoice['invoiceName'] . '.zip' : "";
             $parsed_date = $this->exts->parse_date($invoice['invoiceDate'], 'd M Y', 'Y-m-d');
             if ($parsed_date == '') {
                 $parsed_date = $this->exts->parse_date($invoice['invoiceDate'], 'd# M Y', 'Y-m-d');
@@ -1341,6 +1345,11 @@ class PortalScriptCDP
                         $invoiceAmount = $invoiceAmount . ' EUR';
                     }
 
+                    if ($invoiceName == '' || $invoiceName == null) {
+                        $invoiceName = time(); // create custom name in case no name found for this invoice
+                        sleep(2);
+                    }
+
                     $invoiceAltName = "Seller-Invoice" . $invoiceDate;
                     if (!$this->exts->invoice_exists($invoiceName) && !$this->exts->invoice_exists($invoiceAltName)) {
                         array_push($invoices, array(
@@ -1365,7 +1374,7 @@ class PortalScriptCDP
                 $this->exts->log('invoiceAmount: ' . $invoice['invoiceAmount']);
                 $this->exts->log('invoiceUrl: ' . $invoice['invoiceUrl']);
 
-                $invoiceFileName = $invoice['invoiceName'] . '.pdf';
+                $invoiceFileName = !empty($invoice['invoiceName']) ? $invoice['invoiceName'] . '.pdf' : "";
                 $parsed_date = $this->exts->parse_date($invoice['invoiceDate'], 'd M Y', 'Y-m-d');
                 if ($parsed_date == '') {
                     $parsed_date = $this->exts->parse_date($invoice['invoiceDate'], 'd#m#Y', 'Y-m-d');
@@ -1398,14 +1407,14 @@ class PortalScriptCDP
 
                 if (count($this->exts->getElements('#printableSections')) > 0) {
                     $this->exts->executeSafeScript('
-                    var printableView = document.getElementById("printableSections");
-                    var allLinks = document.getElementsByTagName("link");
-                    var allStyles = document.getElementsByTagName("style");
-                    var printableHTML = Array.from(allLinks).map(link => link.outerHTML).join("")
-                                        + Array.from(allStyles).map(link => link.outerHTML).join("")
-                                        + printableView.outerHTML;
-                    document.body.innerHTML = printableHTML;
-                ');
+                var printableView = document.getElementById("printableSections");
+                var allLinks = document.getElementsByTagName("link");
+                var allStyles = document.getElementsByTagName("style");
+                var printableHTML = Array.from(allLinks).map(link => link.outerHTML).join("")
+                                    + Array.from(allStyles).map(link => link.outerHTML).join("")
+                                    + printableView.outerHTML;
+                document.body.innerHTML = printableHTML;
+            ');
 
                     $downloaded_file = $this->exts->download_current($invoiceFileName, 3);
                     if (trim($downloaded_file) != '' && file_exists($downloaded_file)) {
@@ -1416,10 +1425,10 @@ class PortalScriptCDP
                     }
                 } else if (count($this->exts->getElements('#sc-navbar-container')) > 0) {
                     $this->exts->executeSafeScript('
-                    document.querySelectorAll("#sc-navbar-container")[0].remove();
-                    document.querySelectorAll("article.dashboard-header")[0].remove();
-                    document.querySelectorAll(".sc-footer")[0].remove();
-                ');
+                document.querySelectorAll("#sc-navbar-container")[0].remove();
+                document.querySelectorAll("article.dashboard-header")[0].remove();
+                document.querySelectorAll(".sc-footer")[0].remove();
+            ');
 
                     $downloaded_file = $this->exts->download_current($invoiceFileName, 3);
                     if (trim($downloaded_file) != '' && file_exists($downloaded_file)) {
@@ -1449,8 +1458,8 @@ class PortalScriptCDP
                 $pageCount++;
                 //$this->exts->moveToElementAndClick('.currentpagination + a');
                 $this->exts->executeSafeScript('
-                document.querySelectorAll(\'.currentpagination + a\')[0].click();
-            ');
+            document.querySelectorAll(\'.currentpagination + a\')[0].click();
+        ');
                 sleep(15);
                 $this->downloadStatements($pageCount);
             }
@@ -1469,23 +1478,23 @@ class PortalScriptCDP
 
             // It using shadow root, so collect invoice detail by JS
             $invoices = $this->exts->executeSafeScript('
-            var data = [];
-            var trs = document.querySelectorAll("kat-data-table tbody tr .dashboard-link kat-link[href*=groupId]");
+        var data = [];
+        var trs = document.querySelectorAll("kat-data-table tbody tr .dashboard-link kat-link[href*=groupId]");
 
-            // Skip first row because it is current period, do not get it
-            for (var i = 1; i < trs.length; i ++) {
-            var link = trs[i].shadowRoot.querySelector("a");
-            var url = link.href;
+        // Skip first row because it is current period, do not get it
+        for (var i = 1; i < trs.length; i ++) {
+        var link = trs[i].shadowRoot.querySelector("a");
+        var url = link.href;
 
-            data.push({
-            invoiceName: url.split("groupId=").pop().split("&")[0],
-            invoiceDate: "",
-            invoiceAmount: "",
-            invoiceUrl: url
-            });
-            }
-            return data;
-        ');
+        data.push({
+        invoiceName: url.split("groupId=").pop().split("&")[0],
+        invoiceDate: "",
+        invoiceAmount: "",
+        invoiceUrl: url
+        });
+        }
+        return data;
+    ');
             // Download all invoices
             $this->exts->log('Statements found: ' . count($invoices));
             foreach ($invoices as $invoice) {
@@ -1494,7 +1503,8 @@ class PortalScriptCDP
                 $this->exts->log('invoiceDate: ' . $invoice['invoiceDate']);
                 $this->exts->log('invoiceAmount: ' . $invoice['invoiceAmount']);
                 $this->exts->log('invoiceUrl: ' . $invoice['invoiceUrl']);
-                $invoiceFileName = $invoice['invoiceName'] . '.pdf';
+
+                $invoiceFileName = !empty($invoice['invoiceName']) ? $invoice['invoiceName'] . '.pdf' : "";
                 $this->isNoInvoice = false;
 
                 // Download invoice if it not exisited
@@ -1512,10 +1522,10 @@ class PortalScriptCDP
                     if ($this->exts->exists('.dashboard-content #print-this-page-link')) {
                         // Clear some alert, popup..etc
                         $this->exts->executeSafeScript('
-                        if(document.querySelector("kat-alert") != null){
-                        document.querySelector("kat-alert").shadowRoot.querySelector("[part=alert-dismiss-button]").click();
-                        }
-                    ');
+                    if(document.querySelector("kat-alert") != null){
+                    document.querySelector("kat-alert").shadowRoot.querySelector("[part=alert-dismiss-button]").click();
+                    }
+                ');
                         $this->exts->moveToElementAndClick('.katHmdCancelBtn');
                         // END clearing alert..
 
@@ -1568,7 +1578,7 @@ class PortalScriptCDP
                 $download_button = $this->exts->getElement('button[data-takt-id*="SingleDownload"]', $row);
                 if ($download_button != null) {
                     $invoiceName =  trim($this->exts->extract('button[data-takt-id*="OpenPreview"]', $row));
-                    $invoiceFileName = $invoiceName . '.pdf';
+                    $invoiceFileName = !empty($invoiceName) ? $invoiceName . '.pdf' : '';
                     $invoiceDate = trim($this->exts->extract('div[col-id="DUE_DATE"]', $row));
                     $amountText = trim($this->exts->extract('div[col-id="AMOUNT_DUE"]', $row));
                     $invoiceAmount = preg_replace('/[^\d\.\,]/', '', $amountText);
@@ -1647,8 +1657,8 @@ class PortalScriptCDP
         $current_domain_country = end(explode('amazon.', $temp_paths[2]));
         //$this->exts->changeSelectbox('select[name="myo-table-results-per-page"]', '100', 15);
         $this->exts->execute_javascript('
-            $("select[name=\'myo-table-results-per-page\']").val("100");
-            $("select[name=\'myo-table-results-per-page\']").change();');
+        $("select[name=\'myo-table-results-per-page\']").val("100");
+        $("select[name=\'myo-table-results-per-page\']").change();');
         sleep(3);
         $this->exts->waitTillPresent('#orders-table tbody tr [data-test-id="manage-idu-invoice-button"]:not(.a-button-primary) input[type="submit"]', 40);
         //This is needed because sometime there is no invoice on page 1 and browser get closed because of inactivity
@@ -1676,7 +1686,7 @@ class PortalScriptCDP
                             $this->isNoInvoice = false;
                             $invoiceName = trim($this->exts->extract('kat-table-cell:nth-child(3)', $popRow));
                             if (!$this->exts->invoice_exists($invoiceName)) {
-                                $invoiceFileName = $invoiceName . '.pdf';
+                                $invoiceFileName = !empty($invoiceName) ? $invoiceName . '.pdf' : '';
                                 $invoiceAmount = '';
                                 $invoiceDate = '';
                                 $invoiceUrl = 'https://sellercentral.amazon.de' . $invoice_link->getAttribute('href');

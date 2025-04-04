@@ -189,7 +189,7 @@ class PortalScriptCDP
                 $invoiceName = end($segments);
                 $invoiceName = $invoiceName ?? time();
                 $invoiceDate = $this->exts->extract('td:nth-child(3)', $row);
-                $invoiceAmount = $this->exts->extract('td:nth-child(2)', $row);;
+                $invoiceAmount = $this->exts->extract('td:nth-child(2)', $row);
 
                 array_push($invoices, array(
                     'invoiceName' => $invoiceName,
