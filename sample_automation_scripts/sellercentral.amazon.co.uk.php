@@ -61,7 +61,6 @@ class PortalScriptCDP
 
     /*Define constants used in script*/
     public $baseUrl = 'https://sellercentral.amazon.co.uk/gp/payments-account/view-transactions.html';
-
     public $username_selector = 'form[name="signIn"] input[name="email"]:not([type="hidden"])';
     public $password_selector = 'form[name="signIn"] input[name="password"]';
     public $submit_login_selector = 'form[name="signIn"] input#signInSubmit';
@@ -147,33 +146,55 @@ class PortalScriptCDP
             // End handling login form
             $this->checkFillTwoFactor();
 
+            $isOtpExpired =  $this->exts->extract('div.a-alert-content');
+            $this->exts->log('::Otp Expired Message:: ' . $isOtpExpired);
+
+            if (stripos($isOtpExpired, strtolower("Your One Time Password (OTP) has expired. Please request another from the ‘Didn't receive the One Time Password?’ link below.")) !== false) {
+
+                $this->exts->moveToElementAndClick('a[id="auth-get-new-otp-link"]');
+                sleep(4);
+                $this->exts->waitTillPresent('input[id="auth-send-code"]');
+                $this->exts->moveToElementAndClick('input[id="auth-send-code"]');
+                sleep(10);
+
+                $this->checkFillTwoFactor();
+            }
 
             if ($this->exts->exists('form#auth-account-fixup-phone-form a#ap-account-fixup-phone-skip-link')) {
                 $this->exts->moveToElementAndClick('form#auth-account-fixup-phone-form a#ap-account-fixup-phone-skip-link');
                 sleep(2);
             }
         }
-
-        if ($this->exts->exists('.picker-app .picker-item-column button.picker-button')) {
-            // This portal is for UK so select UK first, else select default
-            $target_selection = $this->exts->getElement('//button[contains(@class, "picker-button")]//*[contains(text(), "United Kingdom")]', null, 'xpath');
+        if ($this->exts->exists('button.full-page-account-switcher-account-details')) {
+            //  This portal is for UK so select UK first, else select default
+            $target_selection = $this->exts->getElementByText('button.full-page-account-switcher-account-details', ['United Kingdom'], null, true);
             if ($target_selection == null) {
-                $target_selection = $this->exts->getElement('//button[contains(@class, "picker-button")]//*[contains(text(), "Vereinigtes K") or contains(text(), "Regno Unito") or contains(text(), "Reino Unido") or contains(text(), "Royaume-Uni")]', null, 'xpath'); // finding UK selection but in other languages
+                //Sometime we need to expand to see the list
+                $this->exts->moveToElementAndClick('button.full-page-account-switcher-account-details');
+                sleep(10);
+                $target_selection = $this->exts->getElementByText('button.full-page-account-switcher-account-details', ['United Kingdom'], null, true);
             }
 
-            if ($target_selection == null) { // If do not found, get default picker
-                $target_selection = $this->exts->getElement('.picker-view-column:last-child .picker-button');
+            if ($target_selection == null) {
+                $target_selection = $this->exts->getElementByText('button.full-page-account-switcher-account-details', ['Regno Unito'], null, true);
             }
-            try {
-                $target_selection->getLocationOnScreenOnceScrolledIntoView();
-                $target_selection->click();
-            } catch (\Exception $exception) {
-                $this->exts->executeSafeScript('arguments[0].click();', [$target_selection]);
+
+            if ($target_selection == null) {
+                $target_selection = $this->exts->getElementByText('button.full-page-account-switcher-account-details', ['Royaume-Uni'], null, true);
             }
-            sleep(1);
-            if ($this->exts->exists('.picker-app button.picker-switch-accounts-button:not([disabled])')) {
-                $this->exts->moveToElementAndClick('.picker-app button.picker-switch-accounts-button:not([disabled])');
+
+            if ($target_selection == null && count($this->exts->getElements('button.full-page-account-switcher-account-details')) > 1) { // If do not found, get default picker
+                $target_selection = $this->exts->getElements('button.full-page-account-switcher-account-details')[1];
+            }
+            if ($target_selection != null) {
+                $this->exts->click_element($target_selection);
+            }
+            sleep(2);
+            if ($this->exts->exists('button.kat-button--primary:not([disabled])')) {
+                $this->exts->moveToElementAndClick('button.kat-button--primary:not([disabled])');
                 sleep(10);
+            } else {
+                $this->exts->account_not_ready();
             }
         }
 
@@ -182,36 +203,65 @@ class PortalScriptCDP
             sleep(3);
             $this->exts->log(__FUNCTION__ . '::User logged in');
             $this->exts->capture("3-login-success");
-            if ($this->exts->exists('.picker-app .picker-item-column button.picker-button')) {
-                // This portal is for UK so select UK first, else select default
-                $target_selection = $this->exts->getElement('//button[contains(@class, "picker-button")]//*[contains(text(), "United Kingdom")]', null, 'xpath');
-                if ($target_selection == null) {
-                    $target_selection = $this->exts->getElement('//button[contains(@class, "picker-button")]//*[contains(text(), "Vereinigtes K") or contains(text(), "Regno Unito") or contains(text(), "Reino Unido") or contains(text(), "Royaume-Uni")]', null, 'xpath'); // UK but in other language
-                }
 
-                if ($target_selection == null) { // If do not found, get default picker
-                    $target_selection = $this->exts->getElement('.picker-view-column:last-child .picker-button');
+            if ($this->exts->exists('button.full-page-account-switcher-account-details')) {
+                //  This portal is for UK so select UK first, else select default
+                $target_selection = $this->exts->getElementByText('button.full-page-account-switcher-account-details', ['United Kingdom'], null, true);
+                if ($target_selection == null) {
+                    //Sometime we need to expand to see the list
+                    $this->exts->moveToElementAndClick('button.full-page-account-switcher-account-details');
+                    sleep(10);
+                    $target_selection = $this->exts->getElementByText('button.full-page-account-switcher-account-details', ['United Kingdom'], null, true);
                 }
-                try {
-                    $target_selection->getLocationOnScreenOnceScrolledIntoView();
-                    $target_selection->click();
-                } catch (\Exception $exception) {
-                    $this->exts->executeSafeScript('arguments[0].click();', [$target_selection]);
+    
+                if ($target_selection == null) {
+                    $target_selection = $this->exts->getElementByText('button.full-page-account-switcher-account-details', ['Regno Unito'], null, true);
+                }
+    
+                if ($target_selection == null) {
+                    $target_selection = $this->exts->getElementByText('button.full-page-account-switcher-account-details', ['Royaume-Uni'], null, true);
+                }
+    
+                if ($target_selection == null && count($this->exts->getElements('button.full-page-account-switcher-account-details')) > 1) { // If do not found, get default picker
+                    $target_selection = $this->exts->getElements('button.full-page-account-switcher-account-details')[1];
+                }
+                if ($target_selection != null) {
+                    $this->exts->click_element($target_selection);
                 }
                 sleep(1);
-                if ($this->exts->exists('.picker-app button.picker-switch-accounts-button:not([disabled])')) {
-                    $this->exts->moveToElementAndClick('.picker-app button.picker-switch-accounts-button:not([disabled])');
+                if ($this->exts->exists('button.kat-button--primary:not([disabled])')) {
+                    $this->exts->moveToElementAndClick('button.kat-button--primary:not([disabled])');
                     sleep(10);
+                } else {
+                    $this->exts->account_not_ready();
                 }
             }
 
             $this->doAfterLogin();
+
+            // Final, check no invoice
+            if ($this->isNoInvoice) {
+                $this->exts->no_invoice();
+            }
+            $this->exts->success();
         } else {
             $this->exts->log(__FUNCTION__ . '::Use login failed ' . $this->exts->getUrl());
+            $error_text = strtolower($this->exts->extract('div#auth-email-invalid-claim-alert div.a-alert-content'));
+            $OtpPageError =  $this->exts->extract('div.a-alert-content');
+
+            $this->exts->log('::Error text ' . $error_text);
+            $this->exts->log('::Error text Otp Page ' . $OtpPageError);
+
             if ($this->isIncorrectCredential()) {
                 $this->exts->loginFailure(1);
             } else if (strpos(strtolower($this->exts->extract('div[id*="error-message"]', null, 'innerText')), 'incorrect') !== false) {
                 $this->exts->capture("loginFailedConfirmed");
+                $this->exts->loginFailure(1);
+            } else if (
+                stripos($OtpPageError, strtolower('Die von dir angegebenen Anmeldeinformationen waren inkorrekt. Überprüfe sie und versuche es erneut.')) !== false ||
+                stripos($OtpPageError, strtolower('The credentials you provided were incorrect. Check them and try again.')) !== false ||
+                stripos($OtpPageError, strtolower("Your One Time Password (OTP) has expired. Please request another from the ‘Didn't receive the One Time Password?’ link below.")) !== false
+            ) {
                 $this->exts->loginFailure(1);
             } else if ($this->exts->exists('form[name="forgotPassword"], [data-metric-name="sc:auth-failed:no-account:start-registration-button"]')) {
                 $this->exts->account_not_ready();
@@ -219,10 +269,11 @@ class PortalScriptCDP
                 $this->exts->loginFailure();
             }
         }
-    } //div[id*="error-message"]
+    }
     private function checkFillLogin()
     {
-        if ($this->exts->exists($this->password_selector)) {
+        $this->exts->waitTillPresent($this->username_selector);
+        if ($this->exts->exists($this->username_selector)) {
             sleep(3);
             $this->exts->capture("2-login-page");
 
@@ -230,7 +281,8 @@ class PortalScriptCDP
             $this->exts->moveToElementAndType($this->username_selector, $this->username);
             sleep(1);
             $this->exts->moveToElementAndClick('input[id="continue"]');
-
+            sleep(2);
+            $this->exts->waitTillPresent($this->password_selector);
             $this->exts->log("Enter Password");
             $this->exts->moveToElementAndType($this->password_selector, $this->password);
             sleep(1);
@@ -787,11 +839,6 @@ class PortalScriptCDP
                 $this->downloadSellerFeeInvoice();
             }
         }
-
-        // Final, check no invoice
-        if ($this->isNoInvoice) {
-            $this->exts->no_invoice();
-        }
     }
     private function downloadTransaction($pageCount = 1)
     {
@@ -829,6 +876,12 @@ class PortalScriptCDP
                     if ($invoiceAltName == "---" || empty($checkText) || trim($checkText) == "") {
                         $invoiceAltName = $invoiceName;
                     }
+
+                    if ($invoiceName == '' || $invoiceName == null) {
+                        $invoiceName = time(); // create custom name in case no name found for this invoice
+                        sleep(2);
+                    }
+
                     if (!$this->exts->invoice_exists($invoiceName) || !$this->exts->invoice_exists($invoiceAltName)) {
                         array_push($invoices, array(
                             'invoiceName' => ($invoiceAltName != "" && $invoiceAltName != "---") ? $invoiceAltName : $invoiceName,
@@ -852,7 +905,9 @@ class PortalScriptCDP
                 $this->exts->log('invoiceAmount: ' . $invoice['invoiceAmount']);
                 $this->exts->log('invoiceUrl: ' . $invoice['invoiceUrl']);
 
-                $invoiceFileName = $invoice['invoiceName'] . '.pdf';
+
+                $invoiceFileName =  !empty($invoice['invoiceName']) ? $invoice['invoiceName'] . '.pdf' : "";
+
                 $parsed_date = $this->exts->parse_date($invoice['invoiceDate'], 'd M Y', 'Y-m-d');
                 if ($parsed_date == '') {
                     $parsed_date = $this->exts->parse_date($invoice['invoiceDate'], 'd#m#Y', 'Y-m-d');
@@ -941,7 +996,7 @@ class PortalScriptCDP
                         $this->isNoInvoice = false;
                         $invoiceName =  $this->exts->extract('[role="cell"]:nth-child(3)', $row);
                         $invoiceName = trim($invoiceName);
-                        $invoiceFileName = $invoiceName . '.pdf';
+                        $invoiceFileName = !empty($invoiceName) ? $invoiceName . '.pdf' : '';
                         $invoiceDate = $this->exts->extract('[role="cell"]:nth-child(1)', $row);
                         $amountText = $this->exts->extract('a#link-target', $row);
                         $invoiceAmount = preg_replace('/[^\d\.\,]/', '', $amountText);
@@ -1058,6 +1113,11 @@ class PortalScriptCDP
                         $invoiceAmount = $invoiceAmount . ' EUR';
                     }
 
+                    if ($invoiceName == '' || $invoiceName == null) {
+                        $invoiceName = time(); // create custom name in case no name found for this invoice
+                        sleep(2);
+                    }
+
                     $invoiceAltName = "Seller-Invoice" . $invoiceDate;
                     if (!$this->exts->invoice_exists($invoiceName) && !$this->exts->invoice_exists($invoiceAltName)) {
                         array_push($invoices, array(
@@ -1082,7 +1142,7 @@ class PortalScriptCDP
                 $this->exts->log('invoiceAmount: ' . $invoice['invoiceAmount']);
                 $this->exts->log('invoiceUrl: ' . $invoice['invoiceUrl']);
 
-                $invoiceFileName = $invoice['invoiceName'] . '.pdf';
+                $invoiceFileName = !empty($invoice['invoiceName']) ? $invoice['invoiceName'] . '.pdf' : "";
                 $parsed_date = $this->exts->parse_date($invoice['invoiceDate'], 'd M Y', 'Y-m-d');
                 if ($parsed_date == '') {
                     $parsed_date = $this->exts->parse_date($invoice['invoiceDate'], 'd#m#Y', 'Y-m-d');
@@ -1208,7 +1268,8 @@ class PortalScriptCDP
                 $this->exts->log('invoiceDate: ' . $invoice['invoiceDate']);
                 $this->exts->log('invoiceAmount: ' . $invoice['invoiceAmount']);
                 $this->exts->log('invoiceUrl: ' . $invoice['invoiceUrl']);
-                $invoiceFileName = $invoice['invoiceName'] . '.pdf';
+
+                $invoiceFileName = !empty($invoice['invoiceName']) ? $invoice['invoiceName'] . '.pdf' : "";
                 $this->isNoInvoice = false;
 
                 // Download invoice if it not exisited
@@ -1267,7 +1328,7 @@ class PortalScriptCDP
             if (count($tags) >= 14 && $this->exts->querySelector('button[data-invoice]', end($tags)) != null) {
                 $invoice_button = $this->exts->querySelector('button[data-invoice]', end($tags));
                 $invoiceName = $invoice_button->getAttribute('data-invoice');
-                $invoiceFileName = $invoiceName . '.pdf';
+                $invoiceFileName = !empty($invoiceName) ? $invoiceName . '.pdf' : '';
                 $invoiceDate = trim($tags[count($tags) - 3]->getText());
                 $invoiceAmount = '';
 
@@ -1503,7 +1564,7 @@ class PortalScriptCDP
                 $download_button = $this->exts->getElement('.dwnld-icon-alignment .dwnld-btn-enb', $row);
                 if ($download_button != null) {
                     $invoiceName =  trim($this->exts->extract('td[id^="invoice-number"]', $row));
-                    $invoiceFileName = $invoiceName . '.pdf';
+                    $invoiceFileName =  !empty($invoiceName) ? $invoiceName . '.pdf' : '';
                     $invoiceDate = trim($this->exts->extract('td[id^="invoice-date"]', $row));
                     $amountText = trim($this->exts->extract('td[id^="invoice-total"]', $row));
                     $invoiceAmount = preg_replace('/[^\d\.\,]/', '', $amountText);
@@ -1588,7 +1649,7 @@ class PortalScriptCDP
                         $this->isNoInvoice = false;
                         $invoiceName = trim($this->exts->extract('td:nth-child(3)', $popRow));
                         if (!$this->exts->invoice_exists($invoiceName)) {
-                            $invoiceFileName = $invoiceName . '.pdf';
+                            $invoiceFileName = !empty($invoiceName) ? $invoiceName . '.pdf' : '';
                             $invoiceAmount = '';
                             $invoiceDate = '';
                             $invoiceUrl = $invoice_link->getAttribute('href');
