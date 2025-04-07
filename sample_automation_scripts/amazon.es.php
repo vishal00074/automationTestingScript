@@ -185,10 +185,10 @@ class PortalScriptCDP
                 $this->exts->openUrl($this->orderPageUrl);
                 sleep(5);
 
-                $this->exts->success();
                 $this->exts->capture("LoginSuccess");
 
                 $this->processAfterLogin(0);
+                $this->exts->success();
             } else {
                 // Captcha and Two Factor Check
                 if ($this->checkCaptcha() || stripos($this->exts->getUrl(), "/ap/cvf/request") !== false) {
@@ -209,8 +209,6 @@ class PortalScriptCDP
                 if ($this->checkLogin()) {
                     $this->exts->openUrl($this->orderPageUrl);
                     sleep(5);
-
-                    $this->exts->success();
                     $this->exts->capture("LoginSuccess");
 
                     // If portal script supports restart docker and resume portal execution
@@ -218,6 +216,7 @@ class PortalScriptCDP
                     $this->support_restart = true;
 
                     $this->processAfterLogin(0);
+                    $this->exts->success();
                 } else {
                     $this->exts->capture("LoginFailed");
                     $this->exts->loginFailure();
@@ -226,11 +225,10 @@ class PortalScriptCDP
         } else {
             $this->exts->openUrl($this->orderPageUrl);
             sleep(5);
-
-            $this->exts->success();
             $this->exts->capture("LoginSuccess");
 
             $this->processAfterLogin(0);
+            $this->exts->success();
         }
     }
 
@@ -1388,7 +1386,7 @@ class PortalScriptCDP
                                                                     if (trim($invoice_url) != "") {
                                                                         if ($invoicePrefix > 0) {
                                                                             $item_invoice_number = $item_invoice_number . "-" . $invoicePrefix;
-                                                                            $filename =  !empty($item_invoice_number) ?  $item_invoice_number . ".pdf": '';
+                                                                            $filename =  !empty($item_invoice_number) ?  $item_invoice_number . ".pdf" : '';
                                                                         }
 
                                                                         if (stripos($invoice_url, "https://www.amazon.es") === false && stripos($invoice_url, "https://") === false) {
@@ -1616,7 +1614,7 @@ class PortalScriptCDP
                                     $this->exts->log('order_invoice_name: ' . $order_invoice_name);
                                     $this->exts->log('order_invoice_url: ' . $order_invoice_url);
 
-                                    $invoiceFileName = !empty($order_invoice_name) ? $order_invoice_name . '.pdf':'';
+                                    $invoiceFileName = !empty($order_invoice_name) ? $order_invoice_name . '.pdf' : '';
                                     $downloaded_file = $this->exts->direct_download($order_invoice_url, 'pdf', $invoiceFileName);
                                     if (trim($downloaded_file) != '' && file_exists($downloaded_file)) {
                                         $this->exts->new_invoice($order_invoice_name, '', '', $downloaded_file);
@@ -1821,6 +1819,7 @@ class PortalScriptCDP
             $this->exts->click_by_xdotool('li[data-a-tab-name="inbox_bsm_tab"] a');
             sleep(15);
         }
+        $this->exts->capture('process-ms-invoice');
 
         $inv_msgs = array();
         $invMsgRows = $this->exts->querySelectorAll('div[data-a-name="inbox_bsm_tab"] table.message-table tr');
@@ -1858,7 +1857,7 @@ class PortalScriptCDP
         }
 
         $this->exts->log("Found message on page - " . $currentMessagePage . " - " . count($inv_msgs));
-
+        $this->exts->capture('process-ms-invoice-1');
         foreach ($inv_msgs as $inv_msg) {
             // Open New window To process Invoice
             $this->exts->openNewTab();
@@ -1876,16 +1875,18 @@ class PortalScriptCDP
             sleep(2);
             $this->exts->closeAllTabsButThis();
         }
-
+        $this->exts->capture('process-ms-invoice-2');
         if ($this->exts->querySelector("#inbox_button_next_page") != null && (int)@$this->msgTimeLimitReached == 0) {
             $nextBtnClass = $this->exts->querySelector("#inbox_button_next_page")->getAttribute("class");
             if (stripos($nextBtnClass, "disabled") === FALSE) {
 
-                $this->exts->click("#inbox_button_next_page");
-                sleep(5);
-
-                $currentMessagePage++;
-                $this->processMSInvoice($currentMessagePage);
+                if (!$this->exts->exists('span#inbox_button_next_page.a-button-disabled')) {
+                    $this->exts->moveToElementAndClick("#inbox_button_next_page");
+                    sleep(5);
+                    $currentMessagePage++;
+                    $this->processMSInvoice($currentMessagePage);
+                }
+               
             }
         }
     }
@@ -1932,7 +1933,7 @@ class PortalScriptCDP
                                     if (trim($invoice_name) == "") {
                                         $invoice_name = $inv_msg['msg_id'];
                                     }
-                                    $filename = !empty($invoice_name) ? $invoice_name . ".pdf": '';
+                                    $filename = !empty($invoice_name) ? $invoice_name . ".pdf" : '';
 
                                     $invoice_url = $invoice_data['invoice_url'];
                                     if (trim($invoice_url) != "" && stripos($invoice_url, "https://www.amazon.es") === false && stripos($invoice_url, "https://") === false) {
@@ -2023,7 +2024,7 @@ class PortalScriptCDP
                             if (stripos($downloadLink, '/b2b/aba/order-summary/') !== false) {
                                 if (trim($orderNum) !== '' && !$this->exts->invoice_exists($orderNum) && !$this->invoice_overview_exists($orderNum)) {
                                     $invoice_name = $orderNum;
-                                    $fileName = !empty($orderNum) ? $orderNum . '.pdf': '';
+                                    $fileName = !empty($orderNum) ? $orderNum . '.pdf' : '';
 
                                     // Open New window To process Invoice
                                     $this->exts->openNewTab();

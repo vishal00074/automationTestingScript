@@ -95,7 +95,6 @@ private function initPortal($count) {
 			$this->exts->capture("LoginSuccess-if");
 			
 			if (!empty($this->exts->config_array['allow_login_success_request'])) {
- 
 				$this->exts->triggerLoginSuccess();
 			}
 		} else if (strpos($this->exts->extract('div.login div.alert--error'), 'passwor') !== false){

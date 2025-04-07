@@ -33,17 +33,17 @@ class PortalScriptCDP
     }
 
     /*Define constants used in script*/
-    public $baseUrl = 'https://stawag.ladecloud.de/account-type/customer/view/dashboard';
-    public $loginUrl = 'https://stawag.ladecloud.de/login';
-    public $invoicePageUrl = 'https://stawag.ladecloud.de/account-type/customer/view/payment-documents/tab/invoice-transactions';
+    public $baseUrl = 'https://www.groener-schulze.com/main.php';
+    public $loginUrl = 'https://www.groener-schulze.com/main.php?action=navigate&pg=mein_konto&a=6';
+    public $invoicePageUrl = 'https://www.groener-schulze.com/main.php?action=navigate&pg=mein_konto&a=6';
 
-    public $username_selector = 'input[id="views-login-email"]';
-    public $password_selector = 'input[id="components-password-input-password"]';
+    public $username_selector = 'div[class="login"] input[name="username"]';
+    public $password_selector = 'div[class="login"] input[name="login_passwd"]';
     public $remember_me_selector = '';
-    public $submit_login_selector = 'button[type="submit"]';
+    public $submit_login_selector = 'div[class="login"] button[type="submit"]';
 
-    public $check_login_failed_selector = 'p#views-login-submit-error';
-    public $check_login_success_selector = 'a[href="/account-type/customer/view/dashboard"]';
+    public $check_login_failed_selector = 'div.meldung_rot p';
+    public $check_login_success_selector = 'a[href*="?action=logout"][rel="nofollow"]';
 
     public $isNoInvoice = true;
 
@@ -69,9 +69,9 @@ class PortalScriptCDP
             $this->exts->log(">>>>>>>>>>>>>>>Login successful!!!!");
             $this->exts->capture("LoginSuccess");
 
-            if ($this->exts->exists('div.modal-header button[class="close"]')) {
-                $this->exts->moveToElementAndClick('div.modal-header button[class="close"]');
-                sleep(2);
+            if ($this->exts->exists('div#cookieChoiceInfo button')) {
+                $this->exts->moveToElementAndClick('div#cookieChoiceInfo button');
+                sleep(5);
             }
 
             $this->exts->openUrl($this->invoicePageUrl);
@@ -90,8 +90,8 @@ class PortalScriptCDP
 
             $this->exts->log(__FUNCTION__ . '::Error text: ' . $error_text);
             if (
-                stripos($error_text, strtolower('E-Mail-Adresse oder Passwort ist ungültig.')) !== false ||
-                stripos($error_text, strtolower('Email address or password is invalid.')) !== false
+                stripos($error_text, strtolower('Falsche Eingaben.')) !== false ||
+                stripos($error_text, strtolower('Incorrect entries.')) !== false
             ) {
                 $this->exts->loginFailure(1);
             } else {
@@ -161,43 +161,62 @@ class PortalScriptCDP
         $this->exts->waitTillPresent('table tbody tr');
         $this->exts->capture("4-invoices-classic");
 
+        $invoices = [];
         $rows = $this->exts->getElements('table tbody tr');
         foreach ($rows as $key => $row) {
-            $invoiceBtn = $this->exts->getElement('td:nth-child(6) div > div > div:nth-child(1)', $row);
-            if ($invoiceBtn != null) {
-                $invoiceUrl = '';
+            $invoiceLink = $this->exts->getElement('a', $row);
+            if ($invoiceLink != null) {
+                $invoiceUrl = $invoiceLink->getAttribute("href");
                 $invoiceName = $this->exts->extract('td:nth-child(2)', $row);
-                $invoiceDate = $this->exts->extract('td:nth-child(3)', $row);
-                $invoiceAmount = $this->exts->extract('td:nth-child(5)', $row);
+                $invoiceDate = $this->exts->extract('td:nth-child(1)', $row);
+                $invoiceAmount = $this->exts->extract('td:nth-child(3)', $row);
 
+                array_push($invoices, array(
+                    'invoiceName' => $invoiceName,
+                    'invoiceDate' => $invoiceDate,
+                    'invoiceAmount' => $invoiceAmount,
+                    'invoiceUrl' => $invoiceUrl,
+                ));
                 $this->isNoInvoice = false;
-                $this->exts->log('--------------------------');
-                $this->exts->log('invoiceName: ' . $invoiceName);
-                $this->exts->log('invoiceDate: ' . $invoiceDate);
-                $this->exts->log('invoiceAmount: ' . $invoiceAmount);
-                $this->exts->log('invoiceUrl: ' . $invoiceUrl);
+            }
+        }
 
-                $invoiceFileName = !empty($invoiceName) ? $invoiceName . '.pdf' : '';
-                $invoiceDate = $this->exts->parse_date($invoiceDate, 'd.m.Y', 'Y-m-d');
-                $this->exts->log('Date parsed: ' .  $invoiceDate);
+        $this->exts->log('Invoices found: ' . count($invoices));
+        foreach ($invoices as $invoice) {
+            $this->exts->log('--------------------------');
+            $this->exts->log('invoiceName: ' . $invoice['invoiceName']);
+            $this->exts->log('invoiceDate: ' . $invoice['invoiceDate']);
+            $this->exts->log('invoiceAmount: ' . $invoice['invoiceAmount']);
+            $this->exts->log('invoiceUrl: ' . $invoice['invoiceUrl']);
 
-                $downloaded_file = $this->exts->click_and_download($invoiceBtn, 'pdf', $invoiceFileName);
-                sleep(2);
-                if (trim($downloaded_file) != '' && file_exists($downloaded_file)) {
-                    $this->exts->new_invoice($invoiceUrl,  $invoiceDate, $invoiceAmount, $downloaded_file);
-                    sleep(1);
-                } else {
-                    $this->exts->log(__FUNCTION__ . '::No download ' . $invoiceFileName);
-                }
+            $invoiceFileName = !empty($invoice['invoiceName']) ? $invoice['invoiceName'] . '.pdf': '';
+            $invoice['invoiceDate'] = $this->exts->parse_date($invoice['invoiceDate'], 'd.m.Y', 'Y-m-d');
+            $this->exts->log('Date parsed: ' . $invoice['invoiceDate']);
+
+            $downloaded_file = $this->exts->direct_download($invoice['invoiceUrl'], 'pdf', $invoiceFileName);
+            if (trim($downloaded_file) != '' && file_exists($downloaded_file)) {
+                $this->exts->new_invoice($invoice['invoiceName'], $invoice['invoiceDate'], $invoice['invoiceAmount'], $invoiceFileName);
+                sleep(1);
+            } else {
+                $this->exts->log(__FUNCTION__ . '::No download ' . $invoiceFileName);
             }
         }
 
         $restrictPages = isset($this->exts->config_array["restrictPages"]) ? (int)@$this->exts->config_array["restrictPages"] : 3;
+        $count++;
+        $nextPage = 'div.abstand_oben_gross a[href*="?rpg=' . $count . '"]';
+        $this->exts->log(__FUNCTION__ . '::Next Page ' . $nextPage);
 
-        if ($count < $restrictPages && $this->exts->exists('div[data-testid="Pagination"] li:nth-child(5)  button.MuiPaginationItem-previousNext:not(:disabled)')) {
-            $this->exts->click_by_xdotool('div[data-testid="Pagination"] li:nth-child(5)  button.MuiPaginationItem-previousNext:not(:disabled)');
-            sleep(7);
-            $count++;
+        $paginationRows = $this->exts->getElements($nextPage);
+        $nextPageUrl = '';
+        foreach ($paginationRows as $paginationRow) {
+            $nextPageUrl = $paginationRow->getAttribute("href");
+            break; // stop iteration 
+        }
+        $this->exts->log(__FUNCTION__ . '::Next Page URL ' . $nextPageUrl);
+
+        if ($count < $restrictPages && !empty($nextPageUrl)) {
+            $this->exts->openUrl($nextPageUrl);
             $this->downloadInvoices($count);
         }
     }
