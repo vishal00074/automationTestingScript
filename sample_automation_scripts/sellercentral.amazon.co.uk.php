@@ -1086,6 +1086,7 @@ class PortalScriptCDP
     }
     private function downloadStatements($pageCount = 1)
     {
+        $this->exts->log(__FUNCTION__);
         sleep(15);
         $this->exts->capture("4-statements-page");
         if ($this->exts->exists('table > tbody > tr a[href*="/settlement-summary"]')) {
@@ -1327,8 +1328,9 @@ class PortalScriptCDP
             $tags = $this->exts->querySelectorAll('td', $row);
             if (count($tags) >= 14 && $this->exts->querySelector('button[data-invoice]', end($tags)) != null) {
                 $invoice_button = $this->exts->querySelector('button[data-invoice]', end($tags));
-                $invoiceName = $invoice_button->getAttribute('data-invoice');
-                $invoiceFileName = !empty($invoiceName) ? $invoiceName . '.pdf' : '';
+                $invoiceName = $this->exts->extract('td:nth-child(6)', $row);
+                $invoiceFileName = !empty($invoiceName) ? $invoiceName . '.pdf' : time();
+                sleep(1);
                 $invoiceDate = trim($tags[count($tags) - 3]->getText());
                 $invoiceAmount = '';
 
