@@ -1,4 +1,4 @@
-<?php
+<?php // updated captcha code and added trigger loginFailedConfirmed after submitting the form updated download code
 
 /**
  * Chrome Remote via Chrome devtool protocol script, for specific process/portal
@@ -85,6 +85,7 @@ class PortalScriptCDP
         sleep(1);
         $this->exts->openUrl($this->baseUrl);
         sleep(15);
+        $this->clearChrome();
         // after load cookies and open base url, check if user logged in
         // Wait for selector that make sure user logged in
         // If user hase not logged in, open the login url and wait for login form
@@ -147,6 +148,7 @@ class PortalScriptCDP
             if ($this->isNoInvoice) {
                 $this->exts->no_invoice();
             }
+            $this->exts->success();
         } else {
             $this->exts->log('Timeout waitForLogin: ' . $this->exts->getUrl());
             $this->exts->capture("LoginFailed");
@@ -157,6 +159,34 @@ class PortalScriptCDP
                 $this->exts->loginFailure();
             }
         }
+    }
+
+    private function clearChrome()
+    {
+        $this->exts->log("Clearing browser history, cookie, cache");
+        $this->exts->openUrl('chrome://settings/clearBrowserData');
+        sleep(10);
+        $this->exts->capture("clear-page");
+        for ($i = 0; $i < 2; $i++) {
+            $this->exts->type_key_by_xdotool('Tab');
+            sleep(1);
+        }
+        $this->exts->type_key_by_xdotool('Tab');
+        sleep(1);
+        $this->exts->type_key_by_xdotool('Return');
+        sleep(1);
+        $this->exts->type_key_by_xdotool('a');
+        sleep(1);
+        $this->exts->type_key_by_xdotool('Return');
+        sleep(3);
+        $this->exts->capture("clear-page");
+        for ($i = 0; $i < 5; $i++) {
+            $this->exts->type_key_by_xdotool('Tab');
+            sleep(1);
+        }
+        $this->exts->type_key_by_xdotool('Return');
+        sleep(15);
+        $this->exts->capture("after-clear");
     }
 
     public function switchToFrame($query_string)
@@ -179,6 +209,7 @@ class PortalScriptCDP
 
         return false;
     }
+
     private function checkFillLogin()
     {
         $this->exts->waitTillPresent($this->username_selector, 5);
@@ -198,7 +229,11 @@ class PortalScriptCDP
             sleep(5);
             if ($this->exts->exists($this->submit_login_btn)) {
                 $this->exts->click_element($this->submit_login_btn);
-                sleep(5);
+                sleep(7);
+            }
+
+            if (strpos(strtolower($this->exts->extract($this->checkLoginFailedSelector, null, 'innerText')), 'die zugangsdaten sind ung') !== false) {
+                $this->exts->loginFailure(1);
             }
         } else {
             $this->exts->log(__FUNCTION__ . '::Login page not found');
@@ -209,8 +244,8 @@ class PortalScriptCDP
     private function checkFillRecaptcha($count = 1)
     {
         $this->exts->log(__FUNCTION__);
-        $recaptcha_iframe_selector = 'iframe[title="reCAPTCHA"]';
-        $recaptcha_textarea_selector = 'textarea[name="g-recaptcha-response"]';
+        $recaptcha_iframe_selector = 'div#grecaptcha-root iframe[title="reCAPTCHA"]';
+        $recaptcha_textarea_selector = 'div#grecaptcha-root textarea[name="g-recaptcha-response"]';
         if ($this->exts->exists($recaptcha_iframe_selector)) {
             $iframeUrl = $this->exts->extract($recaptcha_iframe_selector, null, 'src');
             $data_siteKey = explode('&', end(explode("&k=", $iframeUrl)))[0];
@@ -221,10 +256,46 @@ class PortalScriptCDP
             $this->exts->log("isCaptchaSolved - " . $isCaptchaSolved);
 
             if ($isCaptchaSolved) {
+
+                $this->exts->log(__FUNCTION__ . "::filling reCaptcha response..");
+                $recaptcha_textareas =  $this->exts->getElements($recaptcha_textarea_selector);
+                for ($i = 0; $i < count($recaptcha_textareas); $i++) {
+                    $this->exts->execute_javascript("arguments[0].innerHTML = '" . $this->exts->recaptcha_answer . "';", [$recaptcha_textareas[$i]]);
+                }
+                sleep(2);
+                $this->exts->capture('recaptcha-filled');
+
+                // Step 2, check if callback function need executed
+                $gcallbackFunction = $this->exts->execute_javascript('
+				if(document.querySelector("[data-callback]") != null){
+					return document.querySelector("[data-callback]").getAttribute("data-callback");
+				}
+
+				var result = ""; var found = false;
+				function recurse (cur, prop, deep) {
+					if(deep > 5 || found){ return;}console.log(prop);
+					try {
+						if(cur == undefined || cur == null || cur instanceof Element || Object(cur) !== cur || Array.isArray(cur)){ return;}
+						if(prop.indexOf(".callback") > -1){result = prop; found = true; return;
+						} else { deep++;
+							for (var p in cur) { recurse(cur[p], prop ? prop + "." + p : p, deep);}
+						}
+					} catch(ex) { console.log("ERROR in function: " + ex); return; }
+				}
+
+				recurse(___grecaptcha_cfg.clients[0], "", 0);
+				return found ? "___grecaptcha_cfg.clients[0]." + result : null;
+			');
+                $this->exts->log('Callback function: ' . $gcallbackFunction);
+                if ($gcallbackFunction != null) {
+                    $this->exts->execute_javascript($gcallbackFunction . '("' . $this->exts->recaptcha_answer . '");');
+                    sleep(10);
+                }
+
                 $this->exts->capture('recaptcha-filled');
             } else {
                 // try again if recaptcha expired
-                if ($count < 3) {
+                if ($count < 5) {
                     $count++;
                     $this->checkFillRecaptcha($count);
                 }
@@ -278,7 +349,7 @@ class PortalScriptCDP
         $totalFiles = count($invoices);
 
         foreach ($invoices as $invoice) {
-            $invoiceFileName = $invoice['invoiceName'] . '.pdf';
+            $invoiceFileName = !empty($invoice['invoiceName']) ? $invoice['invoiceName'] . '.pdf' : '';
 
             $this->exts->log('Date before parse: ' . $invoice['invoiceDate']);
             $invoice['invoiceDate'] = $this->exts->parse_date($invoice['invoiceDate'], 'd.m.Y', 'Y-m-d');
