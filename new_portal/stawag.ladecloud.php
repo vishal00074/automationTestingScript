@@ -45,7 +45,9 @@ class PortalScriptCDP
     public $check_login_failed_selector = 'p#views-login-submit-error';
     public $check_login_success_selector = 'a[href="/account-type/customer/view/dashboard"]';
 
+    public $download_invoice_details = 0;
     public $isNoInvoice = true;
+
 
     /**
      * Entry Method thats called for a portal
@@ -54,6 +56,10 @@ class PortalScriptCDP
     private function initPortal($count)
     {
         $this->exts->log('Begin initPortal ' . $count);
+        $this->download_invoice_details = isset($this->exts->config_array["download_invoice_details"]) ? (int)@$this->exts->config_array["download_invoice_details"] : $this->download_invoice_details;
+
+        $this->exts->log('CONFIG download_invoice_details: ' . $this->download_invoice_details);
+
         $this->exts->openUrl($this->baseUrl);
         sleep(2);
         $this->exts->loadCookiesFromFile();
@@ -76,6 +82,13 @@ class PortalScriptCDP
 
             $this->exts->openUrl($this->invoicePageUrl);
             $this->downloadInvoices();
+
+            if ($this->download_invoice_details) {
+                $this->exts->openUrl($this->invoicePageUrl);
+                $this->exts->log('______Downloading Invoice Detail_______');
+                $this->downloadInvoicesDetail();
+            }
+
             // Final, check no invoice
             if ($this->isNoInvoice) {
                 $this->exts->no_invoice();
@@ -199,6 +212,54 @@ class PortalScriptCDP
             sleep(7);
             $count++;
             $this->downloadInvoices($count);
+        }
+    }
+
+    private function downloadInvoicesDetail($count = 1)
+    {
+        $this->exts->log(__FUNCTION__);
+
+        $this->exts->waitTillPresent('table tbody tr');
+        $this->exts->capture("4-invoices-classic");
+
+        $rows = $this->exts->getElements('table tbody tr');
+        foreach ($rows as $key => $row) {
+            $invoiceBtn = $this->exts->getElement('td:nth-child(6) div > div > div:nth-child(2)', $row);
+            if ($invoiceBtn != null) {
+                $invoiceUrl = '';
+                $invoiceDate = $this->exts->extract('td:nth-child(3)', $row);
+                $invoiceAmount = $this->exts->extract('td:nth-child(5)', $row);
+                $invoiceName = 'detail-'.$this->exts->extract('td:nth-child(2)', $row);
+
+                $this->isNoInvoice = false;
+                $this->exts->log('--------------------------');
+                $this->exts->log('Detail InvoiceName: ' . $invoiceName);
+                $this->exts->log('Detail InvoiceDate: ' . $invoiceDate);
+                $this->exts->log('Detail InvoiceAmount: ' . $invoiceAmount);
+                $this->exts->log('Detail InvoiceUrl: ' . $invoiceUrl);
+
+                $invoiceDate = $this->exts->parse_date($invoiceDate, 'd.m.Y', 'Y-m-d');
+                $this->exts->log('Date parsed: ' .  $invoiceDate);
+                $invoiceFileName = !empty($invoiceName) ? $invoiceName . '.pdf' : '';
+
+                $downloaded_file = $this->exts->click_and_download($invoiceBtn, 'pdf', $invoiceFileName);
+                sleep(2);
+                if (trim($downloaded_file) != '' && file_exists($downloaded_file)) {
+                    $this->exts->new_invoice($invoiceUrl,  $invoiceDate, $invoiceAmount, $downloaded_file);
+                    sleep(1);
+                } else {
+                    $this->exts->log(__FUNCTION__ . '::No download ' . $invoiceFileName);
+                }
+            }
+        }
+
+        $restrictPages = isset($this->exts->config_array["restrictPages"]) ? (int)@$this->exts->config_array["restrictPages"] : 3;
+
+        if ($count < $restrictPages && $this->exts->exists('div[data-testid="Pagination"] li:nth-child(5)  button.MuiPaginationItem-previousNext:not(:disabled)')) {
+            $this->exts->click_by_xdotool('div[data-testid="Pagination"] li:nth-child(5)  button.MuiPaginationItem-previousNext:not(:disabled)');
+            sleep(7);
+            $count++;
+            $this->downloadInvoicesDetail($count);
         }
     }
 }

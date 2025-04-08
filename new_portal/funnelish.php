@@ -146,6 +146,7 @@ class PortalScriptCDP
         return $isLoggedIn;
     }
 
+    //paystripe
     private function downloadInvoices($count = 1)
     {
         $this->exts->log(__FUNCTION__);

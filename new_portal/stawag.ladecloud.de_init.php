@@ -10,7 +10,9 @@ public $submit_login_selector = 'button[type="submit"]';
 public $check_login_failed_selector = 'p#views-login-submit-error';
 public $check_login_success_selector = 'a[href="/account-type/customer/view/dashboard"]';
 
+public $download_invoice_details = 0;
 public $isNoInvoice = true;
+
 
 /**
     * Entry Method thats called for a portal
@@ -19,6 +21,10 @@ public $isNoInvoice = true;
 private function initPortal($count)
 {
     $this->exts->log('Begin initPortal ' . $count);
+    $this->download_invoice_details = isset($this->exts->config_array["download_invoice_details"]) ? (int)@$this->exts->config_array["download_invoice_details"] : $this->download_invoice_details;
+
+    $this->exts->log('CONFIG download_invoice_details: ' . $this->download_invoice_details);
+
     $this->exts->openUrl($this->baseUrl);
     sleep(2);
     $this->exts->loadCookiesFromFile();
@@ -33,6 +39,11 @@ private function initPortal($count)
     if ($this->checkLogin()) {
         $this->exts->log(">>>>>>>>>>>>>>>Login successful!!!!");
         $this->exts->capture("LoginSuccess");
+
+        if ($this->exts->exists('div.modal-header button[class="close"]')) {
+            $this->exts->moveToElementAndClick('div.modal-header button[class="close"]');
+            sleep(2);
+        }
 
         if (!empty($this->exts->config_array['allow_login_success_request'])) {
             $this->exts->triggerLoginSuccess();
