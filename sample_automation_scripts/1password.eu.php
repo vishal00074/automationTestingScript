@@ -1,4 +1,4 @@
-<?php // updated submit_button selector and download code invoice name
+<?php // updated submit_login_selector selector and download code invoice name
 
 /**
  * Chrome Remote via Chrome devtool protocol script, for specific process/portal

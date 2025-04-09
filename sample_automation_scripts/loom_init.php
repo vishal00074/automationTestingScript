@@ -192,8 +192,15 @@ public $google_submit_username_selector = '#identifierNext';
 public $google_password_selector = 'input[name="password"], input[name="Passwd"]';
 public $google_submit_password_selector = '#passwordNext, #passwordNext button';
 public $google_solved_rejected_browser = false;
+
+public $security_phone_number = '';
+public $recovery_email = '';
+
 private function loginGoogleIfRequired()
 {
+    $this->security_phone_number = isset($this->exts->config_array["security_phone_number"]) ? $this->exts->config_array["security_phone_number"] : '';
+    $this->recovery_email = isset($this->exts->config_array["recovery_email"]) ? $this->exts->config_array["recovery_email"] : '';
+
     if ($this->exts->urlContains('google.')) {
         $this->checkFillGoogleLogin();
         sleep(10);
@@ -710,6 +717,11 @@ private function checkGoogleTwoFactorMethod()
         } else if ($this->exts->exists('li [data-challengetype="5"]:not([data-challengeunavailable="true"])')) {
             // Use a smartphone or tablet to receive a security code (even when offline)
             $this->exts->click_by_xdotool('li [data-challengetype="5"]:not([data-challengeunavailable="true"])');
+        } else if ($this->exts->exists('li div[data-sendmethod="SMS"]')) {
+            // Click on phone option
+            
+            $this->exts->click_by_xdotool('li div[data-sendmethod="SMS"]');
+            $this->exts->capture('select-phone');
         } else if ($this->exts->exists('li [data-challengetype]:not([data-challengetype="4"]):not([data-challengetype="2"]):not([data-challengeunavailable="true"])')) {
             // We DONT recommend method is QR code OR is Security USB, we can not solve this type of 2FA
             $this->exts->click_by_xdotool('li [data-challengetype]:not([data-challengetype="4"]):not([data-challengetype="2"]):not([data-challengeunavailable="true"])');
@@ -747,6 +759,8 @@ private function checkGoogleTwoFactorMethod()
         }
     } else if ($this->exts->exists('[data-view-id*="knowledgePreregisteredPhoneView"] input[type="tel"]')) {
         // If methos confirm recovery phone number, send 2FA to ask
+        $this->exts->log('Request for 2fa mobile-1');
+        $this->exts->capture('mobile-2fa-1');
         $this->exts->two_factor_attempts = 3;
         $input_selector = '[data-view-id*="knowledgePreregisteredPhoneView"] input[type="tel"]';
         $message_selector = '[data-view-id] form section div > div[jsslot] > div:first-child';
@@ -760,10 +774,12 @@ private function checkGoogleTwoFactorMethod()
             $this->fillGoogleTwoFactor($input_selector, $message_selector, $submit_selector, true);
             sleep(5);
         }
-    } else if ($this->exts->exists('input#phoneNumberId')) {
+    } else if ($this->exts->exists('input#phoneNumberId, input#idvPin')) {
         // Enter a phone number to receive an SMS with a confirmation code.
+        $this->exts->log('Request for 2fa mobile-2');
+        $this->exts->capture('mobile-2fa-2');
         $this->exts->two_factor_attempts = 3;
-        $input_selector = 'input#phoneNumberId';
+        $input_selector = 'input#phoneNumberId, input#idvPin';
         $message_selector = '[data-view-id] form section > div > div > div:first-child';
         $submit_selector = '';
         if (isset($this->security_phone_number) && $this->security_phone_number != '') {
@@ -913,6 +929,8 @@ private function fillGoogleTwoFactor($input_selector, $message_selector, $submit
     }
 }
 // -------------------- GOOGLE login END
+
+
 
 // ================================== BEGIN LOGIN WITH APPLE ==================================
 public $apple_username_selector = 'input#account_name_text_field';
