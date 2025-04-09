@@ -33,7 +33,7 @@ public $current_state = array();
 public $invalid_filename_keywords = array('agb', 'terms', 'datenschutz', 'privacy', 'rechnungsbeilage', 'informationsblatt', 'gesetzliche', 'retouren', 'widerruf', 'allgemeine gesch', 'mfb-buchung', 'informationen zu zahlung', 'nachvertragliche', 'retourenschein', 'allgemeine_gesch', 'rcklieferschein');
 public $invalid_filename_pattern = '';
 public $isNoInvoice = true;
-public $check_login_failed_selector = 'div#auth-email-missing-alert[style="display: block;"] div.a-alert-content, div#auth-error-message-box';
+public $check_login_failed_selector = 'div#auth-error-message-box div.a-alert-content';
 
 /**
     * Entry Method thats called for a portal
@@ -120,8 +120,6 @@ private function initPortal($count)
 
     if (!$isCookieLoginSuccess) {
         if ($this->checkLogin()) {
-            $this->exts->openUrl($this->orderPageUrl);
-            sleep(5);
             $this->exts->capture("LoginSuccess");
 
             if (!empty($this->exts->config_array['allow_login_success_request'])) {
@@ -132,23 +130,11 @@ private function initPortal($count)
         } else {
             // Captcha and Two Factor Check
             if ($this->checkCaptcha() || stripos($this->exts->getUrl(), "/ap/cvf/request") !== false) {
-                // if($this->exts->querySelector('form[name="claimspicker"]') != null) {
-                // 	$this->exts->init_required();
-                // } else {
-                // 	$this->processImageCaptcha();
-                // }
                 $this->processImageCaptcha();
             }
-            // else if($this->checkMultiFactorAuth() && stripos($this->exts->getUrl(), "/ap/mfa?") !== false) {
-            // 	$this->exts->init_required();
-            // } else if($this->exts->querySelector("form.cvf-widget-form[action=\"verify\"] input[name=\"code\"]") != null && stripos($this->exts->getUrl(), "/ap/cvf/verify") !== false) {
-            // 	$this->exts->init_required();
-            // }
 
             sleep(5);
             if ($this->checkLogin()) {
-                $this->exts->openUrl($this->orderPageUrl);
-                sleep(5);
                 $this->exts->capture("LoginSuccess");
 
                 if (!empty($this->exts->config_array['allow_login_success_request'])) {
@@ -157,13 +143,33 @@ private function initPortal($count)
 
                 $this->exts->success();
             } else {
+                $this->exts->log(__FUNCTION__ . '::Use login failed');
+                $this->exts->log('::URL login failure:: ' . $this->exts->getUrl());
                 $this->exts->capture("LoginFailed");
-                $this->exts->loginFailure();
+
+                $error_text = strtolower($this->exts->extract($this->check_login_failed_selector));
+                $emailFailed = strtolower($this->exts->extract('div#auth-email-invalid-claim-alert div.a-alert-content'));
+
+                $this->exts->log(__FUNCTION__ . '::Email Failed text: ' . $emailFailed);
+                $this->exts->log(__FUNCTION__ . '::error text: ' . $error_text);
+                if (
+                    stripos($emailFailed, strtolower('La dirección de correo electrónico o el número de teléfono móvil faltan o son inválidos. Corríjalo e inténtelo de nuevo.')) !== false ||
+                    stripos($emailFailed, strtolower('The email address or mobile phone number is missing or invalid. Please correct it and try again.')) !== false
+                ) {
+                    $this->exts->loginFailure(1);
+                } elseif (
+                    stripos($error_text, strtolower('La contraseña no es correcta')) !== false ||
+                    stripos($error_text, strtolower('The password is not correct')) !== false  ||
+                    stripos($error_text, strtolower('El código que ha introducido no es válido. Vuelva a intentarlo.')) !== false ||
+                    stripos($error_text, strtolower('The code you entered is invalid. Please try again.')) !== false
+                )
+                    $this->exts->loginFailure(1);
+                else {
+                    $this->exts->loginFailure();
+                }
             }
         }
     } else {
-        $this->exts->openUrl($this->orderPageUrl);
-        sleep(5);
         $this->exts->capture("LoginSuccess");
 
         if (!empty($this->exts->config_array['allow_login_success_request'])) {
@@ -207,7 +213,7 @@ function fillForm($count)
                     sleep(2);
 
                     $this->exts->log("Username form button click");
-                    $this->exts->click_by_xdotool($this->continue_button_selector);
+                    $this->exts->moveToElementAndClick($this->continue_button_selector);
                     sleep(5);
 
                     if ($this->exts->exists('#ap_captcha_guess, #auth-captcha-guess')) {
@@ -324,10 +330,6 @@ function fillForm($count)
                 }
             }
 
-            // if($this->checkCaptcha() || stripos($this->exts->getUrl(), "/ap/cvf/request") !== false) {
-            // 	$this->exts->log("Image captcha not solved");
-            // 	$this->exts->init_required();
-            // }
             $this->exts->log("END fillForm URL - " . $this->exts->getUrl());
         }
         if ($this->exts->exists('form#auth-account-fixup-phone-form a#ap-account-fixup-phone-skip-link')) {
@@ -628,8 +630,8 @@ public function checkLogin()
 }
 
 /**
-* Method to Process Image Catcha and Password field if present
-*/
+    * Method to Process Image Catcha and Password field if present
+    */
 public function processImageCaptcha()
 {
     $this->exts->log("Processing Image Captcha");

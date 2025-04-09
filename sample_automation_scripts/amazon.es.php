@@ -1,4 +1,4 @@
-<?php
+<?php // remove undefined variable support_restart  updated check_login_failed_selector i have migrated the script and trigger loginFailedConfirmed in case incorrect email and password and invalid otp
 
 /**
  * Chrome Remote via Chrome devtool protocol script, for specific process/portal
@@ -95,7 +95,7 @@ class PortalScriptCDP
     public $invalid_filename_keywords = array('agb', 'terms', 'datenschutz', 'privacy', 'rechnungsbeilage', 'informationsblatt', 'gesetzliche', 'retouren', 'widerruf', 'allgemeine gesch', 'mfb-buchung', 'informationen zu zahlung', 'nachvertragliche', 'retourenschein', 'allgemeine_gesch', 'rcklieferschein');
     public $invalid_filename_pattern = '';
     public $isNoInvoice = true;
-    public $check_login_failed_selector = 'div#auth-email-missing-alert[style="display: block;"] div.a-alert-content, div#auth-error-message-box';
+    public $check_login_failed_selector = 'div#auth-error-message-box div.a-alert-content';
 
     /**
      * Entry Method thats called for a portal
@@ -192,18 +192,8 @@ class PortalScriptCDP
             } else {
                 // Captcha and Two Factor Check
                 if ($this->checkCaptcha() || stripos($this->exts->getUrl(), "/ap/cvf/request") !== false) {
-                    // if($this->exts->querySelector('form[name="claimspicker"]') != null) {
-                    // 	$this->exts->init_required();
-                    // } else {
-                    // 	$this->processImageCaptcha();
-                    // }
                     $this->processImageCaptcha();
                 }
-                // else if($this->checkMultiFactorAuth() && stripos($this->exts->getUrl(), "/ap/mfa?") !== false) {
-                // 	$this->exts->init_required();
-                // } else if($this->exts->querySelector("form.cvf-widget-form[action=\"verify\"] input[name=\"code\"]") != null && stripos($this->exts->getUrl(), "/ap/cvf/verify") !== false) {
-                // 	$this->exts->init_required();
-                // }
 
                 sleep(5);
                 if ($this->checkLogin()) {
@@ -211,15 +201,33 @@ class PortalScriptCDP
                     sleep(5);
                     $this->exts->capture("LoginSuccess");
 
-                    // If portal script supports restart docker and resume portal execution
-                    // Enable this only after successfull login, otherwise no need to process restart
-                    $this->support_restart = true;
-
                     $this->processAfterLogin(0);
                     $this->exts->success();
                 } else {
+                    $this->exts->log(__FUNCTION__ . '::Use login failed');
+                    $this->exts->log('::URL login failure:: ' . $this->exts->getUrl());
                     $this->exts->capture("LoginFailed");
-                    $this->exts->loginFailure();
+
+                    $error_text = strtolower($this->exts->extract($this->check_login_failed_selector));
+                    $emailFailed = strtolower($this->exts->extract('div#auth-email-invalid-claim-alert div.a-alert-content'));
+
+                    $this->exts->log(__FUNCTION__ . '::Email Failed text: ' . $emailFailed);
+                    $this->exts->log(__FUNCTION__ . '::error text: ' . $error_text);
+                    if (
+                        stripos($emailFailed, strtolower('La dirección de correo electrónico o el número de teléfono móvil faltan o son inválidos. Corríjalo e inténtelo de nuevo.')) !== false ||
+                        stripos($emailFailed, strtolower('The email address or mobile phone number is missing or invalid. Please correct it and try again.')) !== false
+                    ) {
+                        $this->exts->loginFailure(1);
+                    } elseif (
+                        stripos($error_text, strtolower('La contraseña no es correcta')) !== false ||
+                        stripos($error_text, strtolower('The password is not correct')) !== false  ||
+                        stripos($error_text, strtolower('El código que ha introducido no es válido. Vuelva a intentarlo.')) !== false ||
+                        stripos($error_text, strtolower('The code you entered is invalid. Please try again.')) !== false
+                    )
+                        $this->exts->loginFailure(1);
+                    else {
+                        $this->exts->loginFailure();
+                    }
                 }
             }
         } else {
@@ -265,7 +273,7 @@ class PortalScriptCDP
                         sleep(2);
 
                         $this->exts->log("Username form button click");
-                        $this->exts->click_by_xdotool($this->continue_button_selector);
+                        $this->exts->moveToElementAndClick($this->continue_button_selector);
                         sleep(5);
 
                         if ($this->exts->exists('#ap_captcha_guess, #auth-captcha-guess')) {
@@ -382,10 +390,6 @@ class PortalScriptCDP
                     }
                 }
 
-                // if($this->checkCaptcha() || stripos($this->exts->getUrl(), "/ap/cvf/request") !== false) {
-                // 	$this->exts->log("Image captcha not solved");
-                // 	$this->exts->init_required();
-                // }
                 $this->exts->log("END fillForm URL - " . $this->exts->getUrl());
             }
             if ($this->exts->exists('form#auth-account-fixup-phone-form a#ap-account-fixup-phone-skip-link')) {
@@ -908,25 +912,18 @@ class PortalScriptCDP
             }
 
             // Fill order Select
-            // $this->exts->querySelector("select[name=\"orderFilter\"]")->selectOptionByValue($yearOrderSelection);
             $this->exts->log("processing year element  " . $optionSelector);
             if ($this->exts->exists("select[name=\"orderFilter\"]")) {
                 $optionSelEle = "select[name=\"orderFilter\"] option[value=\"" . $optionSelector . "\"]";
                 $selectElement = $this->exts->querySelector($optionSelEle);
                 $this->exts->click_element($selectElement);
             }
-            // else {
-            //     $this->exts->changeSelectbox('select[name="timeFilter"] option', $optionSelector);
-            // }
             sleep(2);
 
             if ($this->exts->querySelector($this->password_selector) != null || stripos($this->exts->getUrl(), "/ap/signin?") !== FALSE) {
                 if ($this->login_tryout == 0) {
                     $this->fillForm(0);
                 }
-                // else {
-                // 	$this->exts->init_required();
-                // }
             }
 
             $this->exts->capture("orders-" . $optionSelector);
@@ -1044,7 +1041,6 @@ class PortalScriptCDP
                             sleep(4);
                         }
 
-                        // $this->exts->capture("invoice pagination-".$optionSelector."-".$key1);
                         if ($this->exts->querySelector("div.a-box-group.a-spacing-base.order") != null) {
                             $this->exts->log("Invoice Found");
 
@@ -1418,8 +1414,6 @@ class PortalScriptCDP
                                                                                 $currentUrl = $this->exts->getUrl();
 
                                                                                 // Open New window To process Invoice
-                                                                                // $this->exts->open_new_window();
-
                                                                                 // Call Processing function to process current page invoices
                                                                                 $this->exts->openNewTab($invoice_url);
                                                                                 sleep(2);
@@ -1645,10 +1639,10 @@ class PortalScriptCDP
             // Keep processed years
             $this->last_state['years'] = array();
             $this->current_state['years'][] = $optionSelector;
-            for ($i = 0; $i < 5 && $this->exts->urlContains('errors/400.html'); $i++) {
-                $this->exts->navigate()->back();
-                sleep(5);
-            }
+            // for ($i = 0; $i < 5 && $this->exts->urlContains('errors/400.html'); $i++) {
+            //     $this->exts->navigate()->back();
+            //     sleep(5);
+            // }
         }
     }
 
@@ -1886,7 +1880,6 @@ class PortalScriptCDP
                     $currentMessagePage++;
                     $this->processMSInvoice($currentMessagePage);
                 }
-               
             }
         }
     }
@@ -2022,7 +2015,7 @@ class PortalScriptCDP
 
                         foreach ($downloadLinks as $downloadLink) {
                             if (stripos($downloadLink, '/b2b/aba/order-summary/') !== false) {
-                                if (trim($orderNum) !== '' && !$this->exts->invoice_exists($orderNum) && !$this->invoice_overview_exists($orderNum)) {
+                                if (trim($orderNum) !== '' && !$this->exts->invoice_exists($orderNum)) {
                                     $invoice_name = $orderNum;
                                     $fileName = !empty($orderNum) ? $orderNum . '.pdf' : '';
 
@@ -2144,9 +2137,6 @@ class PortalScriptCDP
                                 $this->exts->switchToInitTab();
                                 sleep(2);
                                 $this->exts->closeAllTabsButThis();
-
-                                // $handles = $this->exts->getWindowHandles();
-                                // $this->exts->log('Total Tabs - ' . count($handles));
                             }
                         }
                     } else {

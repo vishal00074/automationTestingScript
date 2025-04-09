@@ -256,8 +256,15 @@ class PortalScriptCDP
     public $google_password_selector = 'input[name="password"], input[name="Passwd"]';
     public $google_submit_password_selector = '#passwordNext, #passwordNext button';
     public $google_solved_rejected_browser = false;
+
+    public $security_phone_number = '';
+    public $recovery_email = '';
+
     private function loginGoogleIfRequired()
     {
+        $this->security_phone_number = isset($this->exts->config_array["security_phone_number"]) ? $this->exts->config_array["security_phone_number"] : '';
+        $this->recovery_email = isset($this->exts->config_array["recovery_email"]) ? $this->exts->config_array["recovery_email"] : '';
+
         if ($this->exts->urlContains('google.')) {
             $this->checkFillGoogleLogin();
             sleep(10);
