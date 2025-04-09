@@ -1,4 +1,4 @@
-<?php
+<?php // updated submit_button selector and download code invoice name
 
 /**
  * Chrome Remote via Chrome devtool protocol script, for specific process/portal
@@ -66,7 +66,7 @@ class PortalScriptCDP
     public $secret_key;
     public $password_selector = 'input[type="password"]';
     public $remember_me_selector = '';
-    public $submit_login_selector = '.signin-actions button,button[type="submit"]';
+    public $submit_login_selector = '.signin-actions button,button[type="submit"], main#signin-form button';
 
     public $check_login_failed_selector = 'p[data-test="validation-message"],p.error-description';
     public $check_login_success_selector = 'a[name="myreicheltstatusbarlink"]';
@@ -98,7 +98,6 @@ class PortalScriptCDP
         if ($this->checkLogin()) {
             $this->exts->log(">>>>>>>>>>>>>>>Login successful!!!!");
             $this->exts->capture("LoginSuccess");
-            $this->exts->success();
             $this->exts->openUrl($this->invoicePageUrl);
             $this->processInvoices();
             // Final, check no invoice
@@ -126,17 +125,15 @@ class PortalScriptCDP
         $this->exts->waitTillPresent($this->username_selector, 10);
         try {
             if ($this->exts->querySelector($this->username_selector) != null) {
-
                 $this->exts->capture("1-pre-login");
                 $this->exts->log("Enter Username");
                 $this->exts->moveToElementAndType($this->username_selector, $this->username);
 
                 sleep(2);
-                if ($this->exts->exists($this->submit_login_selector) && $this->exts->querySelector($this->password_selector) == null) {
-                    $this->exts->click_element($this->submit_login_selector);
+                if ($this->exts->exists($this->submit_login_selector)) {
+                    $this->exts->moveToElementAndClick($this->submit_login_selector);
                     sleep(4);
                 }
-
                 $this->exts->waitTillPresent($this->user_secretKey_selector, 30);
 
                 if (isset($this->exts->config_array['secret_key']) || $this->secret_key != '') {
@@ -144,8 +141,6 @@ class PortalScriptCDP
                 } else {
                     $this->checkFillTwoFactor();
                 }
-
-
                 sleep(2);
                 $this->exts->log("Enter Password");
                 $this->exts->moveToElementAndType($this->password_selector, $this->password);
@@ -158,7 +153,7 @@ class PortalScriptCDP
                 $this->exts->capture("1-login-page-filled");
                 sleep(5);
                 if ($this->exts->exists($this->submit_login_selector)) {
-                    $this->exts->click_element($this->submit_login_selector);
+                    $this->exts->moveToElementAndClick($this->submit_login_selector);
                 }
             }
         } catch (\Exception $exception) {
@@ -227,7 +222,7 @@ class PortalScriptCDP
             $this->exts->log('invoiceDate: ' . $invoice['invoiceDate']);
             $this->exts->log('invoiceAmount: ' . $invoice['invoiceAmount']);
 
-            $invoiceFileName = $invoice['invoiceName'] . '.pdf';
+            $invoiceFileName =  !empty($invoice['invoiceName']) ? $invoice['invoiceName'] . '.pdf': '';
             $invoice['invoiceDate'] = $this->exts->parse_date($invoice['invoiceDate'], 'd. F Y', 'Y-m-d');
             $this->exts->log('Date parsed: ' . $invoice['invoiceDate']);
 

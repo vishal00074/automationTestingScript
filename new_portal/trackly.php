@@ -33,17 +33,17 @@ class PortalScriptCDP
     }
 
     /*Define constants used in script*/
-    public $baseUrl = 'https://dashboard-1.edesk.com/home';
-    public $loginUrl = 'https://dashboard.edesk.com/login';
-    public $invoicePageUrl = 'https://dashboard-1.edesk.com/payments';
+    public $baseUrl = 'https://trackly.io/';
+    public $loginUrl = 'https://trackly.io/users/sign_in';
+    public $invoicePageUrl = 'https://trackly.io/account/billing';
 
-    public $username_selector = 'input[name="username"]';
-    public $password_selector = 'input[name="password"]';
+    public $username_selector = 'input[id="user_email"]';
+    public $password_selector = 'input[id="user_password"]';
     public $remember_me_selector = '';
-    public $submit_login_selector = 'button[type="submit"]';
+    public $submit_login_selector = 'input[type="submit"]';
 
-    public $check_login_failed_selector = 'div.alert-danger';
-    public $check_login_success_selector = 'a[href="/logout"]';
+    public $check_login_failed_selector = 'div.form-errors';
+    public $check_login_success_selector = 'a[href="/users/sign_out"]';
 
     public $isNoInvoice = true;
 
@@ -69,11 +69,6 @@ class PortalScriptCDP
             $this->exts->log(">>>>>>>>>>>>>>>Login successful!!!!");
             $this->exts->capture("LoginSuccess");
 
-            if ($this->exts->exists('div.modal-header button[class="close"]')) {
-                $this->exts->moveToElementAndClick('div.modal-header button[class="close"]');
-                sleep(2);
-            }
-
             $this->exts->openUrl($this->invoicePageUrl);
             $this->downloadInvoices();
             // Final, check no invoice
@@ -89,7 +84,7 @@ class PortalScriptCDP
             $error_text = strtolower($this->exts->extract($this->check_login_failed_selector));
 
             $this->exts->log(__FUNCTION__ . '::Error text: ' . $error_text);
-            if (stripos($error_text, strtolower('Invalid username/email or password. Please try again.')) !== false ) {
+            if (stripos($error_text, strtolower('Invalid Email or password.')) !== false ) {
                 $this->exts->loginFailure(1);
             } else {
                 $this->exts->loginFailure();
@@ -155,18 +150,19 @@ class PortalScriptCDP
     {
         $this->exts->log(__FUNCTION__);
 
-        $this->exts->waitTillPresent('table tbody tr');
+        $this->exts->waitTillPresent('div[class="table billing-history"] div.table-row');
         $this->exts->capture("4-invoices-classic");
 
         $invoices = [];
-        $rows = $this->exts->getElements('table tbody tr');
+        $rows = $this->exts->getElements('div[class="table billing-history"] div.table-row');
         foreach ($rows as $key => $row) {
             $invoiceLink = $this->exts->getElement('a', $row);
             if ($invoiceLink != null) {
                 $invoiceUrl = $invoiceLink->getAttribute("href");
-                $invoiceName = $this->exts->extract('td a', $row);
-                $invoiceDate = $this->exts->extract('td:nth-child(1)', $row);
-                $invoiceAmount = $this->exts->extract('td:nth-child(4)', $row);
+                $parts = explode('/', $invoiceUrl);
+                $invoiceName = end($parts);
+                $invoiceDate = $this->exts->extract('div.attribute-label', $row);
+                $invoiceAmount = $this->exts->extract('span.invoice-value', $row);
 
                 array_push($invoices, array(
                     'invoiceName' => $invoiceName,
@@ -197,15 +193,6 @@ class PortalScriptCDP
             } else {
                 $this->exts->log(__FUNCTION__ . '::No download ' . $invoiceFileName);
             }
-        }
-
-        $restrictPages = isset($this->exts->config_array["restrictPages"]) ? (int)@$this->exts->config_array["restrictPages"] : 3;
-
-        if ($count < $restrictPages && $this->exts->exists('div.paginator-box-footer a i.ff-chevron-right')) {
-            $this->exts->click_by_xdotool('div.paginator-box-footer a i.ff-chevron-right');
-            sleep(7);
-            $count++;
-            $this->downloadInvoices($count);
         }
     }
 }
