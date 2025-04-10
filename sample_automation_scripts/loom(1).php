@@ -838,12 +838,12 @@ class PortalScriptCDP
                 $this->fillGoogleTwoFactor($input_selector, $message_selector, $submit_selector, true);
                 sleep(5);
             }
-        } else if ($this->exts->exists('input#phoneNumberId, input#idvPin')) {
+        } else if ($this->exts->exists('input#phoneNumberId')) {
             // Enter a phone number to receive an SMS with a confirmation code.
             $this->exts->log('Request for 2fa mobile-2');
             $this->exts->capture('mobile-2fa-2');
             $this->exts->two_factor_attempts = 3;
-            $input_selector = 'input#phoneNumberId, input#idvPin';
+            $input_selector = 'input#phoneNumberId';
             $message_selector = '[data-view-id] form section > div > div > div:first-child';
             $submit_selector = '';
             if (isset($this->security_phone_number) && $this->security_phone_number != '') {
@@ -1247,7 +1247,7 @@ class PortalScriptCDP
                     sleep(5);
                     if ($this->exts->getElement('a[href*=".com/invoice"]') != null) {
                         $invoiceName = $this->exts->extract('div.App-InvoiceDetails > table > tbody > tr:nth-child(1) > td:nth-child(2) > span');
-                        $invoiceFileName = $invoiceName . '.pdf';
+                        $invoiceFileName = !empty($invoiceName) ? $invoiceName . '.pdf': '';
 
                         $downloaded_file = $this->exts->click_and_download('button[data-testid="download-invoice-receipt-pdf-button"]', 'pdf', $invoiceFileName);
                         if (trim($downloaded_file) != '' && file_exists($downloaded_file)) {
@@ -1286,7 +1286,7 @@ class PortalScriptCDP
                     }
                     if ($this->exts->getElement('a[href*=".com/invoice"], button[data-testid="download-invoice-receipt-pdf-button"]') != null) {
                         $invoiceName = $this->exts->extract('div.App-InvoiceDetails > table > tbody > tr:nth-child(1) > td:nth-child(2) > span');
-                        $invoiceFileName = $invoiceName . '.pdf';
+                        $invoiceFileName = !empty($invoiceName) ? $invoiceName . '.pdf': '';
 
                         $downloaded_file = $this->exts->click_and_download('button[data-testid="download-invoice-receipt-pdf-button"]', 'pdf', $invoiceFileName);
                         if (trim($downloaded_file) != '' && file_exists($downloaded_file)) {
