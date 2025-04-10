@@ -1,4 +1,4 @@
-<?php
+<?php // i have updated two factor submit button selector
 
 /**
  * Chrome Remote via Chrome devtool protocol script, for specific process/portal
@@ -247,7 +247,7 @@ class PortalScriptCDP
     {
         $two_factor_selector = 'input[autocomplete="one-time-code"], input#code';
         $two_factor_message_selector = 'header p, [class*="loginChallengePage"] > p';
-        $two_factor_submit_selector = 'button[class*="continueButton"], button[type="submit"][data-action-button-primary="true"], button[type="submit"][value="verify"]';
+        $two_factor_submit_selector = 'button[value="continue"], button[class*="continueButton"], button[type="submit"][data-action-button-primary="true"]';
 
         if ($this->exts->querySelector($two_factor_selector) != null && $this->exts->two_factor_attempts < 3) {
             $this->exts->log("Two factor page found.");

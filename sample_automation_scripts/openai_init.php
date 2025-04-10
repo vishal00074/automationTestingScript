@@ -97,12 +97,14 @@ private function initPortal($count)
     if ($this->isLoggedin()) {
         sleep(5);
         $this->exts->log(__FUNCTION__ . '::User logged in');
+        $this->exts->capture("3-login-success");
 
         if (!empty($this->exts->config_array['allow_login_success_request'])) {
             $this->exts->triggerLoginSuccess();
         }
 
         $this->exts->success();
+
     } else {
         $this->exts->log(__FUNCTION__ . '::Use login failed');
 
@@ -177,7 +179,7 @@ private function checkFillTwoFactor()
 {
     $two_factor_selector = 'input[autocomplete="one-time-code"], input#code';
     $two_factor_message_selector = 'header p, [class*="loginChallengePage"] > p';
-    $two_factor_submit_selector = 'button[class*="continueButton"], button[type="submit"][data-action-button-primary="true"], button[type="submit"][value="verify"]';
+    $two_factor_submit_selector = 'button[class*="continueButton"], button[type="submit"][data-action-button-primary="true"], button[type="submit"][value="verify"]button[class*="continueButton"], button[type="submit"][data-action-button-primary="true"], button[type="submit"][value="verify"], button[value="continue"]';
 
     if ($this->exts->querySelector($two_factor_selector) != null && $this->exts->two_factor_attempts < 3) {
         $this->exts->log("Two factor page found.");

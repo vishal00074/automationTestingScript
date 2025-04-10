@@ -774,12 +774,12 @@ private function checkGoogleTwoFactorMethod()
             $this->fillGoogleTwoFactor($input_selector, $message_selector, $submit_selector, true);
             sleep(5);
         }
-    } else if ($this->exts->exists('input#phoneNumberId, input#idvPin')) {
+    } else if ($this->exts->exists('input#phoneNumberId')) {
         // Enter a phone number to receive an SMS with a confirmation code.
         $this->exts->log('Request for 2fa mobile-2');
         $this->exts->capture('mobile-2fa-2');
         $this->exts->two_factor_attempts = 3;
-        $input_selector = 'input#phoneNumberId, input#idvPin';
+        $input_selector = 'input#phoneNumberId';
         $message_selector = '[data-view-id] form section > div > div > div:first-child';
         $submit_selector = '';
         if (isset($this->security_phone_number) && $this->security_phone_number != '') {
