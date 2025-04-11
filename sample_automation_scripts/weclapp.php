@@ -1,4 +1,5 @@
-<?php // migrated script and  added conditionin invoice name is empty and optimized script performance
+<?php // migrated script and  added conditionin invoice name is empty and optimized script performance and updated two fa input selector
+// added trigger loginFailedConfirmed in case two code in invailid
 /**
  * Chrome Remote via Chrome devtool protocol script, for specific process/portal
  *
@@ -62,7 +63,7 @@ class PortalScriptCDP
     public $remember_me_selector = 'form#loginform label[for="user_keep_login"]';
     public $submit_login_selector = 'form#loginform button[type="submit"]';
 
-    public $check_login_failed_selector = '.login-outer-block .error-panel span, .login-block .error-panel span';
+    public $check_login_failed_selector = '.login-outer-block .error-panel span, .login-block .error-panel span,  form#loginform span.text-weclapp-black';
     public $check_login_success_selector = '#headerMyMenu a[id="naviForm:globalLogoutAction"], a[href*="home"], form [id*="selectAccountPanel"]';
 
     public $isNoInvoice = true;
@@ -128,11 +129,15 @@ class PortalScriptCDP
         } else {
             $this->exts->log(__FUNCTION__ . '::Use login failed');
 
+            $isTwoFAFailed = $this->exts->extract('span[id*="loginTwoFactorAuthenticatorPG"] span.rich-messages-label');
+
+            $this->exts->log(__FUNCTION__ . 'isTwoFAFailed ' . $isTwoFAFailed);
+
             if ($this->exts->exists('div[class="error-panel"][style="display: block;"]')) {
 
                 $err_msg1 = $this->exts->extract('div[class="error-panel"][style="display: block;"]');
                 $lowercase_err_msg = strtolower($err_msg1);
-                $substrings = array('e-mail or password wrong', 'wrong', 'e-mail or password');
+                $substrings = array('e-mail or password wrong', 'wrong', 'e-mail or password', 'Login or Password wrong');
                 foreach ($substrings as $substring) {
                     if (strpos($lowercase_err_msg, strtolower($substring)) !== false) {
                         $this->exts->log($err_msg1);
@@ -145,6 +150,8 @@ class PortalScriptCDP
             if ($this->exts->getElement($this->check_login_failed_selector) != null && strpos(strtolower($this->exts->extract($this->check_login_failed_selector, null, 'innerText')), 'passwor') !== false) {
                 $this->exts->loginFailure(1);
             } else if ($this->exts->getElement($this->check_login_failed_selector) != null && strpos(strtolower($this->exts->extract($this->check_login_failed_selector, null, 'innerText')), 'bitte anmeldedaten') !== false) {
+                $this->exts->loginFailure(1);
+            } else if (strpos($isTwoFAFailed, strtolower('The entered 2FA code is incorrect')) !== false) {
                 $this->exts->loginFailure(1);
             } else {
                 $this->exts->loginFailure();
@@ -206,16 +213,16 @@ class PortalScriptCDP
     private function checkFillTwoFactor()
     {
 
-        $two_factor_selector = 'form#loginForm input[name="loginForm:softKey"]';
+        $two_factor_selector = 'input[id="loginForm:twoFactorAuthenticatorCode"]';
         $two_factor_message_selector = 'form#loginForm span[id="loginForm:softTokenRequired"]';
         $two_factor_submit_selector = 'form#loginForm input[name="loginForm:loginButton"]';
         $this->exts->waitTillPresent($two_factor_selector);
 
-        if ($this->exts->getElement($two_factor_selector) != null && $this->exts->two_factor_attempts < 3) {
+        if ($this->exts->querySelector($two_factor_selector) != null && $this->exts->two_factor_attempts < 3) {
             $this->exts->log("Two factor page found.");
             $this->exts->capture("2.1-two-factor");
 
-            if ($this->exts->getElement($two_factor_message_selector) != null) {
+            if ($this->exts->querySelector($two_factor_message_selector) != null) {
                 $this->exts->two_factor_notif_msg_en = "";
                 for ($i = 0; $i < count($this->exts->getElements($two_factor_message_selector)); $i++) {
                     $this->exts->two_factor_notif_msg_en = $this->exts->two_factor_notif_msg_en . $this->exts->getElements($two_factor_message_selector)[$i]->getText() . "\n";
@@ -273,7 +280,7 @@ class PortalScriptCDP
                 $this->isNoInvoice = false;
                 $download_button = $this->exts->getElement('a.ft-pdf', $row);
                 $invoiceName = trim($this->getInnerTextByJS($tags[1]));
-                $invoiceFileName = !empty($invoiceName) ? $invoiceName . '.pdf': '';
+                $invoiceFileName = !empty($invoiceName) ? $invoiceName . '.pdf' : '';
                 $invoiceDate = trim(explode(' -', $this->getInnerTextByJS($tags[2]))[0]);
                 $invoiceAmount = trim(preg_replace('/[^\d\.\,]/', '', $this->getInnerTextByJS($tags[4]))) . ' EUR';
                 $this->isNoInvoice = false;

@@ -1,4 +1,4 @@
-<?php // remove undefined variable support_restart  added code for retry otp if invalid otp first time and trigger login failed confirm in otp is invalid in 2nd attempt 
+<?php // remove undefined variable support_restart  added code for retry otp if invalid otp first time and trigger login failed confirm in otp is invalid in 2nd attempt  added no_invoice check 
 /**
  * Chrome Remote via Chrome devtool protocol script, for specific process/portal
  *
@@ -200,10 +200,20 @@ class PortalScriptCDP
             // retry otp in code is invalid
             if (
                 stripos($this->exts->extract('#auth-error-message-box .a-alert-content, #invalid-otp-code-message', null, 'innerText'), "Le code que vous avez saisi n'est pas valide. Veuillez réessayer.") !== false ||
-                stripos($this->exts->extract('#auth-error-message-box .a-alert-content, #invalid-otp-code-message', null, 'innerText'), "The code you entered is invalid. Please try again.") !== false
+                stripos($this->exts->extract('#auth-error-message-box .a-alert-content, #invalid-otp-code-message', null, 'innerText'), "The code you entered is invalid. Please try again.") !== false ||
+                stripos($this->exts->extract('div#invalid-otp-code-message', null, 'innerText'), "Le code que vous avez saisi n'est pas valide. Veuillez vérifiez le code et réessayez.") !== false
             ) {
-                $this->exts->moveToElementAndClick('a#auth-get-new-otp-link');
-                sleep(5);
+                if ($this->exts->exists('a#auth-get-new-otp-link')) {
+                    $this->exts->moveToElementAndClick('a#auth-get-new-otp-link');
+                    sleep(5);
+                }
+
+                if ($this->exts->exists('div#invalid-otp-code-message')) {
+                    sleep(5);
+                    $this->exts->waitTillPresent('a[class="a-link-normal"]#resend-approval-link', 25);
+                    $this->exts->moveToElementAndClick('a[class="a-link-normal"]#resend-approval-link');
+                    sleep(5);
+                }
                 $this->checkFillTwoFactor();
             }
 
@@ -225,17 +235,17 @@ class PortalScriptCDP
                 $this->exts->openUrl($this->orderPageUrl);
             }
             sleep(5);
-
-            $this->exts->success();
             $this->exts->capture("LoginSuccess");
 
             $this->processAfterLogin(0);
+            $this->exts->success();
         } else {
             if ($this->isIncorrectCredential() || $this->exts->exists('div#auth-email-invalid-claim-alert')) {
                 $this->exts->loginFailure(1);
             } else if (
                 stripos($this->exts->extract('#auth-error-message-box .a-alert-content, #invalid-otp-code-message', null, 'innerText'), "Le code que vous avez saisi n'est pas valide. Veuillez réessayer.") !== false ||
-                stripos($this->exts->extract('#auth-error-message-box .a-alert-content, #invalid-otp-code-message', null, 'innerText'), "The code you entered is invalid. Please try again.") !== false
+                stripos($this->exts->extract('#auth-error-message-box .a-alert-content, #invalid-otp-code-message', null, 'innerText'), "The code you entered is invalid. Please try again.") !== false ||
+                stripos($this->exts->extract('div#invalid-otp-code-message', null, 'innerText'), "Le code que vous avez saisi n'est pas valide. Veuillez vérifiez le code et réessayez.") !== false
             ) {
                 $this->exts->loginFailure(1);
             }
@@ -2292,21 +2302,7 @@ class PortalScriptCDP
                         sleep(1);
                     }
 
-                    // if(!$this->exts->exists('.aba-widget-box.reports-widget .a-row:nth-child(2) .a-column:nth-child(2) a.a-link-normal')) {
-                    //     $this->exts->click_by_xdotool('.b2b-aba-statement-header .b2b-aba-statement-list .b2b-navtab:nth-child(1) a .tabClick');
-                    //     sleep(10);
-                    // }
 
-                    // if($this->exts->exists('.aba-widget-box.reports-widget .a-row:nth-child(2) .a-column:nth-child(2) a.a-link-normal')) {
-                    //     $this->exts->click_by_xdotool('.aba-widget-box.reports-widget .a-row:nth-child(2) .a-column:nth-child(2) a.a-link-normal');
-                    //     sleep(10);
-                    // } else {
-                    //     $this->exts->click_by_xdotool('.b2b-aba-statement-header .b2b-aba-statement-list .b2b-navtab:nth-child(3) a .b2b-report-menu-container');
-                    //     sleep(1);
-
-                    //     $this->exts->click_by_xdotool('.a-popover .reports-menu-options li:nth-child(2) a.report-option');
-                    //     sleep(10);
-                    // }
                     // Click Order report
                     if ($this->exts->exists('a.nav-link[href*="/b2b/aba/"]')) {
                         $url = $this->exts->querySelector('li.report-nav-item a[href*="/b2b/aba/reports?reportType=items_report_1"]')->getAttribute('href');
@@ -2343,24 +2339,24 @@ class PortalScriptCDP
                         $this->download_procurment_document(1);
                         //This only needed if we need to select custom date
                         /*if($this->exts->exists('.react-datepicker__input-container input')) {
-          $this->exts->querySelectorAll('.react-datepicker__input-container input')[0]->click();
-          sleep(1);
+                            $this->exts->querySelectorAll('.react-datepicker__input-container input')[0]->click();
+                            sleep(1);
 
-          $this->exts->click_by_xdotool('.react-datepicker-popper a.react-datepicker__navigation--previous');
-          sleep(1);
+                            $this->exts->click_by_xdotool('.react-datepicker-popper a.react-datepicker__navigation--previous');
+                            sleep(1);
 
-          $today_day = (int)date('d');
+                            $today_day = (int)date('d');
 
-          $this->exts->click_by_xdotool('.react-datepicker-popper .react-datepicker__month .react-datepicker__week [aria-label="day-'.$today_day.'"]:not(.react-datepicker__day--outside-month)');
-          sleep(1);
+                            $this->exts->click_by_xdotool('.react-datepicker-popper .react-datepicker__month .react-datepicker__week [aria-label="day-'.$today_day.'"]:not(.react-datepicker__day--outside-month)');
+                            sleep(1);
 
-          $this->exts->click_by_xdotool('.submit-button');
-          sleep(15);
+                            $this->exts->click_by_xdotool('.submit-button');
+                            sleep(15);
 
-          if($this->exts->exists('.report-table .column:nth-child(3) [class*="cell-row-"]')) {
-              $this->download_procurment_document();
-          }
-      }*/
+                            if($this->exts->exists('.report-table .column:nth-child(3) [class*="cell-row-"]')) {
+                                $this->download_procurment_document();
+                            }
+                        }*/
                     }
                 } else {
                     $this->exts->log('PROCUREMENT_ANALYSIS URL ELEMENT NOT FOUND');
@@ -2393,7 +2389,9 @@ class PortalScriptCDP
                 $this->triggerMsgInvoice();
             }
 
-            $this->exts->success();
+            if ($this->exts->document_counter == 0) {
+                $this->exts->no_invoice();
+            }
         }
     }
 
@@ -2579,7 +2577,8 @@ class PortalScriptCDP
                             $this->exts->log('order_invoice_name: ' . $order_invoice_name);
                             $this->exts->log('order_invoice_url: ' . $order_invoice_url);
 
-                            $invoiceFileName = $order_invoice_name . '.pdf';
+                            $invoiceFileName = !empty($order_invoice_name) ? $order_invoice_name . '.pdf' : '';
+
                             $downloaded_file = $this->exts->direct_download($order_invoice_url, 'pdf', $invoiceFileName);
                             if (trim($downloaded_file) != '' && file_exists($downloaded_file)) {
                                 //This is needed by system to not check overview as invoice and bypass overview number in system
@@ -3873,10 +3872,10 @@ class PortalScriptCDP
                         $tempArr = explode("orderID=", $currentUrl);
                         $tempArr = explode('&', end($tempArr));
                         $orderNum = trim($tempArr[0]);
-                        $filename = !empty($orderNum) ? $orderNum . '.pdf': '';
+                        $filename = !empty($orderNum) ? $orderNum . '.pdf' : '';
                     } else {
                         $orderNum = trim(end(explode("#", $this->exts->extract('b.h1'))));
-                        $filename = !empty($orderNum) ? $orderNum . '.pdf': '';
+                        $filename = !empty($orderNum) ? $orderNum . '.pdf' : '';
                     }
                     sleep(5);
                     $downloaded_file = $this->exts->download_current($filename, 5);
@@ -4061,7 +4060,7 @@ class PortalScriptCDP
                 $this->exts->log('invoiceAmount: ' . $invoiceAmount);
                 $this->exts->log('invoiceUrl: ' . $invoiceUrl);
 
-                $invoiceFileName = !empty($invoiceName) ? $invoiceName . '.pdf': '';
+                $invoiceFileName = !empty($invoiceName) ? $invoiceName . '.pdf' : '';
                 $invoiceDate = $this->exts->parse_date($invoiceDate, 'd. F Y', 'Y-m-d');
                 $this->exts->log('Date parsed: ' . $invoiceDate);
 
@@ -4155,7 +4154,7 @@ class PortalScriptCDP
                                         if (trim($invoice_name) == "") {
                                             $invoice_name = $inv_msg['msg_id'];
                                         }
-                                        $filename = !empty($invoice_name) ? $invoice_name . ".pdf": '';
+                                        $filename = !empty($invoice_name) ? $invoice_name . ".pdf" : '';
 
                                         $invoice_url = $invoice_data['invoice_url'];
                                         if (trim($invoice_url) != "" && stripos($invoice_url, "https://www.amazon.fr") === false && stripos($invoice_url, "https://") === false) {
@@ -4291,7 +4290,7 @@ class PortalScriptCDP
                             if (stripos($downloadLink, '/b2b/aba/order-summary/') !== false) {
                                 if (trim($orderNum) !== '' && !$this->exts->invoice_exists($orderNum) && !$this->invoice_overview_exists($orderNum)) {
                                     $invoice_name = $orderNum;
-                                    $fileName = !empty($orderNum) ? $orderNum . '.pdf': '';
+                                    $fileName = !empty($orderNum) ? $orderNum . '.pdf' : '';
 
                                     // Open New window To process Invoice
                                     $this->exts->openNewTab($downloadLink);
