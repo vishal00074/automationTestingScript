@@ -2676,7 +2676,7 @@ class PortalScriptCDP
                                             $detailPageUrl = "https://www.amazon.fr" . trim($detailPageUrl);
                                         }
 
-                                        $filename = trim($invoice_number) . ".pdf";
+                                        $filename = !empty($invoice_number) ? trim($invoice_number) . ".pdf" : '';
 
                                         //Stop Downloading invoice if invoice is older than 90 days. 45*24 = 1080
                                         /*if($this->last_invoice_date != "" && !empty($this->last_invoice_date)) {
@@ -2983,7 +2983,7 @@ class PortalScriptCDP
                                                         if (trim($invoice_url) != "") {
                                                             if ($invoicePrefix > 0) {
                                                                 $item_invoice_number = $item_invoice_number . "-" . $invoicePrefix;
-                                                                $filename = $item_invoice_number . ".pdf";
+                                                                $filename = !empty($item_invoice_number) ?  $item_invoice_number . ".pdf" : '';
                                                             }
 
                                                             if (stripos($invoice_url, "https://www.amazon.fr") === false && stripos($invoice_url, "https://") === false) {
@@ -3472,7 +3472,7 @@ class PortalScriptCDP
 
                     $filename = "";
                     if (trim($invoiceDate) != "") {
-                        $filename = trim($invoiceDate) . ".pdf";
+                        $filename = !empty($invoiceDate) ? trim($invoiceDate) . ".pdf" : '';
                     }
                     $downloaded_file = $this->exts->direct_download($invoice_url, "pdf", $filename);
                     if (trim($downloaded_file) != "" && file_exists($downloaded_file)) {
@@ -3568,7 +3568,7 @@ class PortalScriptCDP
 
                     $filename = "";
                     if (trim($invoiceDate) != "") {
-                        $filename = trim($invoiceDate) . ".pdf";
+                        $filename = !empty($invoiceDate) ? trim($invoiceDate) . ".pdf" : '';
                     }
 
                     $currentUrl = $this->exts->getUrl();
@@ -3873,10 +3873,10 @@ class PortalScriptCDP
                         $tempArr = explode("orderID=", $currentUrl);
                         $tempArr = explode('&', end($tempArr));
                         $orderNum = trim($tempArr[0]);
-                        $filename = $orderNum . '.pdf';
+                        $filename = !empty($orderNum) ? $orderNum . '.pdf': '';
                     } else {
                         $orderNum = trim(end(explode("#", $this->exts->extract('b.h1'))));
-                        $filename = $orderNum . '.pdf';
+                        $filename = !empty($orderNum) ? $orderNum . '.pdf': '';
                     }
                     sleep(5);
                     $downloaded_file = $this->exts->download_current($filename, 5);
@@ -4061,7 +4061,7 @@ class PortalScriptCDP
                 $this->exts->log('invoiceAmount: ' . $invoiceAmount);
                 $this->exts->log('invoiceUrl: ' . $invoiceUrl);
 
-                $invoiceFileName = $invoiceName . '.pdf';
+                $invoiceFileName = !empty($invoiceName) ? $invoiceName . '.pdf': '';
                 $invoiceDate = $this->exts->parse_date($invoiceDate, 'd. F Y', 'Y-m-d');
                 $this->exts->log('Date parsed: ' . $invoiceDate);
 
@@ -4155,7 +4155,7 @@ class PortalScriptCDP
                                         if (trim($invoice_name) == "") {
                                             $invoice_name = $inv_msg['msg_id'];
                                         }
-                                        $filename = $invoice_name . ".pdf";
+                                        $filename = !empty($invoice_name) ? $invoice_name . ".pdf": '';
 
                                         $invoice_url = $invoice_data['invoice_url'];
                                         if (trim($invoice_url) != "" && stripos($invoice_url, "https://www.amazon.fr") === false && stripos($invoice_url, "https://") === false) {
@@ -4291,7 +4291,7 @@ class PortalScriptCDP
                             if (stripos($downloadLink, '/b2b/aba/order-summary/') !== false) {
                                 if (trim($orderNum) !== '' && !$this->exts->invoice_exists($orderNum) && !$this->invoice_overview_exists($orderNum)) {
                                     $invoice_name = $orderNum;
-                                    $fileName = $orderNum . '.pdf';
+                                    $fileName = !empty($orderNum) ? $orderNum . '.pdf': '';
 
                                     // Open New window To process Invoice
                                     $this->exts->openNewTab($downloadLink);
