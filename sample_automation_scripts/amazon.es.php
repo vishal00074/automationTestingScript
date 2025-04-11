@@ -56,10 +56,7 @@ class PortalScriptCDP
             echo 'Script execution failed.. ' . "\n";
         }
     }
-
-    // Server-Portal-ID: 10251 - Last modified: 22.01.2025 14:13:29 UTC - User: 1
-
-    /*Define constants used in script*/
+    
     public $baseUrl = "https://www.amazon.es";
     public $orderPageUrl = "https://www.amazon.es/gp/css/order-history/ref=nav_youraccount_orders";
     public $messagePageUrl = "https://www.amazon.es/gp/message?e=UTF8&cl=1&ref_=ya_d_l_msg_center#!/inbox";
