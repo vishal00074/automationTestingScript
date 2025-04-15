@@ -1,4 +1,4 @@
-<?php // remove undefined variable support_restart  added code for retry otp if invalid otp first time and trigger login failed confirm in otp is invalid in 2nd attempt  added no_invoice check 
+<?php // updated pagination selector in processYears function 
 /**
  * Chrome Remote via Chrome devtool protocol script, for specific process/portal
  *
@@ -2499,7 +2499,9 @@ class PortalScriptCDP
         foreach ($optionSelectors as $optionSelector) {
             $this->exts->log("processing year  " . $optionSelector);
 
-            if ($this->dateLimitReached == 1) break;
+            if ($this->dateLimitReached == 1) {
+                break;
+            }
 
             // In restart mode, process only those years which is not processed yet
             if ($this->exts->docker_restart_counter > 0 && !empty($this->last_state['years']) && in_array($optionSelector, $this->last_state['years'])) {
@@ -2547,13 +2549,21 @@ class PortalScriptCDP
             }
 
             $this->exts->waitTillPresent("div.a-box-group.a-spacing-base.order, .order-card", 30);
-            // $this->exts->capture("invoice pagination-".$optionSelector."-".$key1);
+
             if (!$this->exts->exists("div.a-box-group.a-spacing-base.order, .order-card")) {
                 sleep(15);
             }
+            $totalPages = 100;
+            if ($this->exts->exists('.a-pagination li#paginationButton')) {
+                $totalPages = count($this->exts->getElements('.a-pagination li#paginationButton'));
+            }
+            $this->exts->log('Total-order-pages:: ' . $totalPages);
+
             $this->exts->capture('order-page');
-            for ($paging_count = 1; $paging_count < 100; $paging_count++) {
+            for ($paging_count = 1; $paging_count < $totalPages; $paging_count++) {
+                sleep(5);
                 if ($this->exts->exists('.order-card a[href*="/ajax/invoice/"]')) {
+
                     // Huy added this 2023-01
                     $count_order_card = count($this->exts->querySelectorAll('.order-card a[href*="/ajax/invoice/"]'));
                     $order_invoices = [];
@@ -3293,11 +3303,55 @@ class PortalScriptCDP
                         }
                         sleep(2);
                     }
+                } else if ($this->exts->querySelector('a[href*="/vps/pslip/ref"]') != null) {
+                    $this->exts->capture('print-orders');
+                    sleep(5);
+                    $invoices = [];
+                    $rows = $this->exts->getElements('div#yourOrderHistorySection div#orderCard');
+                    foreach ($rows as $key => $row) {
+                        $invoiceLink = $this->exts->getElement('a[href*="/vps/pslip/ref"]', $row);
+                        if ($invoiceLink != null) {
+                            $invoiceUrl = $invoiceLink->getAttribute("href");
+                            preg_match('/orderId=([0-9\-]+)/', $invoiceUrl, $matches);
+                            $invoiceName = isset($matches[1]) ?  $matches[1] : '';
+                            $invoiceDate = '';
+                            $invoiceAmount = $this->exts->extract('span[class*="price"]', $row);
+
+                            array_push($invoices, array(
+                                'invoiceName' => $invoiceName,
+                                'invoiceDate' => $invoiceDate,
+                                'invoiceAmount' => $invoiceAmount,
+                                'invoiceUrl' => $invoiceUrl,
+                            ));
+                            $this->isNoInvoice = false;
+                        }
+                    }
+
+                    $this->exts->log('Invoices found: ' . count($invoices));
+                    foreach ($invoices as $invoice) {
+                        $this->exts->log('--------------------------');
+                        $this->exts->log('invoiceName: ' . $invoice['invoiceName']);
+                        $this->exts->log('invoiceDate: ' . $invoice['invoiceDate']);
+                        $this->exts->log('invoiceAmount: ' . $invoice['invoiceAmount']);
+                        $this->exts->log('invoiceUrl: ' . $invoice['invoiceUrl']);
+
+                        $invoiceFileName = !empty($invoice['invoiceName']) ?  $invoice['invoiceName'] . '.pdf' : '';
+                        $invoice['invoiceDate'] = $this->exts->parse_date($invoice['invoiceDate'], 'd.m.Y', 'Y-m-d');
+                        $this->exts->log('Date parsed: ' . $invoice['invoiceDate']);
+
+                        $downloaded_file = $this->exts->direct_download($invoice['invoiceUrl'], 'pdf', $invoiceFileName);
+                        if (trim($downloaded_file) != '' && file_exists($downloaded_file)) {
+                            $this->exts->new_invoice($invoice['invoiceName'], $invoice['invoiceDate'], $invoice['invoiceAmount'], $invoiceFileName);
+                            sleep(1);
+                        } else {
+                            $this->exts->log(__FUNCTION__ . '::No download ' . $invoiceFileName);
+                        }
+                    }
                 }
 
-                if ($this->exts->exists('.a-pagination li.a-selected + li:not(.a-disabled) a')) {
+                if ($this->exts->exists('.a-pagination a[href="#pagination/next/"]')) {
                     $this->exts->log('NEXT page ' . $paging_count);
-                    $this->exts->click_by_xdotool('.a-pagination li.a-selected + li:not(.a-disabled) a');
+                    $this->exts->click_by_xdotool('.a-pagination a[href="#pagination/next/"]');
                     sleep(10);
                 } else {
                     break;
