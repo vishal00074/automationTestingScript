@@ -608,7 +608,7 @@ class PortalScriptCDP
             $this->exts->log('invoiceDate: ' . $invoiceDate);
             $this->exts->log('invoiceAmount: ' . $invoiceAmount);
             $this->exts->log('invoiceUrl: ' .  $invoiceUrl);
-            $invoiceFileName =  $invoiceName . '.pdf';
+            $invoiceFileName = !empty($invoiceName) ? $invoiceName . '.pdf': '';
             $invoiceDate = $this->exts->parse_date($invoiceDate, 'd.m.Y', 'Y-m-d');
             $this->exts->log('Date parsed: ' .  $invoiceDate);
 

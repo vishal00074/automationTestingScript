@@ -1,4 +1,4 @@
-<?php
+<?php // updated login username and password selector code and trigger loginFailedConfirmed in case incorrect credentails.
 
 /**
  * Chrome Remote via Chrome devtool protocol script, for specific process/portal
@@ -58,7 +58,6 @@ class PortalScriptCDP
     }
 
     // Server-Portal-ID: 1246704 - Last modified: 07.04.2025 14:03:36 UTC - User: 1
-
     public $baseUrl = 'https://easyaccess.o2business.de/';
     public $loginUrl = 'https://easyaccess.o2business.de/eCare/s/Rechnungsubersicht';
     public $invoicePageUrl = 'https://easyaccess.o2business.de/eCare/s/Rechnungsubersicht';
@@ -109,50 +108,12 @@ class PortalScriptCDP
             $this->exts->log(__FUNCTION__ . '::User logged in');
             $this->exts->capture("3-login-success");
 
-            // $this->exts->waitTillPresent('[data-region-name="contentComponent"] button.form-button', 10);
-            // if ($this->exts->getElement('[data-region-name="contentComponent"] button.form-button') == null) {
-            //     sleep(10);
-            // }
-
 
             $this->exts->type_key_by_xdotool("ctrl+l");
             sleep(5);
             $this->exts->type_text_by_xdotool($this->invoicePageUrl);
 
             sleep(5);
-
-            // try {
-            //     // $selectAccountElement = $this->exts->getElement('[data-region-name="contentComponent"] select option[value="Alle"]');
-            //     // $selectAccountElement->click();
-            //     $this->exts->moveToElementAndClick('[data-region-name="contentComponent"] select option[value="Alle"]');
-            //     sleep(2);
-            // } catch (\Exception $exception) {
-            //     $this->exts->log('ERROR in slecting all customer ' . $exception->getMessage());
-            // }
-
-
-
-            // $this->exts->waitTillPresent('[data-region-name="contentComponent"] button.form-button:nth-child(1)', 30);
-            // $this->exts->moveToElementAndClick('[data-region-name="contentComponent"] button.form-button:nth-child(1)');
-
-            // for ($i = 0; $i < 20; $i++) {
-            //     $this->exts->type_key_by_xdotool("Tab");
-            //     sleep(1);
-            // }
-            // $this->exts->type_key_by_xdotool("Return");
-            // sleep(10);
-            // $this->exts->type_key_by_xdotool("Tab");
-            // $this->exts->type_key_by_xdotool("Return");
-
-            // for ($i = 0; $i < 6; $i++) {
-            //     $this->exts->type_key_by_xdotool("Tab");
-            //     sleep(1);
-            // }
-            // $this->exts->type_key_by_xdotool("Return");
-
-            // $this->processBilling(1);
-
-
             // Select 1 Year Back date
             $this->exts->click_by_xdotool('select[name="input1"]');
             sleep(2);
@@ -203,7 +164,7 @@ class PortalScriptCDP
         $this->exts->log("Enter Username");
         $this->exts->execute_javascript("
         var input = document
-                    .querySelector('div[data-aura-rendered-by=\"780:0\"] lightning-input')
+                    .querySelector('div[data-aura-rendered-by] lightning-input')
                     ?.shadowRoot?.querySelector('lightning-primitive-input-simple')
                     ?.shadowRoot?.querySelector('input[type=\"text\"]') || null;
                     
@@ -218,7 +179,7 @@ class PortalScriptCDP
         $this->exts->log("Enter Password");
         $this->exts->execute_javascript("
         var input = document
-                    .querySelector('div[data-aura-rendered-by=\"788:0\"] lightning-input')
+                    .querySelector('div[data-aura-rendered-by]:nth-child(2) lightning-input')
                     ?.shadowRoot?.querySelector('lightning-primitive-input-simple')
                     ?.shadowRoot?.querySelector('input[type=\"password\"]') || null;
                     

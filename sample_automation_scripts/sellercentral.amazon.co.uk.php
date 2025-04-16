@@ -1,4 +1,4 @@
-<?php // added selector on otpscreen to trigger loginFailedConfirmed 
+<?php // updated login code
 
 /**
  * Chrome Remote via Chrome devtool protocol script, for specific process/portal
@@ -213,15 +213,15 @@ class PortalScriptCDP
                     sleep(10);
                     $target_selection = $this->exts->getElementByText('button.full-page-account-switcher-account-details', ['United Kingdom'], null, true);
                 }
-    
+
                 if ($target_selection == null) {
                     $target_selection = $this->exts->getElementByText('button.full-page-account-switcher-account-details', ['Regno Unito'], null, true);
                 }
-    
+
                 if ($target_selection == null) {
                     $target_selection = $this->exts->getElementByText('button.full-page-account-switcher-account-details', ['Royaume-Uni'], null, true);
                 }
-    
+
                 if ($target_selection == null && count($this->exts->getElements('button.full-page-account-switcher-account-details')) > 1) { // If do not found, get default picker
                     $target_selection = $this->exts->getElements('button.full-page-account-switcher-account-details')[1];
                 }
@@ -272,8 +272,8 @@ class PortalScriptCDP
     }
     private function checkFillLogin()
     {
-        $this->exts->waitTillPresent($this->username_selector);
-        if ($this->exts->exists($this->username_selector)) {
+        $this->exts->waitTillAnyPresent([$this->username_selector, $this->password_selector]);
+        if ($this->exts->querySelector($this->username_selector) != null || $this->exts->querySelector($this->password_selector) != null) {
             sleep(3);
             $this->exts->capture("2-login-page");
 

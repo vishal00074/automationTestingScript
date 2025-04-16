@@ -83,30 +83,29 @@ private function checkFillLoginUndetected()
     $this->exts->log("Enter Username");
     $this->exts->execute_javascript("
     var input = document
-                .querySelector('div[data-aura-rendered-by=\"780:0\"] lightning-input')
+                .querySelector('div[data-aura-rendered-by] lightning-input')
                 ?.shadowRoot?.querySelector('lightning-primitive-input-simple')
                 ?.shadowRoot?.querySelector('input[type=\"text\"]') || null;
                 
-    if (input) {
-        input.value = '" . $this->username . "';
-        input.dispatchEvent(new Event('input', { bubbles: true, composed: true }));
-    }
-");
+        if (input) {
+            input.value = '" . $this->username . "';
+            input.dispatchEvent(new Event('input', { bubbles: true, composed: true }));
+        }
+    ");
 
     sleep(1);
-
     $this->exts->log("Enter Password");
     $this->exts->execute_javascript("
     var input = document
-                .querySelector('div[data-aura-rendered-by=\"788:0\"] lightning-input')
+                .querySelector('div[data-aura-rendered-by]:nth-child(2) lightning-input')
                 ?.shadowRoot?.querySelector('lightning-primitive-input-simple')
                 ?.shadowRoot?.querySelector('input[type=\"password\"]') || null;
                 
     if (input) {
-        input.value = '" . $this->password . "';
-        input.dispatchEvent(new Event('input', { bubbles: true, composed: true }));
-    }
-");
+            input.value = '" . $this->password . "';
+            input.dispatchEvent(new Event('input', { bubbles: true, composed: true }));
+        }
+    ");
 
     $this->exts->capture('2-Form-Filled');
     sleep(5);

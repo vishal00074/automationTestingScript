@@ -3,7 +3,7 @@ public $loginUrl = "https://client.canal.fr/";
 public $homePageUrl = "https://client.canal.fr/abonnement/";
 public $username_selector = 'input[name="identifier"]';
 public $password_selector = 'input[name="credentials.passcode"][type="password"]';
-public $submit_button_selector = 'input[type="submit"]';
+public $submit_button_selector = 'form input[type="submit"]:not(:disabled)';
 public $month_names_fr = array('janvier', 'février', 'mars', 'avril', 'mai', 'juin', 'juillet', 'août', 'septembre', 'octobre', 'novembre', 'décembre');
 public $login_tryout = 0;
 public $restrictPages = 3;
@@ -97,7 +97,7 @@ function fillForm($count)
             $this->exts->moveToElementAndType($this->password_selector, $this->password);
             sleep(2);
 
-            $this->exts->click_by_xdotool($this->submit_button_selector);
+            $this->exts->moveToElementAndClick($this->submit_button_selector);
 
             sleep(8);
         }

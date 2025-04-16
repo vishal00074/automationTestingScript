@@ -665,6 +665,10 @@ class PortalScriptCDP
             if ($this->exts->execute_javascript("document.querySelector('header#o-header elcos-header').shadowRoot.querySelector('button[data-oevent-action=\"espaceclient\"]') != null") == true) {
                 $isLoggedIn = true;
             }
+
+            if ($this->exts->execute_javascript('!!document.querySelector("header elcos-header")?.shadowRoot?.querySelector("div#header-identity-panel")')) {
+                $isLoggedIn = true;
+            }
         } catch (Exception $exception) {
             $this->exts->log("Exception checking loggedin " . $exception);
         }
@@ -1037,7 +1041,7 @@ class PortalScriptCDP
                         $receiptName = $this->exts->extract('td a[href*="&idFacture="] span.ec_visually_hidden', $receipt);
                         $receiptName = trim(explode("(", end(explode(" du ", $receiptName)))[0]);
                         $receiptName = $idContrat . '_' . str_replace('/', '', $receiptName);
-                        $receiptFileName = $receiptName . '.pdf';
+                        $receiptFileName = !empty($receiptName) ? $receiptName . '.pdf': '';
                         $parsed_date = $this->exts->parse_date($receiptDate, 'j M Y', 'Y-m-d');
                         $receiptAmount = $tags[1]->getAttribute('innerText');
                         $receiptAmount = preg_replace('/[^\d\.,]/m', '', $receiptAmount) . 'EUR';
@@ -1121,7 +1125,7 @@ class PortalScriptCDP
                     $invoiceName = explode('(', $invoiceName)[0];
                     $invoiceName = preg_replace("/[^\w\-]/", '', $invoiceName);
                     $this->exts->log('Final invoice name: ' . $invoiceName);
-                    $invoiceFileName = $invoiceName . '.pdf';
+                    $invoiceFileName = !empty($invoiceName) ? $invoiceName . '.pdf': '';
                     @rename($downloaded_file, $this->exts->config_array['download_folder'] . $invoiceFileName);
 
                     // Download invoice if it not exisited
@@ -1189,7 +1193,7 @@ class PortalScriptCDP
                         $receiptUrl = "div#bill-archive div#historical-bills-container div.bill-separation.row div a.bill-link#invoice" . $i;
                         $idContrat = trim(explode("/", end(explode("/contract/", $currentURL)))[0]);
                         $receiptName = $idContrat . "_" . str_replace(" ", "", $receiptDate);
-                        $receiptFileName = $receiptName . '.pdf';
+                        $receiptFileName = !empty($receiptName) ? $receiptName . '.pdf': '';
                         $this->exts->log($receiptName);
                         $this->exts->log($receiptFileName);
                         $this->exts->log($receiptUrl);
@@ -1286,7 +1290,7 @@ class PortalScriptCDP
                         $invoiceName = explode('(', $invoiceName)[0];
                         $invoiceName = str_replace(' ', '', $invoiceName);
                         $this->exts->log('Final invoice name: ' . $invoiceName);
-                        $invoiceFileName = $invoiceName . '.pdf';
+                        $invoiceFileName = !empty($invoiceName) ? $invoiceName . '.pdf': '';
                         @rename($downloaded_file, $this->exts->config_array['download_folder'] . $invoiceFileName);
 
                         if ($this->exts->invoice_exists($invoiceName)) {
@@ -1348,7 +1352,7 @@ class PortalScriptCDP
             }
             $invoiceName = trim(explode('/', end(explode('/contracts/', $this->exts->getUrl())))[0]) . str_replace(' ', '', $invoiceDate);
             $invoiceAmount = trim(preg_replace('/[^\d\.\,]/', '', $this->exts->extract('div.latest-bill span.bill-price', null, 'innerText'))) . ' EUR';
-            $invoiceFileName = $invoiceName . '.pdf';
+            $invoiceFileName = !empty($invoiceName) ? $invoiceName . '.pdf': '';
             $this->isNoInvoice = false;
 
             $this->exts->log('--------------------------');
@@ -1392,7 +1396,7 @@ class PortalScriptCDP
                     $invoiceDate = $this->exts->translate_date_abbr(strtolower($invoiceDate));
                     $invoiceName = trim(explode('/', end(explode('/facture-paiement/', $invoice_url)))[0]) . str_replace(' ', '', $invoiceDate);
                     $invoiceAmount = '';
-                    $invoiceFileName = $invoiceName . '.pdf';
+                    $invoiceFileName = !empty($invoiceName) ? $invoiceName . '.pdf': '';
                     $this->isNoInvoice = false;
 
                     $this->exts->log('--------------------------');
@@ -1448,7 +1452,7 @@ class PortalScriptCDP
                     $invoiceName = trim(explode('/', end(explode('/contracts/', $this->exts->getUrl())))[0]) . str_replace(' ', '', $invoiceDate);
                 }
                 $invoiceAmount = trim(preg_replace('/[^\d\.\,]/', '', $this->exts->extract('.bill-amount', $row, 'innerText'))) . ' EUR';
-                $invoiceFileName = $invoiceName . '.pdf';
+                $invoiceFileName = !empty($invoiceName) ? $invoiceName . '.pdf': '';
                 $this->isNoInvoice = false;
 
                 $this->exts->log('--------------------------');
@@ -1502,7 +1506,7 @@ class PortalScriptCDP
                     $invoiceName = trim(explode('/', end(explode('/contracts/', $this->exts->getUrl())))[0]) . str_replace(' ', '', $invoiceDate);
                 }
                 $invoiceAmount = trim(preg_replace('/[^\d\.\,]/', '', $this->exts->extract('.ht-numb', $row, 'innerText'))) . ' EUR';
-                $invoiceFileName = $invoiceName . '.pdf';
+                $invoiceFileName = !empty($invoiceName) ? $invoiceName . '.pdf': '';
                 $this->isNoInvoice = false;
 
                 $this->exts->log('--------------------------');
@@ -1556,7 +1560,7 @@ class PortalScriptCDP
                     $invoiceName = trim(explode('/', end(explode('/contracts/', $this->exts->getUrl())))[0]) . str_replace(' ', '', $invoiceDate);
                 }
                 $invoiceAmount = trim(preg_replace('/[^\d\.\,]/', '', $this->exts->extract('a div.item-container div.amount', $row, 'innerText'))) . ' EUR';
-                $invoiceFileName = $invoiceName . '.pdf';
+                $invoiceFileName = !empty($invoiceName) ? $invoiceName . '.pdf': '';
                 $this->isNoInvoice = false;
 
                 $this->exts->log('--------------------------');

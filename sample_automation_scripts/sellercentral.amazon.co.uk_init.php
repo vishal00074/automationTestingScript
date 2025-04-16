@@ -208,8 +208,8 @@ private function initPortal($count)
 }
 private function checkFillLogin()
 {
-    $this->exts->waitTillPresent($this->username_selector);
-    if ($this->exts->exists($this->username_selector)) {
+    $this->exts->waitTillAnyPresent([$this->username_selector, $this->password_selector]);
+    if ($this->exts->querySelector($this->username_selector) != null || $this->exts->querySelector($this->password_selector) != null) {
         sleep(3);
         $this->exts->capture("2-login-page");
 

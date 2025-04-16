@@ -1,4 +1,4 @@
-<?php // i have updated the before login code and optimized secript performance i have added condition to handle empty invoice name
+<?php //  updated submit button selector and download code
 /**
  * Chrome Remote via Chrome devtool protocol script, for specific process/portal
  *
@@ -61,7 +61,7 @@ class PortalScriptCDP
     public $homePageUrl = "https://client.canal.fr/abonnement/";
     public $username_selector = 'input[name="identifier"]';
     public $password_selector = 'input[name="credentials.passcode"][type="password"]';
-    public $submit_button_selector = 'input[type="submit"]';
+    public $submit_button_selector = 'form input[type="submit"]:not(:disabled)';
     public $month_names_fr = array('janvier', 'février', 'mars', 'avril', 'mai', 'juin', 'juillet', 'août', 'septembre', 'octobre', 'novembre', 'décembre');
     public $login_tryout = 0;
     public $restrictPages = 3;
@@ -156,7 +156,7 @@ class PortalScriptCDP
                 $this->exts->moveToElementAndType($this->password_selector, $this->password);
                 sleep(2);
 
-                $this->exts->click_by_xdotool($this->submit_button_selector);
+                $this->exts->moveToElementAndClick($this->submit_button_selector);
 
                 sleep(8);
             }
@@ -227,7 +227,7 @@ class PortalScriptCDP
             $this->exts->log('invoiceAmount: ' . $invoice['invoiceAmount']);
             $this->exts->log('invoiceUrl: ' . $invoice['invoiceUrl']);
 
-            $invoiceFileName =  !empty($invoice['invoiceName']) ? $invoice['invoiceName'] . '.pdf': '';
+            $invoiceFileName =  !empty($invoice['invoiceName']) ? $invoice['invoiceName'] . '.pdf' : '';
             $downloaded_file = $this->exts->direct_download($invoice['invoiceUrl'], 'pdf', $invoiceFileName);
             if (trim($downloaded_file) != '' && file_exists($downloaded_file)) {
                 $this->exts->new_invoice($invoice['invoiceName'], $invoice['invoiceDate'], $invoice['invoiceAmount'], $invoiceFileName);
@@ -240,7 +240,7 @@ class PortalScriptCDP
 
     private function processInvoicesNew($paging_count = 1)
     {
-        $this->exts->waitTillPresent('ul li a.arrow-list__item[href*="/paiement"]', 30);
+        $this->exts->waitTillPresent('ul li a.arrow-list__item', 30);
         $this->exts->capture("4-invoices-page");
         $invoices = [];
 
@@ -256,26 +256,23 @@ class PortalScriptCDP
             }
         ');
             $attempt++;
-            sleep(5);
+            sleep(4);
         }
 
-        $rows = $this->exts->querySelectorAll('ul li a.arrow-list__item[href*="/paiement"]');
+        $rows = $this->exts->getElements('ul li a.arrow-list__item');
         foreach ($rows as $row) {
-            if ($row != null) {
-                $invoiceUrl = $row->getAttribute('href');
+            $invoiceUrl = $row->getAttribute('href');
+            if ($invoiceUrl != null) {
                 preg_match('/\bdate=([0-9]{6})\b/', $invoiceUrl, $matches);
                 $invoiceName = $matches[1];
                 $invoiceAmount =  '';
                 $invoiceDate =  '';
 
-                $downloadBtn = '';
-
                 array_push($invoices, array(
                     'invoiceName' => $invoiceName,
                     'invoiceDate' => $invoiceDate,
                     'invoiceAmount' => $invoiceAmount,
-                    'invoiceUrl' => $invoiceUrl,
-                    'downloadBtn' => $downloadBtn
+                    'invoiceUrl' => $invoiceUrl
                 ));
                 $this->isNoInvoice = false;
             }
@@ -294,7 +291,7 @@ class PortalScriptCDP
             $this->exts->log('invoiceAmount: ' . $invoice['invoiceAmount']);
             $this->exts->log('invoiceUrl: ' . $invoice['invoiceUrl']);
 
-            $invoiceFileName =  !empty($invoice['invoiceName']) ? $invoice['invoiceName'] . '.pdf': '';
+            $invoiceFileName =  !empty($invoice['invoiceName']) ? $invoice['invoiceName'] . '.pdf' : '';
             $invoice['invoiceDate'] = $this->exts->parse_date($invoice['invoiceDate'], 'd. F Y', 'Y-m-d');
             $this->exts->log('Date parsed: ' . $invoice['invoiceDate']);
 
