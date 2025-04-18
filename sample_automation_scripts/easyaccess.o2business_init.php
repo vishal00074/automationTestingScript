@@ -87,13 +87,14 @@ private function checkFillLoginUndetected()
                 ?.shadowRoot?.querySelector('lightning-primitive-input-simple')
                 ?.shadowRoot?.querySelector('input[type=\"text\"]') || null;
                 
-        if (input) {
-            input.value = '" . $this->username . "';
-            input.dispatchEvent(new Event('input', { bubbles: true, composed: true }));
-        }
-    ");
+    if (input) {
+        input.value = '" . $this->username . "';
+        input.dispatchEvent(new Event('input', { bubbles: true, composed: true }));
+    }
+");
 
     sleep(1);
+
     $this->exts->log("Enter Password");
     $this->exts->execute_javascript("
     var input = document
@@ -102,16 +103,93 @@ private function checkFillLoginUndetected()
                 ?.shadowRoot?.querySelector('input[type=\"password\"]') || null;
                 
     if (input) {
-            input.value = '" . $this->password . "';
-            input.dispatchEvent(new Event('input', { bubbles: true, composed: true }));
-        }
-    ");
+        input.value = '" . $this->password . "';
+        input.dispatchEvent(new Event('input', { bubbles: true, composed: true }));
+    }
+");
 
     $this->exts->capture('2-Form-Filled');
     sleep(5);
 
     $this->exts->log("Submit Login Form");
     $this->exts->moveToElementAndClick($this->submit_login_selector);
+    sleep(15);
 
-    sleep(10);
+
+    $isTwoFA = $this->exts->execute_javascript('document.body.innerHTML.includes("Wir senden zur Bestätigung der Anmeldung einen Prüfcode an ihre E-Mail-Adresse.");');
+
+    $this->exts->log('isTwoFA:' . $isTwoFA);
+    if ($isTwoFA) {
+        $this->checkFillTwoFactor();
+        sleep(5);
+    }
+}
+
+private function checkFillTwoFactor()
+{
+    $two_factor_selector = '';
+    $two_factor_message_selector = '';
+    $two_factor_submit_selector = $this->submit_login_selector;
+
+    if ($this->exts->two_factor_attempts < 3) {
+        $this->exts->log("Two factor page found.");
+        $this->exts->capture("2.1-two-factor");
+
+        if ($this->exts->querySelector($two_factor_message_selector) != null) {
+            $this->exts->two_factor_notif_msg_en = "";
+            for ($i = 0; $i < count($this->exts->getElements($two_factor_message_selector)); $i++) {
+                $this->exts->two_factor_notif_msg_en = $this->exts->two_factor_notif_msg_en . $this->exts->getElements($two_factor_message_selector)[$i]->getAttribute('innerText') . "\n";
+            }
+            $this->exts->two_factor_notif_msg_en = trim($this->exts->two_factor_notif_msg_en);
+            $this->exts->two_factor_notif_msg_de = $this->exts->two_factor_notif_msg_en;
+            $this->exts->log("Message:\n" . $this->exts->two_factor_notif_msg_en);
+        }
+        if ($this->exts->two_factor_attempts == 2) {
+            $this->exts->two_factor_notif_msg_en = $this->exts->two_factor_notif_msg_en . ' ' . $this->exts->two_factor_notif_msg_retry_en;
+            $this->exts->two_factor_notif_msg_de = $this->exts->two_factor_notif_msg_de . ' ' . $this->exts->two_factor_notif_msg_retry_de;
+        }
+
+        $two_factor_code = trim($this->exts->fetchTwoFactorCode());
+
+        if (!empty($two_factor_code) && trim($two_factor_code) != '') {
+            $this->exts->log("checkFillTwoFactor: Entering two_factor_code." . $two_factor_code);
+
+
+            $this->exts->log("Enter TwoFA  Code");
+            $this->exts->execute_javascript("
+                var input = document
+                .querySelector('div[data-aura-rendered-by]:nth-child(3) lightning-input:nth-child(3)')
+                ?.shadowRoot?.querySelector('lightning-primitive-input-simple')
+                ?.shadowRoot?.querySelector('input[type=\"text\"]') || null;
+                        
+            if (input) {
+                input.value = '" . $two_factor_code . "';
+                input.dispatchEvent(new Event('input', { bubbles: true, composed: true }));
+            }
+            ");
+
+            $this->exts->log("checkFillTwoFactor: Clicking submit button.");
+            sleep(3);
+            $this->exts->capture("2.2-two-factor-filled-" . $this->exts->two_factor_attempts);
+
+            $this->exts->moveToElementAndClick($two_factor_submit_selector);
+            sleep(10);
+            if ($this->exts->exists('div[class*="errorMessage"]')) {
+
+                $this->exts->capture("wrong 2FA code error-" . $this->exts->two_factor_attempts);
+                $this->exts->log('The code you entered is incorrect. Please try again.');
+            }
+
+            if ($this->exts->querySelector($two_factor_selector) == null) {
+                $this->exts->log("Two factor solved");
+            } else if ($this->exts->two_factor_attempts < 3) {
+                $this->exts->two_factor_attempts++;
+                $this->checkFillTwoFactor();
+            } else {
+                $this->exts->log("Two factor can not solved");
+            }
+        } else {
+            $this->exts->log("Not received two factor code");
+        }
+    }
 }

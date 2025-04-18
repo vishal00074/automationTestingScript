@@ -188,10 +188,13 @@ class PortalScriptCDP
             $this->exts->capture("2-login-page");
             $this->exts->log("Enter Username");
             $this->exts->moveToElementAndType($this->username_selector, $this->username);
-            sleep(4);
+            sleep(10);
             $this->exts->capture("2-email-filled");
 
-            if (stripos($this->exts->extract('#email-signup-button[type="submit"]', null, 'innerText'), 'Atlassian') !== false) {
+            $isAtLassianLogin =  $this->exts->extract('#email-signup-button[type="submit"]', null, 'innerText');
+            $this->exts->log('isAtLassianLogin:: ' . $isAtLassianLogin);
+
+            if (stripos($isAtLassianLogin, 'Atlassian') !== false) {
                 $this->exts->log('inside Atlassian Login');
                 $this->exts->moveToElementAndClick('#email-signup-button[type="submit"]');
                 sleep(7);
@@ -783,7 +786,7 @@ class PortalScriptCDP
                 $this->exts->click_by_xdotool('li [data-challengetype="5"]:not([data-challengeunavailable="true"])');
             } else if ($this->exts->exists('li div[data-sendmethod="SMS"]')) {
                 // Click on phone option
-               
+
                 $this->exts->click_by_xdotool('li div[data-sendmethod="SMS"]');
                 $this->exts->capture('select-phone');
             } else if ($this->exts->exists('li [data-challengetype]:not([data-challengetype="4"]):not([data-challengetype="2"]):not([data-challengeunavailable="true"])')) {
@@ -821,7 +824,7 @@ class PortalScriptCDP
                 $this->fillGoogleTwoFactor($input_selector, $message_selector, $submit_selector, true);
                 sleep(5);
             }
-        } else if ($this->exts->exists('[data-view-id*="knowledgePreregisteredPhoneView"] input[type="tel"]')) {
+        } else if ($this->exts->querySelector('[data-view-id*="knowledgePreregisteredPhoneView"] input[type="tel"]') != null) {
             // If methos confirm recovery phone number, send 2FA to ask
             $this->exts->log('Request for 2fa mobile-1');
             $this->exts->capture('mobile-2fa-1');
@@ -834,11 +837,11 @@ class PortalScriptCDP
                 $this->exts->type_key_by_xdotool('Return');
                 sleep(5);
             }
-            if ($this->exts->exists($input_selector)) {
+            if ($this->exts->querySelector($input_selector) != null) {
                 $this->fillGoogleTwoFactor($input_selector, $message_selector, $submit_selector, true);
                 sleep(5);
             }
-        } else if ($this->exts->exists('input#phoneNumberId')) {
+        } else if ($this->exts->querySelector('input#phoneNumberId') != null) {
             // Enter a phone number to receive an SMS with a confirmation code.
             $this->exts->log('Request for 2fa mobile-2');
             $this->exts->capture('mobile-2fa-2');
@@ -851,10 +854,10 @@ class PortalScriptCDP
                 $this->exts->type_key_by_xdotool('Return');
                 sleep(7);
             }
-            if ($this->exts->exists($input_selector)) {
+            if ($this->exts->querySelector($input_selector) != null) {
                 $this->fillGoogleTwoFactor($input_selector, $message_selector, $submit_selector, true);
             }
-        } else if ($this->exts->exists('[data-view-id*="authzenView"] form, form [data-illustration*="authzen"]') || $this->exts->urlContains('/challenge/dp?')) {
+        } else if ($this->exts->querySelector('[data-view-id*="authzenView"] form, form [data-illustration*="authzen"]') != null || $this->exts->urlContains('/challenge/dp?')) {
             // Check your smartphone. Google has sent a notification to your smartphone. Tap Yes in the notification, then tap 91 on your smartphone to continue
             $this->exts->two_factor_attempts = 3;
             $message_selector = '[data-view-id*="authzenView"] form, [data-view-id] form[method="post"]';
@@ -862,7 +865,7 @@ class PortalScriptCDP
             $this->exts->two_factor_notif_msg_de = trim($this->exts->extract($message_selector, null, 'text')) . "\n>>>Geben Sie danach hier unten \"OK\" ein.";
             $this->fillGoogleTwoFactor(null, null, '');
             sleep(5);
-        } else if ($this->exts->exists('[data-view-id*="securityKeyWebAuthnView"], [data-view-id*="securityKeyView"]')) {
+        } else if ($this->exts->querySelector('[data-view-id*="securityKeyWebAuthnView"], [data-view-id*="securityKeyView"]') != null) {
             // Method: insert your security key and touch it
             $this->exts->two_factor_attempts = 3;
             $this->exts->two_factor_notif_msg_en = 'Use chrome, login then insert your security key and touch it' . "\n>>>Enter \"OK\" after confirmation on device";
@@ -873,14 +876,14 @@ class PortalScriptCDP
         }
 
         // STEP 3: (Optional)  After choose method and confirm email or phone or.., google may asked confirm one more time before send code
-        if ($this->exts->exists('#smsButton, [data-illustration="accountRecoverySmsPin"]')) {
+        if ($this->exts->querySelector('#smsButton, [data-illustration="accountRecoverySmsPin"]') != null) {
             // Sometime user must confirm before google send sms
             $this->exts->click_by_xdotool('#smsButton, div:first-child > [role="button"], [data-secondary-action-label] > div > div:nth-child(1) button');
             sleep(10);
-        } else if ($this->exts->exists('#authzenNext') && $this->exts->exists('[data-view-id*="authzenView"], [data-illustration*="authzen"]')) {
+        } else if ($this->exts->querySelector('#authzenNext') != null && $this->exts->querySelector('[data-view-id*="authzenView"], [data-illustration*="authzen"]') != null) {
             $this->exts->click_by_xdotool('[data-view-id] #authzenNext');
             sleep(10);
-        } else if ($this->exts->exists('#idvpreregisteredemailNext') && !$this->exts->exists('form input:not([type="hidden"])')) {
+        } else if ($this->exts->querySelector('#idvpreregisteredemailNext') != null && !$this->exts->querySelector('form input:not([type="hidden"])') != null) {
             $this->exts->click_by_xdotool('#idvpreregisteredemailNext');
             sleep(10);
         } else if (count($this->exts->querySelectorAll('li [data-challengetype]:not([data-challengeunavailable="true"]):not([data-challengetype="undefined"])')) > 0) {
@@ -890,19 +893,19 @@ class PortalScriptCDP
 
 
         // STEP 4: input code
-        if ($this->exts->exists('form input[name="idvPin"], form input[name="totpPin"], input[name="code"], input#backupCodePin, input#idvPin, input#idvPinId')) {
+        if ($this->exts->querySelector('form input[name="idvPin"], form input[name="totpPin"], input[name="code"], input#backupCodePin, input#idvPin, input#idvPinId') != null) {
             $input_selector = 'form input[name="idvPin"], form input[name="totpPin"], input[name="code"], input#backupCodePin, input#idvPin, input#idvPinId';
             $message_selector = 'form > span > section > div > div > div:first-child';
             $submit_selector = '#idvPreregisteredPhoneNext, #idvpreregisteredemailNext, #totpNext, #idvanyphoneverifyNext, #backupCodeNext';
             $this->exts->two_factor_attempts = 3;
             $this->fillGoogleTwoFactor($input_selector, $message_selector, $submit_selector, true);
-        } else if ($this->exts->exists('input[name="ootpPin"], input#securityKeyOtpInputId')) {
+        } else if ($this->exts->querySelector('input[name="ootpPin"], input#securityKeyOtpInputId') != null) {
             $input_selector = 'input[name="ootpPin"], input#securityKeyOtpInputId';
             $message_selector = 'form > span > section > div > div > div:first-child';
             $submit_selector = '';
             $this->exts->two_factor_attempts = 0;
             $this->fillGoogleTwoFactor($input_selector, $message_selector, $submit_selector, true);
-        } else if ($this->exts->exists('[data-view-id*="authzenView"] form, form [data-illustration*="authzen"]') || $this->exts->urlContains('/challenge/dp?')) {
+        } else if ($this->exts->querySelector('[data-view-id*="authzenView"] form, form [data-illustration*="authzen"]') || $this->exts->urlContains('/challenge/dp?') != null) {
             // Check your smartphone. Google has sent a notification to your smartphone. Tap Yes in the notification, then tap 91 on your smartphone to continue
             $this->exts->two_factor_attempts = 3;
             $message_selector = '[data-view-id*="authzenView"] form, [data-view-id] form[method="post"]';
@@ -910,7 +913,7 @@ class PortalScriptCDP
             $this->exts->two_factor_notif_msg_de = trim($this->exts->extract($message_selector, null, 'text')) . "\n>>>Geben Sie danach hier unten \"OK\" ein.";
             $this->fillGoogleTwoFactor(null, null, '');
             sleep(5);
-        } else if ($this->exts->exists('[data-view-id*="securityKeyWebAuthnView"], [data-view-id*="securityKeyView"]')) {
+        } else if ($this->exts->querySelector('[data-view-id*="securityKeyWebAuthnView"], [data-view-id*="securityKeyView"]') != null) {
             // Method: insert your security key and touch it
             $this->exts->two_factor_attempts = 3;
             $this->exts->two_factor_notif_msg_en = 'Use chrome, login then insert your security key and touch it' . "\n>>>Enter \"OK\" after confirmation on device";
@@ -918,7 +921,7 @@ class PortalScriptCDP
             $this->fillGoogleTwoFactor(null, null, '');
             sleep(5);
             // choose another option: #assistActionIdk
-        } else if ($this->exts->exists('input[name="secretQuestionResponse"]')) {
+        } else if ($this->exts->querySelector('input[name="secretQuestionResponse"]') != null) {
             $input_selector = 'input[name="secretQuestionResponse"]';
             $message_selector = 'form > span > section > div > div > div:first-child';
             $submit_selector = '[data-secondary-action-label] > div > div:nth-child(1) button';
@@ -958,9 +961,9 @@ class PortalScriptCDP
                 sleep(2);
                 $this->exts->capture("2.2-two-factor-filled-" . $this->exts->two_factor_attempts);
 
-                if ($this->exts->exists($submit_selector)) {
+                if ($this->exts->querySelector($submit_selector) != null) {
                     $this->exts->log("fillTwoFactor: Clicking submit button.");
-                    $this->exts->click_by_xdotool($submit_selector);
+                    $this->exts->moveToElementAndClick($submit_selector);
                 } else if ($submit_by_enter) {
                     $this->exts->type_key_by_xdotool('Return');
                 }
@@ -972,7 +975,7 @@ class PortalScriptCDP
                     if ($this->exts->two_factor_attempts < 3) {
                         $this->exts->notification_uid = '';
                         $this->exts->two_factor_attempts++;
-                        if ($this->exts->exists('form input[name="idvPin"], form input[name="totpPin"], input[name="code"], input#backupCodePin')) {
+                        if ($this->exts->querySelector('form input[name="idvPin"], form input[name="totpPin"], input[name="code"], input#backupCodePin') != null) {
                             // if(strpos(strtoupper($this->exts->extract('div:last-child[style*="visibility: visible;"] [role="button"]')), 'CODE') !== false){
                             $this->exts->click_by_xdotool('[aria-relevant="additions"] + [style*="visibility: visible;"] [role="button"]');
                             sleep(2);
@@ -1247,7 +1250,7 @@ class PortalScriptCDP
                     sleep(5);
                     if ($this->exts->getElement('a[href*=".com/invoice"]') != null) {
                         $invoiceName = $this->exts->extract('div.App-InvoiceDetails > table > tbody > tr:nth-child(1) > td:nth-child(2) > span');
-                        $invoiceFileName = !empty($invoiceName) ? $invoiceName . '.pdf': '';
+                        $invoiceFileName = !empty($invoiceName) ? $invoiceName . '.pdf' : '';
 
                         $downloaded_file = $this->exts->click_and_download('button[data-testid="download-invoice-receipt-pdf-button"]', 'pdf', $invoiceFileName);
                         if (trim($downloaded_file) != '' && file_exists($downloaded_file)) {
@@ -1286,7 +1289,7 @@ class PortalScriptCDP
                     }
                     if ($this->exts->getElement('a[href*=".com/invoice"], button[data-testid="download-invoice-receipt-pdf-button"]') != null) {
                         $invoiceName = $this->exts->extract('div.App-InvoiceDetails > table > tbody > tr:nth-child(1) > td:nth-child(2) > span');
-                        $invoiceFileName = !empty($invoiceName) ? $invoiceName . '.pdf': '';
+                        $invoiceFileName = !empty($invoiceName) ? $invoiceName . '.pdf' : '';
 
                         $downloaded_file = $this->exts->click_and_download('button[data-testid="download-invoice-receipt-pdf-button"]', 'pdf', $invoiceFileName);
                         if (trim($downloaded_file) != '' && file_exists($downloaded_file)) {
@@ -1303,7 +1306,7 @@ class PortalScriptCDP
             }
         }
     }
-    function getInnerTextByJS($selector_or_object, $parent = null)
+    public function getInnerTextByJS($selector_or_object, $parent = null)
     {
         if ($selector_or_object == null) {
             $this->exts->log(__FUNCTION__ . ' Can not get innerText of null');

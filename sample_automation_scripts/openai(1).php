@@ -1,4 +1,4 @@
-<?php // i have updated two factor submit button selector
+<?php // i have updated updated microsfot login code //div#pageContent button#acceptButton
 
 /**
  * Chrome Remote via Chrome devtool protocol script, for specific process/portal
@@ -81,77 +81,51 @@ class PortalScriptCDP
         $this->exts->loadCookiesFromFile();
         sleep(1);
         $this->exts->openUrl($this->baseUrl);
-        sleep(5);
+        sleep(10);
         $this->exts->waitTillAnyPresent(['//button//*[contains(text(), "Log in")]', 'a[href="/settings/profile"]', '//input[starts-with(@name, "cf") and contains(@name, "response") and string-length(@value) <= 0]']);
         $this->check_solve_cloudflare_page();
         $this->exts->capture('1-init-page');
 
         if (!$this->isLoggedin()) {
-            sleep(2);
-            $this->exts->click_element('//button//*[contains(text(), "Log in")]');
-            sleep(5);
-            $this->check_solve_cloudflare_page();
-            sleep(5);
-            $this->exts->waitTillPresent($this->username_selector, 10);
-            if ($this->exts->querySelector($this->username_selector) != null && $this->login_with_google != '1' && $this->login_with_microsoft != '1') {
-                $this->exts->log("Enter Username");
-                $this->exts->moveToElementAndType($this->username_selector, $this->username);
-                sleep(1);
-                $this->exts->capture("2-username-filled");
-                $this->exts->moveToElementAndClick('button[type="submit"]');
+
+            $this->userNotLoggedIn();
+
+            $authError = strtolower($this->exts->extract('h1[class*="heading"] span'));
+            $this->exts->log("auth Error:: " . $authError);
+
+            if (
+                stripos($authError, strtolower('Oops, an error occurred!')) !== false ||
+                stripos($authError, strtolower('Authentication Error')) !== false
+            ) {
+
+                $invalidRequestError = strtolower($this->exts->extract('div[class*="subTitle"] > span > div[class*="subtitle"]'));
+                $this->exts->log("invalidRequestError:: " . $invalidRequestError);
+                if (stripos($invalidRequestError, strtolower('which is not the authentication method you used during sign up')) !== false) {
+                    $this->exts->capture('capture-invalid_request_error');
+                    $this->exts->loginFailure(1);
+                }
+
+
+                $this->exts->capture("try-again-login");
+                $this->exts->moveToElementAndClick('button[aria-describedby]');
+                $this->exts->moveToElementAndClick('a[href*="auth_provider=auth0"]');
+
                 sleep(5);
-                $this->check_solve_cloudflare_page();
-            }
-            if ($this->login_with_google == '1') {
-                $this->exts->click_element('//button[contains(text(), "Google")]');
-                sleep(5);
-            } else if ($this->login_with_microsoft == '1') {
-                $this->exts->click_element('//button[contains(text(), "Microsoft")]');
-                sleep(5);
-            }
-            for ($i = 0; $i < 5 && $this->exts->getElementByText('h1', ['Oops, an error occurred!'], null, false) != null; $i++) {
                 $this->clearChrome();
                 $this->exts->openUrl($this->baseUrl);
                 sleep(5);
-                $this->exts->waitTillPresent('//button//*[contains(text(), "Log in")]');
+                $this->exts->waitTillAnyPresent(['//button//*[contains(text(), "Log in")]', 'a[href="/settings/profile"]', '//input[starts-with(@name, "cf") and contains(@name, "response") and string-length(@value) <= 0]']);
                 $this->check_solve_cloudflare_page();
-                sleep(2);
-                $this->exts->click_element('//button//*[contains(text(), "Log in")]');
-                sleep(5);
-                $this->check_solve_cloudflare_page();
-                sleep(5);
-                $this->exts->waitTillPresent($this->username_selector, 10);
-                if ($this->exts->querySelector($this->username_selector) != null && $this->login_with_google != '1') {
-                    $this->exts->log("Enter Username");
-                    $this->exts->moveToElementAndType($this->username_selector, $this->username);
-                    sleep(1);
-                    $this->exts->capture("2-username-filled");
-                    $this->exts->moveToElementAndClick('button[type="submit"]');
-                    sleep(5);
-                    $this->check_solve_cloudflare_page();
-                }
-                if ($this->login_with_google == '1') {
-                    $this->exts->click_element('//button[contains(text(), "Google")]');
-                    sleep(5);
-                } else if ($this->login_with_microsoft == '1') {
-                    $this->exts->click_element('//button[contains(text(), "Microsoft")]');
-                    sleep(5);
-                }
+                $this->userNotLoggedIn();
             }
 
-            if ($this->login_with_google == '1') {
-                $this->loginGoogleIfRequired();
-            } elseif ($this->login_with_microsoft == '1') {
-                $this->loginMicrosoftIfRequired();
-            } else {
-                $this->checkFillLogin();
-                sleep(6);
-            }
             $this->check_solve_cloudflare_page();
             $this->checkFillTwoFactor();
             $this->check_solve_cloudflare_page();
             $this->exts->waitTillPresent('a[href="/settings/profile"]');
         }
+
+
 
         if ($this->isLoggedin()) {
             sleep(5);
@@ -175,29 +149,92 @@ class PortalScriptCDP
             $this->processAfterLogin();
         } else {
             $this->exts->log(__FUNCTION__ . '::Use login failed');
-
             $isTwoFAError = $this->exts->execute_javascript('document.body.innerHTML.includes("The code you entered is incorrect. Please try again.")');
-
             $this->exts->log('isTwoFAError ' . $isTwoFAError);
 
             // if microsoft LoginFailed
             $isMicroSoftError = strtolower($this->exts->extract('form[data-testid="usernameForm"] div.ext-error'));
-
+            $isMicroSoftPassError = strtolower($this->exts->extract('div.fui-Field__validationMessage span:nth-child(2)'));
             if ($this->exts->exists('#error-element-password[data-error-code]')) {
                 $this->exts->loginFailure(1);
             } elseif ($isTwoFAError) {
-
                 $this->exts->capture("incorrect-2FA");
-
                 $this->exts->log('incorrect TwoFA');
-
                 $this->exts->loginFailure(1);
-            } else if (stripos($isMicroSoftError, strtolower("That Microsoft account doesn't exist. Enter a different account or ")) !== false) {
+            } else if (stripos($isMicroSoftError, strtolower("That Microsoft account doesn't exist. Enter a different account or")) !== false) {
                 $this->exts->capture("microsoft-login-failed");
+                $this->exts->loginFailure(1);
+            } else if (stripos($isMicroSoftPassError, strtolower("That password is incorrect for your Microsoft account.")) !== false) {
+                $this->exts->capture("microsoft-login-failed-pass");
                 $this->exts->loginFailure(1);
             } else {
                 $this->exts->loginFailure();
             }
+        }
+    }
+
+    private function userNotLoggedIn()
+    {
+        sleep(2);
+        $this->exts->click_element('//button//*[contains(text(), "Log in")]');
+        sleep(5);
+        $this->check_solve_cloudflare_page();
+        sleep(5);
+        $this->exts->waitTillPresent($this->username_selector, 10);
+        if ($this->exts->querySelector($this->username_selector) != null && $this->login_with_google != '1' && $this->login_with_microsoft != '1') {
+            $this->exts->log("Enter Username");
+            $this->exts->moveToElementAndType($this->username_selector, $this->username);
+            sleep(1);
+            $this->exts->capture("2-username-filled");
+            $this->exts->moveToElementAndClick('button[type="submit"]');
+            sleep(5);
+            $this->check_solve_cloudflare_page();
+        }
+
+        $this->selectLoginType();
+
+        for ($i = 0; $i < 5 && $this->exts->getElementByText('h1', ['Oops, an error occurred!'], null, false) != null; $i++) {
+            $this->clearChrome();
+            $this->exts->openUrl($this->baseUrl);
+            sleep(5);
+            $this->exts->waitTillPresent('//button//*[contains(text(), "Log in")]');
+            $this->check_solve_cloudflare_page();
+            sleep(2);
+            $this->exts->click_element('//button//*[contains(text(), "Log in")]');
+            sleep(5);
+            $this->check_solve_cloudflare_page();
+            sleep(5);
+            $this->exts->waitTillPresent($this->username_selector, 10);
+            if ($this->exts->querySelector($this->username_selector) != null && $this->login_with_google != '1') {
+                $this->exts->log("Enter Username");
+                $this->exts->moveToElementAndType($this->username_selector, $this->username);
+                sleep(1);
+                $this->exts->capture("2-username-filled");
+                $this->exts->moveToElementAndClick('button[type="submit"]');
+                sleep(5);
+                $this->check_solve_cloudflare_page();
+            }
+            $this->selectLoginType();
+        }
+
+        if ($this->login_with_google == '1') {
+            $this->loginGoogleIfRequired();
+        } elseif ($this->login_with_microsoft == '1') {
+            $this->loginMicrosoftIfRequired();
+        } else {
+            $this->checkFillLogin();
+            sleep(6);
+        }
+    }
+
+    private function selectLoginType()
+    {
+        if ($this->login_with_google == '1') {
+            $this->exts->click_element('//button[contains(text(), "Google")]');
+            sleep(5);
+        } else if ($this->login_with_microsoft == '1') {
+            $this->exts->click_element('//button[contains(text(), "Microsoft")]');
+            sleep(5);
         }
     }
 
@@ -399,7 +436,18 @@ class PortalScriptCDP
             $this->exts->moveToElementAndType($this->microsoft_username_selector, $this->username);
             sleep(1);
             $this->exts->moveToElementAndClick($this->microsoft_submit_login_selector);
-            sleep(10);
+            sleep(15);
+        }
+
+        // Stay Signed In
+        if ($this->exts->exists('div#pageContent button#acceptButton')) {
+            $this->exts->moveToElementAndClick('div#pageContent button#acceptButton');
+            sleep(15);
+        }
+
+        if ($this->exts->exists('div[data-testid="routeAnimationFluent"] button[data-testid="primaryButton"]')) {
+            $this->exts->moveToElementAndClick('div[data-testid="routeAnimationFluent"] button[data-testid="primaryButton"]');
+            sleep(15);
         }
 
         if ($this->exts->exists('a[data-bind*="href: svr.urlSwitch"][href*="/logout"]')) {
@@ -430,8 +478,18 @@ class PortalScriptCDP
             sleep(2);
             $this->exts->capture("2-microsoft-password-page-filled");
             $this->exts->moveToElementAndClick($this->microsoft_submit_login_selector);
-            sleep(10);
+            sleep(15);
             $this->exts->capture("2-microsoft-after-submit-password");
+            // Stay Signed In
+            if ($this->exts->exists('div#pageContent button#acceptButton')) {
+                $this->exts->moveToElementAndClick('div#pageContent button#acceptButton');
+                sleep(15);
+            }
+
+            if ($this->exts->exists('div[data-testid="routeAnimationFluent"] button[data-testid="primaryButton"]')) {
+                $this->exts->moveToElementAndClick('div[data-testid="routeAnimationFluent"] button[data-testid="primaryButton"]');
+                sleep(15);
+            }
         } else {
             $this->exts->log(__FUNCTION__ . '::microsoft Password page not found');
         }
@@ -1265,8 +1323,8 @@ class PortalScriptCDP
             $submit_selector = '#idvPreregisteredPhoneNext, #idvpreregisteredemailNext, #totpNext, #idvanyphoneverifyNext, #backupCodeNext';
             $this->exts->two_factor_attempts = 3;
             $this->fillGoogleTwoFactor($input_selector, $message_selector, $submit_selector, true);
-        } else if ($this->exts->exists('input[name="ootpPin"], input#securityKeyOtpInputId')) {
-            $input_selector = 'input[name="ootpPin"], input#securityKeyOtpInputId';
+        } else if ($this->exts->exists('input#ootp-pin, input[name="ootpPin"], input#securityKeyOtpInputId')) {
+            $input_selector = 'input#ootp-pin, input[name="ootpPin"], input#securityKeyOtpInputId';
             $message_selector = 'form > span > section > div > div > div:first-child';
             $submit_selector = '';
             $this->exts->two_factor_attempts = 0;
