@@ -123,7 +123,58 @@ class PortalScriptCDP
             $this->checkConfirmButton();
         }
 
-        $this->doAfterLogin();
+        sleep(3);
+        $this->exts->log(__FUNCTION__);
+
+        // then check user logged in or not
+        if ($this->isLoggedIn()) {
+            $this->exts->log(__FUNCTION__ . '::User logged in');
+            $this->exts->capture("3-login-success");
+            // #customers-page .mcc-widget a[href*="/campaign/"]
+            sleep(3);
+            $this->exts->openUrl("https://ads.microsoft.com/cc/Billing/History");
+            sleep(5);
+
+            if ($this->exts->exists('div.lightboxNotification button.btn.btn-link.lightboxSecondRedirect')) {
+                $this->exts->moveToElementAndClick('div.lightboxNotification button.btn.btn-link.lightboxSecondRedirect');
+                sleep(1);
+            }
+
+            if ($this->exts->exists('button.teaching-bubble-close-button')) {
+                $this->exts->moveToElementAndClick('button.teaching-bubble-close-button');
+                sleep(3);
+            }
+
+            $this->selectCustomer();
+
+            // Final, check no invoice
+            if ($this->isNoInvoice) {
+                $this->exts->no_invoice();
+            }
+
+            $this->exts->success();
+        } else {
+            $this->exts->log(__FUNCTION__ . '::Use login failed ');
+            if ($this->exts->exists('#AdditionalSecurityVerificationTabSpan, input#newPassword, [data-bind*="Lockout_Reason"]')) {
+                $this->exts->account_not_ready();
+            } else if ($this->exts->urlContains('account.live.com/ar/cancel')) {
+                $this->exts->account_not_ready();
+            } else if ($this->exts->urlContains('/Abuse?')) {
+                $this->exts->account_not_ready();
+            } else if ($this->exts->querySelector('#passwordError a[href*="ResetPassword"], #passwordError a[href*="passwordreset"]') != null) {
+                $this->exts->loginFailure(1);
+            } elseif ($this->exts->getElementByText('div[id*="Error"]', ["account doesn't exist", "username may be incorrect", "username may not be correct", "Dieser Benutzername ist möglicherweise nicht korrekt", "Der Benutzername ist möglicherweise falsch", "Konto existiert nicht"], null, false) != null) {
+                $this->exts->loginFailure(1);
+            } elseif ($this->exts->getElementByText('div[id="error_Info"]', ["incorrect account or password", "falschen Konto oder Kennwort anzumelden"], null, false) != null || $this->exts->exists('input#LoginModel_Password.error')) {
+                $this->exts->loginFailure(1);
+            } elseif ($this->exts->getElementByText('div[id="usernameError"]', ["Eine Anmeldung mit einem persönlichen Konto ist hier nicht möglich", "You can't sign in here with a personal account"], null, false) != null) {
+                $this->exts->loginFailure(1);
+            } elseif ($this->exts->getElementByText('div[id*="Error"]', ["Sign-in is blocked"], null, false) != null) {
+                $this->exts->account_not_ready();
+            } else {
+                $this->exts->loginFailure();
+            }
+        }
     }
     private function checkFillLogin()
     {
@@ -621,61 +672,7 @@ class PortalScriptCDP
         return $this->exts->exists('button#O365_MainLink_Me #O365_MainLink_MePhoto, div.msame_Drop_signOut a, a[href*="/logout"]:not(#footerSignout), button#user-center') ||
             $this->exts->exists('ul[role="menubar"] li button[data-value="billing"]') || $this->exts->exists('ul[role="menubar"] li button[data-value="Billing"]');
     }
-    private function doAfterLogin()
-    {
-        sleep(3);
-        $this->exts->log(__FUNCTION__);
 
-        // then check user logged in or not
-        if ($this->isLoggedIn()) {
-            $this->exts->log(__FUNCTION__ . '::User logged in');
-            $this->exts->capture("3-login-success");
-            // #customers-page .mcc-widget a[href*="/campaign/"]
-            sleep(3);
-            $this->exts->openUrl("https://ads.microsoft.com/cc/Billing/History");
-            sleep(5);
-
-            if ($this->exts->exists('div.lightboxNotification button.btn.btn-link.lightboxSecondRedirect')) {
-                $this->exts->moveToElementAndClick('div.lightboxNotification button.btn.btn-link.lightboxSecondRedirect');
-                sleep(1);
-            }
-
-            if ($this->exts->exists('button.teaching-bubble-close-button')) {
-                $this->exts->moveToElementAndClick('button.teaching-bubble-close-button');
-                sleep(3);
-            }
-
-            $this->selectCustomer();
-
-            // Final, check no invoice
-            if ($this->isNoInvoice) {
-                $this->exts->no_invoice();
-            }
-
-            // $this->exts->success();
-        } else {
-            $this->exts->log(__FUNCTION__ . '::Use login failed ');
-            if ($this->exts->exists('#AdditionalSecurityVerificationTabSpan, input#newPassword, [data-bind*="Lockout_Reason"]')) {
-                $this->exts->account_not_ready();
-            } else if ($this->exts->urlContains('account.live.com/ar/cancel')) {
-                $this->exts->account_not_ready();
-            } else if ($this->exts->urlContains('/Abuse?')) {
-                $this->exts->account_not_ready();
-            } else if ($this->exts->querySelector('#passwordError a[href*="ResetPassword"], #passwordError a[href*="passwordreset"]') != null) {
-                $this->exts->loginFailure(1);
-            } elseif ($this->exts->getElementByText('div[id*="Error"]', ["account doesn't exist", "username may be incorrect", "username may not be correct", "Dieser Benutzername ist möglicherweise nicht korrekt", "Der Benutzername ist möglicherweise falsch", "Konto existiert nicht"], null, false) != null) {
-                $this->exts->loginFailure(1);
-            } elseif ($this->exts->getElementByText('div[id="error_Info"]', ["incorrect account or password", "falschen Konto oder Kennwort anzumelden"], null, false) != null || $this->exts->exists('input#LoginModel_Password.error')) {
-                $this->exts->loginFailure(1);
-            } elseif ($this->exts->getElementByText('div[id="usernameError"]', ["Eine Anmeldung mit einem persönlichen Konto ist hier nicht möglich", "You can't sign in here with a personal account"], null, false) != null) {
-                $this->exts->loginFailure(1);
-            } elseif ($this->exts->getElementByText('div[id*="Error"]', ["Sign-in is blocked"], null, false) != null) {
-                $this->exts->account_not_ready();
-            } else {
-                $this->exts->loginFailure();
-            }
-        }
-    }
     private function selectCustomer()
     {
         $this->exts->log('start function selectCustomer');

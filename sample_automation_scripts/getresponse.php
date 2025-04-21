@@ -129,9 +129,9 @@ class PortalScriptCDP
             if ($this->totalFiles == 0) {
                 $this->exts->log("No invoice!!");
                 $this->exts->no_invoice();
-            } else {
-                $this->exts->success();
             }
+
+            $this->exts->success();
         } else {
             $this->exts->capture("LoginFailed");
             $this->exts->log(__FUNCTION__ . '::Use login failed');
@@ -368,11 +368,11 @@ class PortalScriptCDP
                     $this->exts->type_key_by_xdotool('Tab');
                     sleep(1);
                 }
-                foreach($two_factor_code_split  as $value){
+                foreach ($two_factor_code_split  as $value) {
                     $this->exts->type_text_by_xdotool($value);
                     sleep(1);
                 }
-               
+
 
                 $this->exts->log("checkFillTwoFactor: Clicking submit button.");
                 sleep(3);
@@ -449,7 +449,7 @@ class PortalScriptCDP
                         $receiptUrl = $this->exts->extract('td a[href*="app/document"]', $receipt, 'href');
                         $receiptName = trim(end(explode('/document/', $receiptUrl)));
                         $receiptName = explode('/', $receiptName)[0];
-                        $receiptFileName = $receiptName . '.pdf';
+                        $receiptFileName = !empty($receiptName) ? $receiptName . '.pdf': '';
                         $parsed_date = $this->exts->parse_date($receiptDate);
                         $receiptAmount = $tags[3]->getText();
                         $receiptAmount = trim(preg_replace('/[^\d\.\,]/', '', $receiptAmount)) . ' EUR';
