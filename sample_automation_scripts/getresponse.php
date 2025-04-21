@@ -140,10 +140,11 @@ class PortalScriptCDP
             $errorText = strtolower($this->exts->extract($this->check_login_failed_selector));
 
             $this->exts->log('errorText  ' . $errorText);
-
             if (stripos($errorText, strtolower('The email or password you entered are incorrect')) !== false) {
                 $this->exts->loginFailure(1);
             } else if (stripos(strtolower($this->exts->extract('span[data-ats-login-form-input-error="email"]')), strtolower('Incorrect email')) !== false) {
+                $this->exts->loginFailure(1);
+            } else if (stripos(strtolower($this->exts->extract('div#verificationCode-error')), strtolower('Du hast einen falschen Authentifizierungscode eingegeben. Bitte versuche es erneut')) !== false) {
                 $this->exts->loginFailure(1);
             } else {
                 $this->exts->loginFailure();
@@ -363,12 +364,15 @@ class PortalScriptCDP
                 $this->exts->log("checkFillTwoFactor: Entering two_factor_code." . $two_factor_code);
                 $two_factor_code_split = str_split($two_factor_code);
 
-
-                $this->exts->executeSafeScript("
-                    let code = " . json_encode($two_factor_code_split) . ";
-                    document.querySelectorAll('.neo-pin-input').forEach((el, i) => el.value = code[i]);
-                ");
-
+                for ($i = 0; $i < 5; $i++) {
+                    $this->exts->type_key_by_xdotool('Tab');
+                    sleep(1);
+                }
+                foreach($two_factor_code_split  as $value){
+                    $this->exts->type_text_by_xdotool($value);
+                    sleep(1);
+                }
+               
 
                 $this->exts->log("checkFillTwoFactor: Clicking submit button.");
                 sleep(3);
