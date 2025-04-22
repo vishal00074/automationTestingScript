@@ -1,4 +1,4 @@
-<?php // updated login code
+<?php
 
 /**
  * Chrome Remote via Chrome devtool protocol script, for specific process/portal
@@ -56,20 +56,19 @@ class PortalScriptCDP
             echo 'Script execution failed.. ' . "\n";
         }
     }
-    
-    public $baseUrl = 'https://sellercentral.amazon.co.uk/gp/payments-account/view-transactions.html';
+
+    public $baseUrl = "https://sellercentral.amazon.com/home";
     public $username_selector = 'form[name="signIn"] input[name="email"]:not([type="hidden"])';
     public $password_selector = 'form[name="signIn"] input[name="password"]';
     public $submit_login_selector = 'form[name="signIn"] input#signInSubmit';
     public $remember_me = 'form[name="signIn"] input[name="rememberMe"]:not(:checked)';
-    public $isNoInvoice = true;
+    public $restrictPages = 3;
 
+    public $isNoInvoice = true;
     public $payment_settlements = 0;
-    public $seller_invoice = 0;
     public $transaction_invoices = 0;
     public $seller_fees = 0;
     public $no_advertising_bills = 0;
-    public $language_code = 'de_DE';
     public $currentSelectedMarketPlace = "";
     public $no_marketplace = 1;
     /**
@@ -79,38 +78,53 @@ class PortalScriptCDP
     private function initPortal($count)
     {
         $this->exts->log('Begin initPortal ' . $count);
-        $this->seller_invoice = isset($this->exts->config_array["seller_invoice"]) ? (int)@$this->exts->config_array["seller_invoice"] : $this->seller_invoice;
+
+        $this->restrictPages = isset($this->exts->config_array["restrictPages"]) ? (int)@$this->exts->config_array["restrictPages"] : 3;
         $this->payment_settlements = isset($this->exts->config_array["payment_settlements"]) ? (int)@$this->exts->config_array["payment_settlements"] : $this->payment_settlements;
         $this->transaction_invoices = isset($this->exts->config_array["transaction_invoices"]) ? (int)@$this->exts->config_array["transaction_invoices"] : $this->transaction_invoices;
         $this->seller_fees = isset($this->exts->config_array["seller_fees"]) ? (int)@$this->exts->config_array["seller_fees"] : $this->seller_fees;
         $this->no_advertising_bills = isset($this->exts->config_array["advertising_bills"]) ? (int)@$this->exts->config_array["advertising_bills"] : $this->no_advertising_bills;
-        $this->exts->log('CONFIG seller_invoice: ' . $this->seller_invoice);
         $this->exts->log('CONFIG payment_settlements: ' . $this->payment_settlements);
         $this->exts->log('CONFIG transaction view: ' . $this->transaction_invoices);
         $this->exts->log('CONFIG seller fees: ' . $this->seller_fees);
-        $this->exts->log('CONFIG No Advert Invoices: ' . $this->no_advertising_bills);
+
+        $this->exts->loadCookiesFromFile(true);
 
         $this->exts->openUrl($this->baseUrl);
-        sleep(1);
+        sleep(5);
+        $this->exts->capture('1-init-page-1');
 
-        // Load cookies
-        $this->exts->loadCookiesFromFile();
-        sleep(1);
-        $this->exts->openUrl($this->baseUrl);
-        sleep(10);
-        $this->exts->capture('1-init-page');
+        if ($this->exts->profile_loaded() && !$this->isLoginSuccess() && !$this->exts->exists('.picker-app .picker-view-column button.picker-button')) {
+            $this->exts->log("Clearing browser history, cookie, cache");
+            $this->exts->clearCookies();
+            $this->exts->execute_javascript('
+            localStorage.clear();
+            sessionStorage.clear();
+        ');
+            sleep(3);
+            //Load cookie forcefully this will load freash cookie even if profile is loaded.
+            $this->exts->loadCookiesFromFile(true);
+            $this->exts->openUrl($this->baseUrl);
+            sleep(5);
+            $this->exts->capture('1-init-page-2');
+            $this->checkSolveCaptcha();
+        }
 
-        // If user hase not logged in from cookie, clear cookie, open the login url and do login
+        $this->check_and_pick_market(); // Huy 2022-10: MUST check market picker here, for some case, picker showed but no US market, then the domain is not .com, then website may require login
+        // If user hase not logged in from cookie
         if (!$this->isLoginSuccess()) {
             $this->exts->log('NOT logged via cookie');
-            // $this->exts->clearCookies();
-            $this->exts->openUrl($this->baseUrl);
-            sleep(10);
+            $this->checkSolveCaptcha();
+            // $this->exts->openUrl($this->baseUrl);
+            $this->exts->moveToElementAndClick('kat-button#sign-in-button > button, a[href*="amazon.com/signin"]');
+            sleep(5);
             if (!$this->exts->exists($this->password_selector)) {
                 $this->exts->capture("2-login-exception");
                 $this->exts->clearCookies();
                 $this->exts->openUrl($this->baseUrl);
-                sleep(10);
+                sleep(5);
+                $this->exts->moveToElementAndClick('kat-button#sign-in-button > button, a[href*="amazon.com/signin"]');
+                sleep(7);
             }
             // Login, retry few time since it show captcha
             $this->checkFillLogin();
@@ -141,12 +155,16 @@ class PortalScriptCDP
                 }
             }
             // End handling login form
+
             $this->checkFillTwoFactor();
+            sleep(5);
 
             $isOtpExpired =  $this->exts->extract('div.a-alert-content');
             $this->exts->log('::Otp Expired Message:: ' . $isOtpExpired);
+            sleep(5);
+            $this->exts->capture('otp-page-1');
 
-            if (stripos($isOtpExpired, strtolower("Your One Time Password (OTP) has expired. Please request another from the ‘Didn't receive the One Time Password?’ link below.")) !== false) {
+            if (stripos($isOtpExpired, strtolower("The One Time Password (OTP) you entered is not valid. Please try again.")) !== false) {
 
                 $this->exts->moveToElementAndClick('a[id="auth-get-new-otp-link"]');
                 sleep(4);
@@ -157,27 +175,55 @@ class PortalScriptCDP
                 $this->checkFillTwoFactor();
             }
 
+            if (stripos($isOtpExpired, strtolower("seconds before requesting another code.")) !== false) {
+                sleep(20);
+                $this->exts->moveToElementAndClick('a[id="auth-get-new-otp-link"]');
+                sleep(4);
+                $this->exts->waitTillPresent('input[id="auth-send-code"]');
+                $this->exts->moveToElementAndClick('input[id="auth-send-code"]');
+                sleep(10);
+
+                $this->checkFillTwoFactor();
+            }
+
+            if ($this->exts->urlContains('forgotpassword/reverification')) {
+                $this->exts->account_not_ready();
+            }
+
             if ($this->exts->exists('form#auth-account-fixup-phone-form a#ap-account-fixup-phone-skip-link')) {
                 $this->exts->moveToElementAndClick('form#auth-account-fixup-phone-form a#ap-account-fixup-phone-skip-link');
                 sleep(2);
             }
         }
+
+        sleep(5);
+        // $this->exts->waitTillPresent('div[class="full-page-account-switcher-account"]:nth-child(3) button', 15);
+        // if ($this->exts->exists('div[class="full-page-account-switcher-account"]:nth-child(3) button')) {
+        //     $this->exts->click_element('div[class="full-page-account-switcher-account"]:nth-child(3) button');
+        //     sleep(1);
+        //     if ($this->exts->exists('#sc-content-container .full-page-account-switcher-accounts-wrapper div:nth-child(3) div:nth-child(3)')) {
+        //         $this->exts->click_element('#sc-content-container .full-page-account-switcher-accounts-wrapper div:nth-child(3) div:nth-child(3)');
+        //         sleep(2);
+        //         if ($this->exts->exists('div[class*="switcher-footer"] button')) {
+        //             $this->exts->click_element('div[class*="switcher-footer"] button');
+        //             sleep(10);
+        //         } else {
+        //             $this->exts->log("Not Found Select account button selector");
+        //         }
+        //     } else {
+        //         $this->exts->log("Not Found Germany button selector");
+        //     }
+        // } else {
+        //     $this->exts->log("Not Found Factor Glue button selector");
+        // }
+
+        $this->exts->waitTillPresent('button.full-page-account-switcher-account-details');
         if ($this->exts->exists('button.full-page-account-switcher-account-details')) {
-            //  This portal is for UK so select UK first, else select default
-            $target_selection = $this->exts->getElementByText('button.full-page-account-switcher-account-details', ['United Kingdom'], null, true);
+            // This portal is for Germany so select UK first, else select default
+            $target_selection = $this->exts->getElementByText('button.full-page-account-switcher-account-details', ['United Kingdom', 'United States'], null, true);
             if ($target_selection == null) {
-                //Sometime we need to expand to see the list
-                $this->exts->moveToElementAndClick('button.full-page-account-switcher-account-details');
-                sleep(10);
-                $target_selection = $this->exts->getElementByText('button.full-page-account-switcher-account-details', ['United Kingdom'], null, true);
-            }
-
-            if ($target_selection == null) {
-                $target_selection = $this->exts->getElementByText('button.full-page-account-switcher-account-details', ['Regno Unito'], null, true);
-            }
-
-            if ($target_selection == null) {
-                $target_selection = $this->exts->getElementByText('button.full-page-account-switcher-account-details', ['Royaume-Uni'], null, true);
+             
+                $target_selection = $this->exts->getElementByText('button.full-page-account-switcher-account-details', ['United Kingdom', 'United States',], null, true);
             }
 
             if ($target_selection == null && count($this->exts->getElements('button.full-page-account-switcher-account-details')) > 1) { // If do not found, get default picker
@@ -186,7 +232,10 @@ class PortalScriptCDP
             if ($target_selection != null) {
                 $this->exts->click_element($target_selection);
             }
-            sleep(2);
+            sleep(1);
+
+            $this->exts->capture('selected-region');
+            
             if ($this->exts->exists('button.kat-button--primary:not([disabled])')) {
                 $this->exts->moveToElementAndClick('button.kat-button--primary:not([disabled])');
                 sleep(10);
@@ -195,92 +244,107 @@ class PortalScriptCDP
             }
         }
 
+        $this->exts->capture('account-selected');
+        // Fill again if login form open
+        $this->checkFillLogin();
+        sleep(5);
+        $this->checkFillTwoFactor();
+        sleep(5);
+        
+
+
+
+
+        $this->check_and_pick_market();
         // then check user logged in or not
         if ($this->isLoginSuccess()) {
             sleep(3);
             $this->exts->log(__FUNCTION__ . '::User logged in');
             $this->exts->capture("3-login-success");
 
-            if ($this->exts->exists('button.full-page-account-switcher-account-details')) {
-                //  This portal is for UK so select UK first, else select default
-                $target_selection = $this->exts->getElementByText('button.full-page-account-switcher-account-details', ['United Kingdom'], null, true);
-                if ($target_selection == null) {
-                    //Sometime we need to expand to see the list
-                    $this->exts->moveToElementAndClick('button.full-page-account-switcher-account-details');
-                    sleep(10);
-                    $target_selection = $this->exts->getElementByText('button.full-page-account-switcher-account-details', ['United Kingdom'], null, true);
-                }
-
-                if ($target_selection == null) {
-                    $target_selection = $this->exts->getElementByText('button.full-page-account-switcher-account-details', ['Regno Unito'], null, true);
-                }
-
-                if ($target_selection == null) {
-                    $target_selection = $this->exts->getElementByText('button.full-page-account-switcher-account-details', ['Royaume-Uni'], null, true);
-                }
-
-                if ($target_selection == null && count($this->exts->getElements('button.full-page-account-switcher-account-details')) > 1) { // If do not found, get default picker
-                    $target_selection = $this->exts->getElements('button.full-page-account-switcher-account-details')[1];
-                }
-                if ($target_selection != null) {
-                    $this->exts->click_element($target_selection);
-                }
-                sleep(1);
-                if ($this->exts->exists('button.kat-button--primary:not([disabled])')) {
-                    $this->exts->moveToElementAndClick('button.kat-button--primary:not([disabled])');
-                    sleep(10);
-                } else {
-                    $this->exts->account_not_ready();
-                }
-            }
-
-            $this->doAfterLogin();
-
-            // Final, check no invoice
-            if ($this->isNoInvoice) {
-                $this->exts->no_invoice();
-            }
-            $this->exts->success();
+            $this->invoicePage();
         } else {
             $this->exts->log(__FUNCTION__ . '::Use login failed ' . $this->exts->getUrl());
+
+
             $error_text = strtolower($this->exts->extract('div#auth-email-invalid-claim-alert div.a-alert-content'));
             $OtpPageError =  $this->exts->extract('div.a-alert-content');
 
             $this->exts->log('::Error text ' . $error_text);
             $this->exts->log('::Error text Otp Page ' . $OtpPageError);
 
+
             if ($this->isIncorrectCredential()) {
                 $this->exts->loginFailure(1);
-            } else if (strpos(strtolower($this->exts->extract('div[id*="error-message"]', null, 'innerText')), 'incorrect') !== false) {
-                $this->exts->capture("loginFailedConfirmed");
-                $this->exts->loginFailure(1);
+            } else if ($this->exts->exists('form[name="forgotPassword"]')) {
+                $this->exts->account_not_ready();
+            } else if ($this->exts->exists('[data-metric-name="sc:auth-failed:no-account:start-registration-button"]')) {
+                $this->exts->account_not_ready();
             } else if (
                 stripos($OtpPageError, strtolower('Die von dir angegebenen Anmeldeinformationen waren inkorrekt. Überprüfe sie und versuche es erneut.')) !== false ||
                 stripos($OtpPageError, strtolower('The credentials you provided were incorrect. Check them and try again.')) !== false ||
-                stripos($OtpPageError, strtolower("Your One Time Password (OTP) has expired. Please request another from the ‘Didn't receive the One Time Password?’ link below.")) !== false
+                stripos($OtpPageError, strtolower("The One Time Password (OTP) you entered is not valid. Please try again.")) !== false
             ) {
                 $this->exts->loginFailure(1);
-            } else if ($this->exts->exists('form[name="forgotPassword"], [data-metric-name="sc:auth-failed:no-account:start-registration-button"]')) {
-                $this->exts->account_not_ready();
+            } else if (
+                stripos($error_text, strtolower('Wrong or Invalid email address or mobile phone number. Please correct and try again.')) !== false ||
+                stripos($error_text, strtolower('wrong or invalid e-mail address or mobile phone number. please correct and try again.')) !== false
+            ) {
+                $this->exts->loginFailure(1);
+            } elseif (
+                strpos($this->exts->extract('div[id="auth-error-message-box"] div[class="a-alert-content"]'), 'you entered is not valid') !== false ||
+                strpos($this->exts->extract('div[id="auth-error-message-box"] div[class="a-alert-content"]'), 'Your password is incorrect') !== false
+            ) {
+                $this->exts->loginFailure(1);
             } else {
                 $this->exts->loginFailure();
             }
         }
     }
+    private function check_and_pick_market()
+    {
+        if ($this->exts->exists('.picker-app .picker-view-column button.picker-button')) {
+            // There will be 3 columns, the first column is sub-accounts.
+            // If just one column, then we must select sub-account first
+            $count_column = count($this->exts->querySelectorAll('.picker-app .picker-view-column'));
+            if ($count_column < 2) {
+                $this->exts->capture('1-sub-account-picker');
+                $this->exts->moveToElementAndClick('.picker-app .picker-view-column button.picker-button');
+                sleep(5);
+            }
+            $this->exts->capture('1-market-picker');
+            // This portal is for amazon.com so select US first, else select default
+            $us_market_option = $this->exts->getElement('//button[contains(@class, "picker-button")]//*[text()="United States"]', null, 'xpath');
+            if ($us_market_option != null) {
+                $this->exts->click_element($us_market_option);
+            } else {
+                $this->exts->click_element('.picker-view-column:last-child .picker-button');
+            }
+            sleep(2);
+            if ($this->exts->exists('.picker-app button.picker-switch-accounts-button:not([disabled])')) {
+                $this->exts->moveToElementAndClick('.picker-app button.picker-switch-accounts-button:not([disabled])');
+                sleep(10);
+            }
+        }
+    }
     private function checkFillLogin()
     {
-        $this->exts->waitTillAnyPresent([$this->username_selector, $this->password_selector]);
-        if ($this->exts->querySelector($this->username_selector) != null || $this->exts->querySelector($this->password_selector) != null) {
+        if ($this->exts->exists($this->password_selector)) {
             sleep(3);
             $this->exts->capture("2-login-page");
 
             $this->exts->log("Enter Username");
             $this->exts->moveToElementAndType($this->username_selector, $this->username);
             sleep(1);
-            $this->exts->moveToElementAndClick('input[id="continue"]');
-            sleep(2);
-            $this->exts->waitTillPresent($this->password_selector);
+
+            if ($this->exts->exists('input[id="continue"]')) {
+                $this->exts->moveToElementAndClick('input[id="continue"]');
+                sleep(5);
+            }
+
             $this->exts->log("Enter Password");
+            $this->exts->moveToElementAndType($this->password_selector, '');
+            $this->exts->moveToElementAndClick($this->password_selector);
             $this->exts->moveToElementAndType($this->password_selector, $this->password);
             sleep(1);
             $this->exts->moveToElementAndClick('form[name="signIn"] input[name="rememberMe"]:not(:checked)');
@@ -340,12 +404,14 @@ class PortalScriptCDP
             $two_factor_code = trim($this->exts->fetchTwoFactorCode());
             if (!empty($two_factor_code) && trim($two_factor_code) != '') {
                 $this->exts->log("checkFillTwoFactor: Entering two_factor_code." . $two_factor_code);
-                if ($this->exts->exists('input[name="otpCode"]:not([type="hidden"])')) {
-                    $this->exts->moveToElementAndType('input[name="otpCode"]:not([type="hidden"])', $two_factor_code);
+
+                if ($this->exts->exists('input[name="otpCode"]')) {
+                    $this->exts->moveToElementAndType('input[name="otpCode"]', $two_factor_code);
                 } else if ($this->exts->exists('input[name="otc-1"]')) {
                     $this->exts->moveToElementAndClick('input[name="otc-1"]');
-                    $this->exts->type_text_by_xdotool($two_factor_code);
+                    $this->exts->moveToElementAndType($two_factor_selector, $two_factor_code);
                 }
+
                 if ($this->exts->exists('label[for="auth-mfa-remember-device"] input[name="rememberDevice"]:not(:checked)')) {
                     $this->exts->moveToElementAndClick('label[for="auth-mfa-remember-device"]');
                 }
@@ -358,21 +424,23 @@ class PortalScriptCDP
             } else {
                 $this->exts->log("Not received two factor code");
             }
-        } else if ($this->exts->exists('[name="transactionApprovalStatus"], #resend-approval-form')) {
+        } else if ($this->exts->exists('[name="transactionApprovalStatus"], form[action*="/approval/poll"], #resend-approval-form')) {
             $this->exts->log("Two factor page found.");
             $this->exts->capture("2.1-two-factor");
-            $message_selector = '.a-spacing-large .transaction-approval-word-break, #channelDetails, .transaction-approval-word-break, #channelDetailsWithImprovedLayout';
-            $this->exts->two_factor_notif_msg_en = trim($this->exts->extract('.transaction-approval-word-break.a-size-medium'));
-            $this->exts->two_factor_notif_msg_en = $this->exts->two_factor_notif_msg_en . "\n" . trim($this->exts->extract('#channelDetails'));
+            $message_selector = '.transaction-approval-word-break, #channelDetails, #channelDetailsWithImprovedLayout, .transaction-approval-word-break, #channelDetailsWithImprovedLayout';
+            $this->exts->two_factor_notif_msg_en = join(' ', $this->exts->getElementsAttribute($message_selector, 'innerText'));
             $this->exts->two_factor_notif_msg_de = $this->exts->two_factor_notif_msg_en . "\n>>>Geben Sie danach hier unten \"OK\" ein.";
-            $this->exts->two_factor_notif_msg_en = $this->exts->two_factor_notif_msg_en . "\n>>>Enter \"OK\" after confirmation on device";
+            $this->exts->two_factor_notif_msg_en = $this->exts->two_factor_notif_msg_en . "\n>>>Enter \"OK\" after confirmation";
+            $this->exts->log($this->exts->two_factor_notif_msg_en);
 
             $this->exts->notification_uid = "";
             $this->exts->two_factor_attempts++;
             $two_factor_code = trim($this->exts->fetchTwoFactorCode());
             if (!empty($two_factor_code) && trim($two_factor_code) != '') {
+                $this->exts->moveToElementAndClick('#resend_notification_expander a[data-action="a-expander-toggle"]');
+                sleep(1);
                 // Click refresh page if user confirmed
-                $this->exts->moveToElementAndClick('a.a-link-normal[href*="/ap/cvf/approval"]');
+                $this->exts->moveToElementAndClick('a.a-link-normal[href*="/ap/cvf/approval"], a#resend-approval-link');
             }
         }
     }
@@ -463,73 +531,25 @@ class PortalScriptCDP
     }
     private function isLoginSuccess()
     {
-        return $this->exts->exists('.nav-right-section [data-test-tag="nav-settings-button"], li.sc-logout-quicklink, .sc-header #partner-switcher button.dropdown-button, li#sc-quicklink-logout') && !$this->exts->exists($this->password_selector) && !$this->exts->exists('[data-metric-name="sc:auth-failed:no-account:start-registration-button"]');
+
+        $loginSuccessSelector = 'a[href="/sign-out"] , li.sc-logout-quicklink, a[href*="sign-in/logout"], .nav-right-section [data-test-tag="nav-settings-button"]';
+        for ($wait = 0; $wait < 2 && $this->exts->executeSafeScript("return !!document.querySelector('" . $loginSuccessSelector . "');") != 1; $wait++) {
+            $this->exts->log('Waiting for login.....');
+            sleep(8);
+        }
+        return $this->exts->exists($loginSuccessSelector);
     }
 
-    private function changeSelectbox($select_box = '', $option_value = '')
+    function invoicePage()
     {
-        $this->exts->waitTillPresent($select_box, 10);
-        if ($this->exts->exists($select_box)) {
-            $option = $select_box . ' option[value=' . $option_value . ']';
-            $this->exts->click_element($select_box);
-            sleep(1);
-            if ($this->exts->exists($option)) {
-                $this->exts->log('Select box Option exists');
-                $this->exts->click_by_xdotool($option);
-                sleep(3);
-            } else {
-                $this->exts->log('Select box Option does not exist');
-            }
-        } else {
-            $this->exts->log('Select box does not exist');
-        }
-    }
+        $this->exts->log("Invoice page");
 
-    private function doAfterLogin()
-    {
-        if ($this->exts->exists('#remind-me-later span.a-button')) {
-            $this->exts->moveToElementAndClick('#remind-me-later span.a-button');
-            sleep(10);
-        }
-
-        // Download from seller-vat-invoices
-        if ((int)@$this->seller_invoice == 1) {
-            $this->exts->openUrl('https://sellercentral.amazon.co.uk/tax/vatreports/bulkdownload');
-            $this->downloadSellerVATInvoice(1);
-
-            //Download Order Invoices
-            $this->exts->moveToElementAndClick('#navbar .nav-button[role="button"]');
-            sleep(2);
-            if ($this->exts->exists('.side-nav a[href*="/orders-v3/ref=xx_"]')) {
-                $this->exts->moveToElementAndClick('.side-nav a[href*="/orders-v3/ref=xx_"]');
-                sleep(10);
-
-                $this->exts->moveToElementAndClick('a[data-test-id="tab-/mfn/shipped"], a[href*="/orders-v3/mfn/shipped?"]');
-            } else {
-                $this->exts->openUrl('https://sellercentral.amazon.co.uk/orders-v3/mfn/shipped?page=1');
-            }
-            sleep(10);
-            $restrictPages = isset($this->exts->config_array["restrictPages"]) ? (int)@$this->exts->config_array["restrictPages"] : 3;
-            if ($restrictPages == '0') {
-                //https://sellercentral.amazon.co.uk/orders-v3/mfn/shipped?page=1&date-range=1611220364000-1622159998000
-                /*$startDate = date('d.m.y', strtotime('-2 years'));
-            $currentUrl = $this->exts->getUrl();
-            $orderPageURL = $currentUrl.'&date-range='.strtotime($startDate).'-'.strtotime(date('d.m.y'));
-            */
-                $this->changeSelectbox('select[name="myo-table-date-range"]', 'last-365', 15);
-            } else {
-                $this->changeSelectbox('select[name="myo-table-date-range"]', 'last-90', 15);
-            }
-            sleep(15);
-            $this->changeSelectbox('select[name="myo-table-results-per-page"]', '100', 15);
-            if (!$this->exts->exists('#orders-table tbody tr td .a-row [data-test-id="manage-idu-invoice-button"] input[type="submit"]')) {
-                sleep(15);
-            }
-            $this->downloadOrderInvoices(1);
-        }
-
-        // Loop through all Marketplace, then download transaction, advertiser invoices and statement
-        $this->exts->openUrl('https://sellercentral.amazon.co.uk/gp/payments-account/past-settlements.html');
+        $this->exts->moveToElementAndClick('#sc-navtab-reports');
+        sleep(5);
+        $paths = explode('/', $this->exts->getUrl());
+        $currentDomainUrl = $paths[0] . '//' . $paths[2];
+        $this->exts->log($currentDomainUrl);
+        $this->exts->openUrl($currentDomainUrl . '/gp/payments-account/past-settlements.html');
         sleep(20);
         $marketplaces = $this->exts->getElementsAttribute('select#sc-mkt-picker-switcher-select option.sc-mkt-picker-switcher-select-option', 'value');
         $this->exts->log('NUMBER OF marketplaces: ' . count($marketplaces));
@@ -538,80 +558,73 @@ class PortalScriptCDP
             foreach ($marketplaces as $key => $marketplace_option) {
                 $this->exts->log('SWITCHING TO market place with path: ' . $marketplace_option);
                 $this->currentSelectedMarketPlace = $marketplace_option;
-                $this->exts->openUrl('https://sellercentral.amazon.co.uk/gp/payments-account/past-settlements.html');
+                $this->exts->openUrl('https://sellercentral.amazon.com/gp/payments-account/past-settlements.html');
                 sleep(15);
-                $this->changeSelectbox('select#sc-mkt-picker-switcher-select', $marketplace_option);
+                $this->exts->execute_javascript('let selectBox = document.querySelector("select#sc-mkt-picker-switcher-select");
+                selectBox.value = ' . $marketplace_option . ';
+                selectBox.dispatchEvent(new Event("change"));');
                 sleep(15);
 
                 if ($this->exts->querySelector($this->password_selector) == null) {
-                    $market_place_homepage = $this->exts->getUrl();
                     if ($this->exts->querySelector('a[href*="/gp/payments-account/settlement-summary.html/ref=xx_payments_tnav_xx"]')) {
                         $this->exts->moveToElementAndClick('a[href*="/gp/payments-account/settlement-summary.html/ref=xx_payments_tnav_xx"]');
                         sleep(15);
-                    } else {
-                        if ($this->exts->querySelector('a[href*="/gp/payments-account/settlement-summary.html/ref=xx_payments_"]')) {
-                            $this->exts->moveToElementAndClick('a[href*="/gp/payments-account/settlement-summary.html/ref=xx_payments_"]');
-                            sleep(15);
-                        }
                     }
-                    $market_place_homepage = $this->exts->getUrl();
 
-                    $Urldomain = "sellercentral.amazon.co.uk";
+                    $Urldomain = "sellercentral.amazon.com";
                     $currentUrl = $this->exts->getUrl();
                     $tempArr = parse_url($currentUrl);
                     $Urldomain = $tempArr["host"];
 
                     if ((int)@$this->transaction_invoices == 1) {
-                        $restrictPages = isset($this->exts->config_array["restrictPages"]) ? (int)@$this->exts->config_array["restrictPages"] : 3;
                         // Download from transaction page
-                        if ($restrictPages == 0) {
+                        if ($this->restrictPages == 0) {
                             $startDate = date('d.m.y', strtotime('-1 years'));
                         } else {
                             $startDate = date('d.m.y', strtotime('-2 months'));
                         }
                         $endDate = date('d.m.y');
-                        $transaction_url = 'https://' . $Urldomain . '/gp/payments-account/view-transactions.html?searchLanguage=de_DE&view=filter&eventType=&subview=dateRange&startDate=' . $startDate . '&endDate=' . $endDate . '&Update=&pageSize=Ten&mostRecentLast=0';
+                        $transaction_url = 'https://' . $Urldomain . '/gp/payments-account/view-transactions.html?searchLanguage=en_US&view=filter&eventType=&subview=dateRange&startDate=' . $startDate . '&endDate=' . $endDate . '&Update=&pageSize=Ten&mostRecentLast=0';
                         $this->exts->log('TRANSACTION URL: ' . $transaction_url);
                         $this->exts->openUrl($transaction_url);
-                        $this->downloadTransaction();
+                        sleep(10);
+
+                        if (count($this->exts->querySelectorAll('#content-top button[type="button"]')) > 1) {
+                            $this->downloadTransaction();
+
+                            //Click on other button "Standard or Invoice orders"
+                            $this->exts->openUrl($transaction_url);
+                            sleep(10);
+                            $this->exts->moveToElementAndClick('#content-top button.marketplace[type="button"]');
+                            sleep(10);
+                            $this->downloadTransaction();
+                        } else {
+                            $this->downloadTransaction();
+                        }
                     }
 
                     // Download from advertiser invoices
                     if ((int)@$this->no_advertising_bills != 1) {
-                        $this->exts->openUrl($market_place_homepage);
-                        sleep(10);
-                        if (stripos($this->exts->getUrl(), '/payments/reports/summary') !== false || stripos(
-                            $this->exts->getUrl(),
-                            '/payments-account/settlement-summary.html'
-                        ) !== false) {
-                            if ($this->exts->querySelector('a[href*="/gp/payments-account/settlement-summary.html/ref=xx_payments_tnav_xx"]')) {
-                                $this->exts->moveToElementAndClick('a[href*="/gp/payments-account/settlement-summary.html/ref=xx_payments_tnav_xx"]');
-                                sleep(15);
-                            } else {
-                                if ($this->exts->querySelector('a[href*="/gp/payments-account/settlement-summary.html/ref=xx_payments_"]')) {
-                                    $this->exts->moveToElementAndClick('a[href*="/gp/payments-account/settlement-summary.html/ref=xx_payments_"]');
-                                    sleep(15);
-                                }
-                            }
-                        } else {
-                            $this->exts->openUrl('https://' . $Urldomain . '/payments/reports/summary');
-                            sleep(15);
-                        }
-
-                        if ($this->exts->exists('a[href*="/gp/advertiser/transactions/transactions.html"]')) {
-                            $this->exts->moveToElementAndClick('a[href*="/gp/advertiser/transactions/transactions.html"]');
-                            $this->downloadAdvertiserInvoices();
-                        } else {
-                            //$this->exts->openUrl('https://'.$Urldomain.'/gp/advertiser/transactions/transactions.html');
-                            //$this->downloadAdvertiserInvoices();
-                            $this->exts->log('No Advertising Billing page found');
-                        }
+                        $this->exts->openUrl('https://' . $Urldomain . '/gp/advertiser/transactions/transactions.html');
+                        $this->downloadAdvertiserInvoices();
                     }
 
                     // Download from statement page
                     if ((int)@$this->payment_settlements == 1) {
                         $this->exts->openUrl('https://' . $Urldomain . '/gp/payments-account/past-settlements.html');
-                        $this->downloadStatements();
+                        sleep(10);
+                        if (count($this->exts->querySelectorAll('#content-top button[type="button"]')) > 1) {
+                            $this->downloadStatements();
+
+                            //Click on other button "Standard or Invoice orders"
+                            $this->exts->openUrl('https://' . $Urldomain . '/gp/payments-account/past-settlements.html');
+                            sleep(10);
+                            $this->exts->moveToElementAndClick('#content-top button.marketplace[type="button"]');
+                            sleep(10);
+                            $this->downloadStatements();
+                        } else {
+                            $this->downloadStatements();
+                        }
                     }
 
                     // Download from seller-fee-invoices
@@ -624,65 +637,74 @@ class PortalScriptCDP
                     $this->exts->capture("login-page-after-marketplace-change-" . $marketplace_option);
                 }
             }
+            $this->exts->openUrl($currentDomainUrl . '/gp/payments-account/past-settlements.html');
+            sleep(15);
         } else if ($this->exts->exists('#partner-switcher button.dropdown-button, button.partner-dropdown-button')) {
-            if ($this->exts->exists('[id*="react-joyride-step"] button[data-action="close"]')) {
-                $this->exts->moveToElementAndClick('[id*="react-joyride-step"] button[data-action="close"]');
-                sleep(2);
-            }
-            // Click partner dropdown
+            $merchant_links = array();
             $this->exts->moveToElementAndClick('#partner-switcher button.dropdown-button, button.partner-dropdown-button');
             sleep(1);
-            $partner_levels = $this->exts->getElements('#partner-switcher .partner-level .dropdown-arrow');
-            // It can be multil parter level, expand all then get all partner IDs
-            foreach ($partner_levels as $key => $partner_level) {
-                try {
-                    $this->exts->log('Expand partner level');
-                    $partner_level->click();
-                } catch (\Exception $exception) {
-                    $this->exts->executeSafeScript("arguments[0].click()", [$partner_level]);
-                }
-                sleep(2);
-            }
-            $this->exts->capture('multil-partner-checking');
-            $merchantLinks = $this->exts->querySelectorAll('#partner-switcher .partner-level ul.merchant-level li a');
-            $this->exts->log('Total partner Links - ' . count($merchantLinks));
-            $merchantLinkIDs = array();
-            // Process United Kingdom first, then other merchant
-            foreach ($merchantLinks as $merchantLink) {
-                $link_text = $merchantLink->getAttribute('innerText');
-                $link_id = $merchantLink->getAttribute('id');
-                if (
-                    strpos($link_text, 'United Kingdom') !== false ||
-                    strpos($link_text, 'Vereinigtes K') !== false ||
-                    strpos($link_text, 'Regno Unito') !== false ||
-                    strpos($link_text, 'Reino Unido') !== false ||
-                    strpos($link_text, 'Royaume-Uni') !== false
-                ) {
-                    // If selection is UK, push to First Item in array
-                    array_unshift($merchantLinkIDs, $link_id);
-                } else {
-                    array_push($merchantLinkIDs, $link_id);
-                }
-            }
-            $totalMerchantLinks = count($merchantLinkIDs);
-            $this->exts->log('Total Link IDs - ' . $totalMerchantLinks);
-            for ($idx = 0; $idx < $totalMerchantLinks; $idx++) {
-                $this->exts->log($merchantLinkIDs[$idx]);
-                $linkSelector = '#partner-switcher .partner-level ul.merchant-level li a#' . $merchantLinkIDs[$idx];
-                $this->exts->log('Link Selector - ' . $linkSelector);
-                $this->exts->moveToElementAndClick($linkSelector);
-                sleep(10);
-
-                if ($this->exts->querySelector($this->username_selector) != null || $this->exts->querySelector($this->password_selector) != null) {
-                    $this->checkFillLogin();
-                    $this->checkFillTwoFactor();
-                    if ($this->exts->exists('form#auth-account-fixup-phone-form a#ap-account-fixup-phone-skip-link')) {
-                        $this->exts->moveToElementAndClick('form#auth-account-fixup-phone-form a#ap-account-fixup-phone-skip-link');
-                        sleep(2);
+            $partner_levels = $this->exts->getElements('#partner-switcher .partner-level');
+            // It can be multil parter level, expand all then get all merchant IDs
+            foreach ($partner_levels as $partner_index => $partner_level) {
+                $dropdown_arrow = $this->exts->getElement('.dropdown-arrow', $partner_level);
+                $child_merchants = count($this->exts->getElements('ul.merchant-level li a[id]', $partner_level));
+                if ($dropdown_arrow != null && $child_merchants == 0) { // If no child merchant loaded, click to expand this partner level
+                    try {
+                        $this->exts->log('Expand partner level');
+                        $dropdown_arrow->click();
+                    } catch (\Exception $exception) {
+                        $this->exts->execute_javascript("arguments[0].click()", [$dropdown_arrow]);
                     }
                 }
+                sleep(2);
+                $partner_id = $this->exts->extract('label.partner-label', $partner_level, 'for');
+                $merchants = $this->exts->getElements('ul.merchant-level li a', $partner_level);
+                foreach ($merchants as $merchant) {
+                    $merchant_id = $merchant->getAttribute('id');
+                    $merchant_text = $merchant->getAttribute('innerText');
+                    if (stripos($merchant_text, 'United States') !== false) { // push US merchant to first
+                        array_unshift($merchant_links, array(
+                            'partner_id' => $partner_id,
+                            'merchant_id' => $merchant_id
+                        ));
+                    } else {
+                        array_push($merchant_links, array(
+                            'partner_id' => $partner_id,
+                            'merchant_id' => $merchant_id
+                        ));
+                    }
+                }
+            }
+            $this->exts->capture('partner-and-merchant-checking');
+            $this->exts->log('Total merchants - ' . count($merchant_links));
 
-                $this->exts->capture("partner-switch-" . $merchantLinkIDs[$idx]);
+            foreach ($merchant_links as $merchant) {
+                $this->exts->update_process_lock();
+                $partner_arrow_selector = '#partner-switcher .partner-level label.dropdown-arrow[for="' . $merchant['partner_id'] . '"]';
+                $merchant_selector = '#partner-switcher .partner-level label.partner-label[for="' . $merchant['partner_id'] . '"] + ul li a#' . $merchant['merchant_id'];
+                if (!$this->exts->exists('#partner-switcher button.dropdown-button, button.partner-dropdown-button')) {
+                    $this->exts->openUrl('https://sellercentral.amazon.com/home');
+                    sleep(10);
+                }
+                $this->exts->log('SWITCH to Merchant Selector - ' . $merchant_selector);
+                $this->exts->moveToElementAndClick('#partner-switcher button.dropdown-button, button.partner-dropdown-button');
+                sleep(1);
+                if (!$this->exts->exists($merchant_selector)) {
+                    // If expanding needed, click partner to expand all sub-merchants
+                    $this->exts->moveToElementAndClick($partner_arrow_selector);
+                    sleep(3);
+                }
+                $this->exts->moveToElementAndClick($merchant_selector);
+                sleep(10);
+
+
+                $this->exts->capture("partner-switch-" . $merchant['partner_id'] . $merchant['merchant_id']);
+                // Mukesh Kumar Singh
+                // do download if domain is not getting changed. so if domain is getting changed for any marketplace we will stop there and check other marketplace
+                // Because this happens from long time for some users it change and for some it is not
+                if (!$this->isLoginSuccess()) {
+                    continue;
+                }
 
                 if ($this->exts->querySelector('a[href*="/gp/payments-account/settlement-summary.html/ref=xx_payments_tnav_xx"]')) {
                     $this->exts->moveToElementAndClick('a[href*="/gp/payments-account/settlement-summary.html/ref=xx_payments_tnav_xx"]');
@@ -697,10 +719,9 @@ class PortalScriptCDP
                 $market_place_homepage = $this->exts->getUrl();
                 $this->exts->log('MarketPlace Home Page - ' . $market_place_homepage);
 
-                $Urldomain = "sellercentral.amazon.co.uk";
-                $currentUrl = $this->exts->getUrl();
-                $tempArr = parse_url($currentUrl);
-                $Urldomain = $tempArr["host"];
+                $currentDomainUrl = "https://sellercentral.amazon.com";
+                $tempArr = parse_url($market_place_homepage);
+                $currentDomainUrl = "https://" . $tempArr["host"];
 
                 if ((int)@$this->transaction_invoices == 1) {
                     // Download from transaction page
@@ -710,95 +731,53 @@ class PortalScriptCDP
                         $startDate = strtotime('-2 months') . '000';
                     }
                     $endDate = strtotime('now') . '000';
-                    $transaction_url = 'https://' . $Urldomain . '/payments/event/view?accountType=PAYABLE&startDate=' . $startDate . '&endDate=' . $endDate . '&resultsPerPage=50&pageNumber=1';
+                    $transaction_url = $currentDomainUrl . '/payments/event/view?accountType=PAYABLE&startDate=' . $startDate . '&endDate=' . $endDate . '&resultsPerPage=50&pageNumber=1';
                     $this->exts->log('TRANSACTION URL (Standard Orders): ' . $transaction_url);
                     $this->exts->openUrl($transaction_url);
                     $this->downloadTransaction();
-                    $transaction_url = 'https://' . $Urldomain . '/payments/event/view?accountType=INVOICING&startDate=' . $startDate . '&endDate=' . $endDate . '&resultsPerPage=50&pageNumber=1';
+                    $transaction_url = $currentDomainUrl . '/payments/event/view?accountType=INVOICING&startDate=' . $startDate . '&endDate=' . $endDate . '&resultsPerPage=50&pageNumber=1';
                     $this->exts->log('TRANSACTION URL (Invoiced Orders): ' . $transaction_url);
                     $this->exts->openUrl($transaction_url);
                     $this->downloadTransaction();
                 }
 
-                // Download from advertiser invoices
-                if ((int)@$this->no_advertising_bills != 1) {
-                    $this->exts->openUrl($market_place_homepage);
-                    sleep(10);
-                    if (stripos($this->exts->getUrl(), '/payments/reports/summary') !== false || stripos(
-                        $this->exts->getUrl(),
-                        '/payments-account/settlement-summary.html'
-                    ) !== false) {
-                        if ($this->exts->querySelector('a[href*="/gp/payments-account/settlement-summary.html/ref=xx_payments_tnav_xx"]')) {
-                            $this->exts->moveToElementAndClick('a[href*="/gp/payments-account/settlement-summary.html/ref=xx_payments_tnav_xx"]');
-                            sleep(15);
-                        } else {
-                            if ($this->exts->querySelector('a[href*="/gp/payments-account/settlement-summary.html/ref=xx_payments_"]')) {
-                                $this->exts->moveToElementAndClick('a[href*="/gp/payments-account/settlement-summary.html/ref=xx_payments_"]');
-                                sleep(15);
-                            }
-                        }
-                    } else {
-                        $this->exts->openUrl('https://' . $Urldomain . '/payments/reports/summary');
-                        sleep(15);
-                    }
-
-                    if (!$this->exts->exists('a[href*="/gp/advertiser/transactions/transactions.html"]')) {
-                        sleep(10);
-                    }
-                    if ($this->exts->exists('a[href*="/gp/advertiser/transactions/transactions.html"]')) {
-                        $this->exts->moveToElementAndClick('a[href*="/gp/advertiser/transactions/transactions.html"]');
-                        $this->downloadAdvertiserInvoices($merchantLinkIDs[$idx]);
-                    } else {
-                        //$this->exts->openUrl('https://'.$Urldomain.'/gp/advertiser/transactions/transactions.html');
-                        //$this->downloadAdvertiserInvoices();
-                        $this->exts->capture("No-advertising-Bill-" . $merchantLinkIDs[$idx]);
-                        $this->exts->log('No Advertising Billing page found');
-                    }
-                }
-
                 // Download from statement page
                 if ((int)@$this->payment_settlements == 1) {
-                    $this->exts->openUrl('https://' . $Urldomain . '/gp/payments-account/past-settlements.html');
+                    $this->exts->openUrl($currentDomainUrl . '/gp/payments-account/past-settlements.html');
                     $this->downloadStatements();
                 }
 
                 // Download from seller-fee-invoices
                 if ((int)@$this->seller_fees == 1) {
-                    $this->exts->openUrl('https://' . $Urldomain . '/tax/seller-fee-invoices');
+                    $this->exts->openUrl($currentDomainUrl . '/tax/seller-fee-invoices');
                     $this->downloadSellerFeeInvoice();
+                }
+                // Download from advertiser invoices
+                if ((int)@$this->no_advertising_bills != 1) {
+                    $this->exts->openUrl($currentDomainUrl . '/gp/advertiser/transactions/transactions.html');
+                    $this->downloadAdvertiserInvoices();
                 }
 
                 sleep(5);
-
                 if (!$this->exts->exists('#partner-switcher button.dropdown-button, button.partner-dropdown-button')) {
                     $this->exts->openUrl($market_place_homepage);
                     sleep(10);
                 }
-                $this->exts->moveToElementAndClick('#partner-switcher button.dropdown-button, button.partner-dropdown-button');
-                sleep(1);
+
+                $this->exts->update_process_lock();
             }
         } else {
             $this->no_marketplace = 0;
-            $this->exts->openUrl('https://sellercentral.amazon.co.uk/gp/payments-account/past-settlements.html');
+            $this->exts->openUrl($currentDomainUrl . '/gp/payments-account/past-settlements.html');
             sleep(15);
-
-            $Urldomain = "sellercentral.amazon.co.uk";
 
             if ($this->exts->querySelector('a[href*="/gp/payments-account/settlement-summary.html/ref=xx_payments_tnav_xx"]')) {
                 $this->exts->moveToElementAndClick('a[href*="/gp/payments-account/settlement-summary.html/ref=xx_payments_tnav_xx"]');
                 sleep(15);
-            } else if ($this->exts->querySelector('a[href*="/gp/payments-account/settlement-summary.html/ref=xx_payments_"]')) {
-                $this->exts->moveToElementAndClick('a[href*="/gp/payments-account/settlement-summary.html/ref=xx_payments_"]');
-                sleep(15);
-            } else {
-                $this->exts->openUrl('https://' . $Urldomain . '/payments/reports/summary');
-                sleep(15);
             }
 
-            $advertDocsExists = false;
-            if ($this->exts->exists('a[href*="/gp/advertiser/transactions/transactions.html"]')) {
-                $advertDocsExists = true;
-            }
+            $Urldomain = "sellercentral.amazon.com";
+
             if ((int)@$this->transaction_invoices == 1) {
                 // Download from transaction page
                 if ($this->restrictPages == 0) {
@@ -807,33 +786,96 @@ class PortalScriptCDP
                     $startDate = strtotime('-2 months') . '000';
                 }
                 $endDate = strtotime('now') . '000';
-                $transaction_url = 'https://' . $Urldomain . '/payments/event/view?accountType=PAYABLE&startDate=' . $startDate . '&endDate=' . $endDate . '&resultsPerPage=50&pageNumber=1';
+                $transaction_url = $currentDomainUrl . '/payments/event/view?accountType=PAYABLE&startDate=' . $startDate . '&endDate=' . $endDate . '&resultsPerPage=50&pageNumber=1';
                 $this->exts->log('TRANSACTION URL (Standard Orders): ' . $transaction_url);
                 $this->exts->openUrl($transaction_url);
                 $this->downloadTransaction();
-                $transaction_url = 'https://' . $Urldomain . '/payments/event/view?accountType=INVOICING&startDate=' . $startDate . '&endDate=' . $endDate . '&resultsPerPage=50&pageNumber=1';
+                $transaction_url = $currentDomainUrl . '/payments/event/view?accountType=INVOICING&startDate=' . $startDate . '&endDate=' . $endDate . '&resultsPerPage=50&pageNumber=1';
                 $this->exts->log('TRANSACTION URL (Invoiced Orders): ' . $transaction_url);
                 $this->exts->openUrl($transaction_url);
                 $this->downloadTransaction();
             }
 
             // Download from advertiser invoices
-            if ((int)@$this->no_advertising_bills != 1 && $advertDocsExists) {
-                $this->exts->openUrl('https://' . $Urldomain . '/gp/advertiser/transactions/transactions.html');
+            if ((int)@$this->no_advertising_bills != 1) {
+                $this->exts->openUrl($currentDomainUrl . '/gp/advertiser/transactions/transactions.html');
                 $this->downloadAdvertiserInvoices();
             }
 
             // Download from statement page
             if ((int)@$this->payment_settlements == 1) {
-                $this->exts->openUrl('https://' . $Urldomain . '/gp/payments-account/past-settlements.html');
+                $this->exts->openUrl($currentDomainUrl . '/gp/payments-account/past-settlements.html');
                 $this->downloadStatements();
             }
 
             // Download from seller-fee-invoices
             if ((int)@$this->seller_fees == 1) {
-                $this->exts->openUrl('https://' . $Urldomain . '/tax/seller-fee-invoices');
-                sleep(15);
+                $this->exts->openUrl($currentDomainUrl . '/tax/seller-fee-invoices');
                 $this->downloadSellerFeeInvoice();
+            }
+        }
+
+        // Final, check no invoice
+        if ($this->isNoInvoice) {
+            $this->exts->no_invoice();
+        }
+    }
+    private function downloadSellerFeeInvoice()
+    {
+        sleep(25);
+        $this->exts->capture("4-seller-fee-invoices-page");
+
+        $rows = $this->exts->querySelectorAll('table > tbody > tr');
+        foreach ($rows as $row) {
+            $tags = $this->exts->querySelectorAll('td', $row);
+            if (count($tags) >= 14 && $this->exts->querySelector('button[data-invoice]', end($tags)) != null) {
+                $invoice_button = $this->exts->querySelector('button[data-invoice]', end($tags));
+                $invoiceName = $invoice_button->getAttribute('data-invoice');
+                $invoiceFileName = $invoiceName . '.pdf';
+                $invoiceDate = trim($tags[count($tags) - 3]->getText());
+                $invoiceAmount = '';
+
+                $this->exts->log('--------------------------');
+                $this->exts->log('invoiceName: ' . $invoiceName);
+                $this->exts->log('invoiceDate: ' . $invoiceDate);
+                $this->exts->log('invoiceAmount: ' . $invoiceAmount);
+                $invoiceDate = $this->exts->parse_date($invoiceDate, 'D M d H:i:s * Y', 'Y-m-d');
+                $this->exts->log('Date parsed: ' . $invoiceDate);
+
+                // Download invoice if it not exisited
+                if ($this->exts->invoice_exists($invoiceName)) {
+                    $this->exts->log('Invoice existed ' . $invoiceFileName);
+                } else {
+                    try {
+                        $this->exts->log('Click download button');
+                        $invoice_button->click();
+                    } catch (\Exception $exception) {
+                        $this->exts->log('Click download button by javascript');
+                        $this->exts->execute_javascript("arguments[0].click()", [$invoice_button]);
+                    }
+                    sleep(10);
+                    $this->exts->wait_and_check_download('pdf');
+                    $downloaded_file = $this->exts->find_saved_file('pdf', $invoiceFileName);
+
+                    if (trim($downloaded_file) != '' && file_exists($downloaded_file)) {
+                        $this->exts->new_invoice($invoiceName, $invoiceDate, $invoiceAmount, $invoiceFileName);
+                        sleep(1);
+                    } else {
+                        $this->exts->log(__FUNCTION__ . '::No download ' . $invoiceFileName);
+                        $this->exts->execute_javascript("arguments[0].click()", [$invoice_button]);
+                        sleep(10);
+                        $this->exts->wait_and_check_download('pdf');
+                        $downloaded_file = $this->exts->find_saved_file('pdf', $invoiceFileName);
+
+                        if (trim($downloaded_file) != '' && file_exists($downloaded_file)) {
+                            $this->exts->new_invoice($invoiceName, $invoiceDate, $invoiceAmount, $invoiceFileName);
+                            sleep(1);
+                        } else {
+                            $this->exts->log(__FUNCTION__ . '::No download ' . $invoiceFileName);
+                        }
+                    }
+                }
+                $this->isNoInvoice = false;
             }
         }
     }
@@ -873,12 +915,6 @@ class PortalScriptCDP
                     if ($invoiceAltName == "---" || empty($checkText) || trim($checkText) == "") {
                         $invoiceAltName = $invoiceName;
                     }
-
-                    if ($invoiceName == '' || $invoiceName == null) {
-                        $invoiceName = time(); // create custom name in case no name found for this invoice
-                        sleep(2);
-                    }
-
                     if (!$this->exts->invoice_exists($invoiceName) || !$this->exts->invoice_exists($invoiceAltName)) {
                         array_push($invoices, array(
                             'invoiceName' => ($invoiceAltName != "" && $invoiceAltName != "---") ? $invoiceAltName : $invoiceName,
@@ -902,9 +938,7 @@ class PortalScriptCDP
                 $this->exts->log('invoiceAmount: ' . $invoice['invoiceAmount']);
                 $this->exts->log('invoiceUrl: ' . $invoice['invoiceUrl']);
 
-
-                $invoiceFileName =  !empty($invoice['invoiceName']) ? $invoice['invoiceName'] . '.pdf' : "";
-
+                $invoiceFileName = $invoice['invoiceName'] . '.pdf';
                 $parsed_date = $this->exts->parse_date($invoice['invoiceDate'], 'd M Y', 'Y-m-d');
                 if ($parsed_date == '') {
                     $parsed_date = $this->exts->parse_date($invoice['invoiceDate'], 'd#m#Y', 'Y-m-d');
@@ -917,7 +951,7 @@ class PortalScriptCDP
                 }
                 $this->exts->log('Date parsed: ' . $parsed_date);
 
-                $this->exts->openNewTab();
+                // $this->exts->open_new_window();
                 $this->exts->openUrl($invoice['invoiceUrl']);
                 sleep(5);
 
@@ -937,7 +971,6 @@ class PortalScriptCDP
                             // }
                         }
                     }
-
                     $this->exts->capture("2-login-page-filled");
                     $this->exts->moveToElementAndClick($this->submit_login_selector);
                     sleep(5);
@@ -946,7 +979,7 @@ class PortalScriptCDP
                     $this->exts->init_required();
                 }
                 sleep(5);
-                $this->exts->executeSafeScript('
+                $this->exts->execute_javascript('
                 document.querySelectorAll(\'div#container div#predictive-help\')[0].remove();
                 document.querySelectorAll(\'div#sc-top-nav\')[0].remove();
                 document.querySelectorAll(\'div#sc-footer-container\')[0].remove();
@@ -962,9 +995,13 @@ class PortalScriptCDP
                 }
 
                 // close new tab too avoid too much tabs
-                $this->exts->switchToInitTab();
-                sleep(2);
-                $this->exts->closeAllTabsButThis();
+                // $handles = $this->exts->webdriver->getWindowHandles();
+                // if (count($handles) > 1) {
+                //     $this->exts->webdriver->switchTo()->window(end($handles));
+                //     $this->exts->webdriver->close();
+                //     $handles = $this->exts->webdriver->getWindowHandles();
+                //     $this->exts->webdriver->switchTo()->window($handles[0]);
+                // }
             }
 
 
@@ -974,7 +1011,7 @@ class PortalScriptCDP
                     $this->exts->update_process_lock();
                 }
                 $pageCount++;
-                $this->exts->executeSafeScript('
+                $this->exts->execute_javascript('
                 document.querySelectorAll(\'.currentpagination + a\')[0].click();
             ');
                 //$this->exts->moveToElementAndClick('.currentpagination + a');
@@ -993,7 +1030,7 @@ class PortalScriptCDP
                         $this->isNoInvoice = false;
                         $invoiceName =  $this->exts->extract('[role="cell"]:nth-child(3)', $row);
                         $invoiceName = trim($invoiceName);
-                        $invoiceFileName = !empty($invoiceName) ? $invoiceName . '.pdf' : '';
+                        $invoiceFileName = $invoiceName . '.pdf';
                         $invoiceDate = $this->exts->extract('[role="cell"]:nth-child(1)', $row);
                         $amountText = $this->exts->extract('a#link-target', $row);
                         $invoiceAmount = preg_replace('/[^\d\.\,]/', '', $amountText);
@@ -1023,22 +1060,22 @@ class PortalScriptCDP
                                 $detail_button->click();
                             } catch (\Exception $exception) {
                                 $this->exts->log('Click detail button by javascript');
-                                $this->exts->executeSafeScript("arguments[0].click()", [$detail_button]);
+                                $this->exts->execute_javascript("arguments[0].click()", [$detail_button]);
                             }
                             sleep(1);
                             $this->exts->waitTillPresent('#sc-content-container .transaction-details-body-section .event-details-body');
                             if ($this->exts->exists('#sc-content-container .transaction-details-body-section .event-details-body')) {
                                 // Clear some alert, popup..etc
-                                $this->exts->executeSafeScript('
+                                $this->exts->execute_javascript('
                                 if(document.querySelector("kat-alert") != null){
-                                   document.querySelector("kat-alert").shadowRoot.querySelector("[part=alert-dismiss-button]").click();
+                                document.querySelector("kat-alert").shadowRoot.querySelector("[part=alert-dismiss-button]").click();
                                 }
                             ');
                                 $this->exts->moveToElementAndClick('.katHmdCancelBtn');
                                 // END clearing alert..
 
                                 // Capture page if detail displayed
-                                $this->exts->executeSafeScript('
+                                $this->exts->execute_javascript('
                                 var divs = document.querySelectorAll("body > div > *:not(#sc-content-container)");
                                 for( var i = 0; i < divs.length; i++){
                                     divs[i].style.display = "none";
@@ -1065,7 +1102,7 @@ class PortalScriptCDP
 
                 // Process next page
                 // This page using shadow element, We must process via JS
-                $is_next = $this->exts->executeSafeScript('
+                $is_next = $this->exts->execute_javascript('
                 try {
                     document.querySelector("kat-pagination").shadowRoot.querySelector("[part=pagination-nav-right]:not(.end)").click();
                     return true;
@@ -1083,7 +1120,6 @@ class PortalScriptCDP
     }
     private function downloadStatements($pageCount = 1)
     {
-        $this->exts->log(__FUNCTION__);
         sleep(15);
         $this->exts->capture("4-statements-page");
         if ($this->exts->exists('table > tbody > tr a[href*="/settlement-summary"]')) {
@@ -1111,11 +1147,6 @@ class PortalScriptCDP
                         $invoiceAmount = $invoiceAmount . ' EUR';
                     }
 
-                    if ($invoiceName == '' || $invoiceName == null) {
-                        $invoiceName = time(); // create custom name in case no name found for this invoice
-                        sleep(2);
-                    }
-
                     $invoiceAltName = "Seller-Invoice" . $invoiceDate;
                     if (!$this->exts->invoice_exists($invoiceName) && !$this->exts->invoice_exists($invoiceAltName)) {
                         array_push($invoices, array(
@@ -1140,7 +1171,7 @@ class PortalScriptCDP
                 $this->exts->log('invoiceAmount: ' . $invoice['invoiceAmount']);
                 $this->exts->log('invoiceUrl: ' . $invoice['invoiceUrl']);
 
-                $invoiceFileName = !empty($invoice['invoiceName']) ? $invoice['invoiceName'] . '.pdf' : "";
+                $invoiceFileName = $invoice['invoiceName'] . '.pdf';
                 $parsed_date = $this->exts->parse_date($invoice['invoiceDate'], 'd M Y', 'Y-m-d');
                 if ($parsed_date == '') {
                     $parsed_date = $this->exts->parse_date($invoice['invoiceDate'], 'd#m#Y', 'Y-m-d');
@@ -1153,7 +1184,7 @@ class PortalScriptCDP
                 }
                 $this->exts->log('Date parsed: ' . $parsed_date);
 
-                $this->exts->openNewTab();
+                // $this->exts->open_new_window();
                 $this->exts->openUrl($invoice['invoiceUrl']);
                 sleep(5);
 
@@ -1167,7 +1198,7 @@ class PortalScriptCDP
                 }
 
                 if (count($this->exts->querySelectorAll('#printableSections')) > 0) {
-                    $this->exts->executeSafeScript('
+                    $this->exts->execute_javascript('
                     var printableView = document.getElementById("printableSections");
                     var allLinks = document.getElementsByTagName("link");
                     var allStyles = document.getElementsByTagName("style");
@@ -1185,7 +1216,7 @@ class PortalScriptCDP
                         $this->exts->log(__FUNCTION__ . '::No download ' . $invoiceFileName);
                     }
                 } else if (count($this->exts->querySelectorAll('#sc-navbar-container')) > 0) {
-                    $this->exts->executeSafeScript('
+                    $this->exts->execute_javascript('
                     document.querySelectorAll("#sc-navbar-container")[0].remove();
                     document.querySelectorAll("article.dashboard-header")[0].remove();
                     document.querySelectorAll(".sc-footer")[0].remove();
@@ -1201,11 +1232,6 @@ class PortalScriptCDP
                 } else {
                     $this->exts->log(__FUNCTION__ . '::Page design is changed for print ' . $invoiceFileName);
                 }
-
-                // close new tab too avoid too much tabs
-                $this->exts->switchToInitTab();
-                sleep(2);
-                $this->exts->closeAllTabsButThis();
             }
 
             $restrictPages = isset($this->exts->config_array["restrictPages"]) ? (int)@$this->exts->config_array["restrictPages"] : 3;
@@ -1219,8 +1245,7 @@ class PortalScriptCDP
                 }
 
                 $pageCount++;
-                //$this->exts->moveToElementAndClick('.currentpagination + a');
-                $this->exts->executeSafeScript('
+                $this->exts->execute_javascript('
                 document.querySelectorAll(\'.currentpagination + a\')[0].click();
             ');
                 sleep(15);
@@ -1230,20 +1255,20 @@ class PortalScriptCDP
             // Huy added this 2021-12
             if ($this->exts->config_array["restrictPages"] == '0') {
                 $currentPageHeight = 0;
-                for ($i = 0; $i < 15 && $currentPageHeight != $this->exts->executeSafeScript('return document.body.scrollHeight;'); $i++) {
+                for ($i = 0; $i < 15 && $currentPageHeight != $this->exts->execute_javascript('return document.body.scrollHeight;'); $i++) {
                     $this->exts->log('Scroll to bottom ' . $currentPageHeight);
-                    $currentPageHeight = $this->exts->executeSafeScript('return document.body.scrollHeight;');
-                    $this->exts->executeSafeScript('window.scrollTo(0,document.body.scrollHeight);');
+                    $currentPageHeight = $this->exts->execute_javascript('return document.body.scrollHeight;');
+                    $this->exts->execute_javascript('window.scrollTo(0,document.body.scrollHeight);');
                     sleep(7);
                 }
                 sleep(5);
             }
 
             // It using shadow root, so collect invoice detail by JS
-            $invoices = $this->exts->executeSafeScript('
+            $invoices = $this->exts->execute_javascript('
             var data = [];
             var trs = document.querySelectorAll("kat-data-table tbody tr kat-link[href*=detail][href*=groupId]");
-        
+
             // Skip first row because it is current period, do not get it
             for (var i = 1; i < trs.length; i ++) {
                 var link = trs[i].shadowRoot.querySelector("a");
@@ -1266,15 +1291,14 @@ class PortalScriptCDP
                 $this->exts->log('invoiceDate: ' . $invoice['invoiceDate']);
                 $this->exts->log('invoiceAmount: ' . $invoice['invoiceAmount']);
                 $this->exts->log('invoiceUrl: ' . $invoice['invoiceUrl']);
-
-                $invoiceFileName = !empty($invoice['invoiceName']) ? $invoice['invoiceName'] . '.pdf' : "";
+                $invoiceFileName = $invoice['invoiceName'] . '.pdf';
                 $this->isNoInvoice = false;
 
                 // Download invoice if it not exisited
                 if ($this->exts->invoice_exists($invoice['invoiceName']) || $this->exts->document_exists($invoiceFileName)) {
                     $this->exts->log('Invoice existed ' . $invoiceFileName);
                 } else {
-                    $this->exts->openNewTab();
+                    // $this->exts->open_new_window();
                     $this->exts->openUrl($invoice['invoiceUrl']);
                     sleep(2);
                     $this->checkFillLogin();
@@ -1284,9 +1308,9 @@ class PortalScriptCDP
 
                     if ($this->exts->exists('.dashboard-content #print-this-page-link')) {
                         // Clear some alert, popup..etc
-                        $this->exts->executeSafeScript('
+                        $this->exts->execute_javascript('
                         if(document.querySelector("kat-alert") != null){
-                           document.querySelector("kat-alert").shadowRoot.querySelector("[part=alert-dismiss-button]").click();
+                        document.querySelector("kat-alert").shadowRoot.querySelector("[part=alert-dismiss-button]").click();
                         }
                     ');
                         $this->exts->moveToElementAndClick('.katHmdCancelBtn');
@@ -1304,398 +1328,140 @@ class PortalScriptCDP
                     } else {
                         $this->exts->capture('statement-detail-error');
                     }
-
-                    // close new tab too avoid too much tabs
-                    $this->exts->switchToInitTab();
-                    sleep(2);
-                    $this->exts->closeAllTabsButThis();
                 }
             }
         }
     }
-    private function downloadSellerFeeInvoice()
+    private function downloadAdvertiserInvoices()
     {
         sleep(25);
-        $this->exts->capture("4-seller-fee-invoices-page");
+        $this->exts->capture("4-advertiser-invoices-page");
 
-        $total_fee_downloaded = 0;
-        $rows = $this->exts->querySelectorAll('table > tbody > tr');
-        $this->exts->log("Number of seller fees rows - " . count($rows));
-        foreach ($rows as $row) {
-            $tags = $this->exts->querySelectorAll('td', $row);
-            if (count($tags) >= 14 && $this->exts->querySelector('button[data-invoice]', end($tags)) != null) {
-                $invoice_button = $this->exts->querySelector('button[data-invoice]', end($tags));
-                $invoiceName = $this->exts->extract('td:nth-child(6)', $row);
-                $invoiceFileName = !empty($invoiceName) ? $invoiceName . '.pdf' : time();
-                sleep(1);
-                $invoiceDate = trim($tags[count($tags) - 3]->getText());
-                $invoiceAmount = '';
-
-                $this->exts->log('--------------------------');
-                $this->exts->log('invoiceName: ' . $invoiceName);
-                $this->exts->log('invoiceDate: ' . $invoiceDate);
-                $this->exts->log('invoiceAmount: ' . $invoiceAmount);
-                $invoiceDate = $this->exts->parse_date($invoiceDate, 'D M d H:i:s * Y', 'Y-m-d');
-                $this->exts->log('Date parsed: ' . $invoiceDate);
-
-                // Download invoice if it not exisited
-                if ($this->exts->invoice_exists($invoiceName)) {
-                    $this->exts->log('Invoice existed ' . $invoiceFileName);
-                } else {
-                    try {
-                        $this->exts->log('Click download button');
-                        $invoice_button->click();
-                    } catch (\Exception $exception) {
-                        $this->exts->log('Click download button by javascript');
-                        $this->exts->executeSafeScript("arguments[0].click()", [$invoice_button]);
-                    }
-                    sleep(10);
-                    $this->exts->wait_and_check_download('pdf');
-                    $downloaded_file = $this->exts->find_saved_file('pdf', $invoiceFileName);
-
-                    if (trim($downloaded_file) != '' && file_exists($downloaded_file)) {
-                        $this->exts->new_invoice($invoiceName, $invoiceDate, $invoiceAmount, $invoiceFileName);
-                        sleep(1);
-                    } else {
-                        $this->exts->log(__FUNCTION__ . '::No pdf ' . $invoiceFileName);
-                        // Invoice maybe old and it is html, implement code if user require them
-                    }
-
-                    // close new tab too avoid too much tabs
-                    $this->exts->switchToInitTab();
-                    sleep(2);
-                    $this->exts->closeAllTabsButThis();
-                }
-                $total_fee_downloaded++;
-                $this->isNoInvoice = false;
+        if ($this->exts->querySelector('select#sc-mkt-picker-switcher-select option.sc-mkt-picker-switcher-select-option[value*="' . trim($this->currentSelectedMarketPlace) . '"]') != null || (int)@$this->no_marketplace == 0) {
+            if ((int)@$this->no_marketplace != 0) {
+                $this->exts->log("Checking marketplace is swtiched correctly");
+                $selectedMarketplace = $this->exts->querySelector('select#sc-mkt-picker-switcher-select option.sc-mkt-picker-switcher-select-option[value*="' . trim($this->currentSelectedMarketPlace) . '"]')->getAttribute('selected');
+                $this->exts->log("Selected Marketplace - " . $selectedMarketplace);
+            } else {
+                $this->exts->log("Selected Marketplace - No MarketPlace");
             }
-            if ($total_fee_downloaded >= 50) break;
-        }
-    }
-    private function downloadSellerVATInvoice($pageCount = 1)
-    {
-        sleep(10);
-        $date_format = "m.d.Y";
-        $startDate = date($date_format, strtotime('-7 days'));
-        if ($this->exts->exists('select[name="reportType"]') && $pageCount == 1) {
-            $this->changeSelectbox('select[name="reportType"]', "VAT Invoices");
-            sleep(10);
-            if ($this->exts->exists('li#vtr-start-date2 input#vtr-start-date-calendar2')) {
-                $currentStart_date = $this->exts->querySelector('li#vtr-start-date2 input#vtr-start-date-calendar2')->getAttribute('aria-label');
-
-                if (stripos($currentStart_date, "m/d") !== false || stripos($currentStart_date, "d/y") !== false) {
+            if ($selectedMarketplace != null || (int)@$this->no_marketplace == 0) {
+                if ($this->exts->waitTillPresent('.calendarsContainer input#startCal')) {
+                    $currentStart_date = $this->exts->querySelector('.calendarsContainer input#startCal')->getAttribute('aria-label');
                     $date_format = "m/d/Y";
-                } else if (stripos($currentStart_date, "m-d") !== false || stripos($currentStart_date, "d-y") !== false) {
-                    $date_format = "m-d-Y";
-                }
-                $this->exts->log(__FUNCTION__ . '::Date format ' . $date_format);
-                $startDate = date($date_format, strtotime('-7 days'));
-                $endDate = date($date_format);
+                    if (stripos($currentStart_date, "d/m") !== false || stripos($currentStart_date, "m/y") !== false) {
+                        $date_format = "d/m/Y";
+                    } else if (stripos($currentStart_date, "d-m") !== false || stripos($currentStart_date, "m-y") !== false) {
+                        $date_format = "d-m-Y";
+                    } else if (stripos($currentStart_date, "m/d") !== false || stripos($currentStart_date, "d/y") !== false) {
+                        $date_format = "m/d/Y";
+                    } else if (stripos($currentStart_date, "m-d") !== false || stripos($currentStart_date, "d-y") !== false) {
+                        $date_format = "m-d-Y";
+                    }
+                    $this->exts->log(__FUNCTION__ . '::Date format ' . $date_format);
+                    // if restrictpages == 0 then 2 years otherwise 2 month
+                    $endDate = date($date_format);
+                    if ($this->restrictPages == 0) {
+                        $startDate = date($date_format, strtotime('-2 years'));
+                    } else {
+                        $startDate = date($date_format, strtotime('-2 months'));
+                    }
 
-                $this->exts->moveToElementAndType('li#vtr-start-date2 input#vtr-start-date-calendar2', $startDate);
-                sleep(1);
-                $this->exts->moveToElementAndType('li#vtr-end-date1 input#vtr-end-date-calendar1', $endDate);
-                sleep(1);
-                $this->exts->capture("4-seller-vat-1-filter");
-                $this->exts->moveToElementAndClick('form#vtr-request-report-form-Bulk-Downlaod input#generate-report-button[type="submit"]');
-                sleep(15);
-                $this->exts->capture("4-seller-vat-2-submitted");
-                $this->exts->openUrl('https://sellercentral.amazon.co.uk/tax/vatreports/bulkdownload');
-                sleep(60);
-            }
-        }
-
-        $this->exts->capture("4-seller-vat-invoices-page");
-
-        $invoices = [];
-        $rows = $this->exts->querySelectorAll('table > tbody > tr');
-        $this->exts->log("Number of VAT Invoice rows - " . count($rows));
-        foreach ($rows as $row) {
-            $tags = $this->exts->querySelectorAll('td', $row);
-            if (count($tags) >= 4 && $this->exts->querySelector('a[href*="/invoice/download/id/"]', $tags[3]) != null) {
-                $invoiceUrl = $this->exts->querySelector('a[href*="/invoice/download/id/"]', $tags[3])->getAttribute("href");
-                $invoiceName = explode(
-                    '/',
-                    array_pop(explode('/id/', $invoiceUrl))
-                )[0];
-                $invoiceName = preg_replace('/[^\w]/', '', $invoiceName);
-                $invoiceDate = trim($tags[1]->getText());
-                $invoiceAmount = '';
-
-                $downloadBtn = $this->exts->querySelector('a[href*="/invoice/download/id/"]', $tags[3]);
-
-                array_push($invoices, array(
-                    'invoiceName' => $invoiceName,
-                    'invoiceDate' => $invoiceDate,
-                    'invoiceAmount' => $invoiceAmount,
-                    'invoiceUrl' => $invoiceUrl,
-                    'downloadBtn' => $downloadBtn
-                ));
-                $this->isNoInvoice = false;
-            }
-        }
-
-        // Download all invoices
-        $this->exts->log('Seller VAT Invoices found: ' . count($invoices));
-        foreach ($invoices as $invoice) {
-            $this->exts->log('--------------------------');
-            $this->exts->log('invoiceName: ' . $invoice['invoiceName']);
-            $this->exts->log('invoiceDate: ' . $invoice['invoiceDate']);
-            $this->exts->log('invoiceAmount: ' . $invoice['invoiceAmount']);
-            $this->exts->log('invoiceUrl: ' . $invoice['invoiceUrl']);
-
-            $invoiceFileName = $invoice['invoiceName'] . '.zip';
-            $parsed_date = $this->exts->parse_date($invoice['invoiceDate'], 'd M Y', 'Y-m-d');
-            if ($parsed_date == '') {
-                $parsed_date = $this->exts->parse_date($invoice['invoiceDate'], 'd# M Y', 'Y-m-d');
-            }
-            if ($parsed_date == '') {
-                $parsed_date = $this->exts->parse_date($invoice['invoiceDate'], 'M d# Y', 'Y-m-d');
-            }
-            $this->exts->log('Date parsed: ' . $parsed_date);
-
-            $downloaded_file = $this->exts->direct_download($invoice['invoiceUrl'], 'zip', $invoiceFileName);
-            if (trim($downloaded_file) != '' && file_exists($downloaded_file)) {
-                $this->exts->new_invoice($invoice['invoiceName'], $parsed_date, $invoice['invoiceAmount'], $invoiceFileName);
-                sleep(1);
-            } else {
-                try {
-                    $this->exts->log('Click download button');
-                    $invoice['downloadBtn']->click();
-                } catch (\Exception $exception) {
-                    $this->exts->log('Click download button by javascript');
-                    $this->exts->executeSafeScript("arguments[0].click()", [$invoice['downloadBtn']]);
-                }
-                sleep(15);
-                $this->exts->wait_and_check_download('pdf');
-                $downloaded_file = $this->exts->find_saved_file('pdf', $invoiceFileName);
-                if (trim($downloaded_file) != '' && file_exists($downloaded_file)) {
-                    $this->exts->new_invoice($invoice['invoiceName'], $parsed_date, $invoice['invoiceAmount'], $invoiceFileName);
+                    $this->exts->moveToElementAndType('.calendarsContainer input#startCal', $startDate);
                     sleep(1);
-                } else {
+                    $this->exts->moveToElementAndType('.calendarsContainer input#endCal', $endDate);
+                    sleep(1);
+                    $this->exts->capture("4-advertiser-invoices-1-filter");
+                    $this->exts->moveToElementAndClick('.calendarsContainer [type="submit"]');
                     sleep(15);
-                    $this->exts->wait_and_check_download('pdf');
-                    $downloaded_file = $this->exts->find_saved_file('pdf', $invoiceFileName);
-                    if (trim($downloaded_file) != '' && file_exists($downloaded_file)) {
-                        $this->exts->new_invoice($invoice['invoiceName'], $parsed_date, $invoice['invoiceAmount'], $invoiceFileName);
-                        sleep(1);
-                    } else {
-                        $this->exts->log(__FUNCTION__ . '::No download ' . $invoiceFileName);
-                    }
+                    $this->exts->capture("4-advertiser-invoices-2-submitted");
                 }
-            }
-        }
 
-        $restrictPages = isset($this->exts->config_array["restrictPages"]) ? (int)@$this->exts->config_array["restrictPages"] : 3;
-        if ($restrictPages == 0 && $pageCount < 25 && $this->exts->querySelector('#formForNextPage button#nextButton') != null) {
-            if (count($invoices) == 0) {
-                $this->exts->update_process_lock();
-            }
-            $pageCount++;
-            $this->exts->moveToElementAndClick('#formForNextPage button#nextButton');
-            sleep(5);
-            $this->downloadSellerVATInvoice($pageCount);
-        }
-    }
-    private function downloadAdvertiserInvoices($partnerId = '')
-    {
-        sleep(25);
-        if ($this->exts->exists('button[class*="CloseButton"]')) {
-            $this->exts->moveToElementAndClick('button[class*="CloseButton"]');
-            sleep(2);
-        }
-        $this->exts->capture("4-advertiser-invoices-page" . $partnerId);
-
-        //if($this->exts->querySelector('select#sc-mkt-picker-switcher-select option.sc-mkt-picker-switcher-select-option[value*="'.trim($this->currentSelectedMarketPlace).'"]') != null || (int)@$this->no_marketplace == 0) {
-        /* With New Design Marketplace check is not possible
-    if((int)@$this->no_marketplace != 0) {
-        $this->exts->log("Checking marketplace is swtiched correctly");
-        $selectedMarketplace = $this->exts->querySelector('select#sc-mkt-picker-switcher-select option.sc-mkt-picker-switcher-select-option[value*="'.trim($this->currentSelectedMarketPlace).'"]')->getAttribute('selected');
-        $this->exts->log("Selected Marketplace - ".$selectedMarketplace);
-    } else {
-        $this->exts->log("Selected Marketplace - No MarketPlace");
-    }*/
-        $selectedMarketplace = $this->currentSelectedMarketPlace;
-        $this->exts->log("Selected Marketplace - " . $selectedMarketplace);
-        $restrictPages = isset($this->exts->config_array["restrictPages"]) ? (int)@$this->exts->config_array["restrictPages"] : 3;
-        //Remove this check because now checking marketplace is not possible in billing page
-        //if($selectedMarketplace != null || (int)@$this->no_marketplace == 0) {
-        if ($this->exts->exists('.calendarsContainer input#startCal')) {
-            $currentStart_date = $this->exts->querySelector('.calendarsContainer input#startCal')->getAttribute('aria-label');
-            $date_format = "d.m.Y";
-            if (stripos($currentStart_date, "d/m") !== false || stripos($currentStart_date, "m/y") !== false) {
-                $date_format = "d/m/Y";
-            } else if (stripos($currentStart_date, "d-m") !== false || stripos($currentStart_date, "m-y") !== false) {
-                $date_format = "d-m-Y";
-            }
-            $this->exts->log(__FUNCTION__ . '::Date format ' . $date_format);
-            // if restrictpages == 0 then 2 years otherwise 2 month
-            $endDate = date($date_format);
-            if ($restrictPages == 0) {
-                $startDate = date($date_format, strtotime('-2 years'));
-            } else {
-                $startDate = date($date_format, strtotime('-2 months'));
-            }
-
-            $this->exts->moveToElementAndType('.calendarsContainer input#startCal', $startDate);
-            sleep(1);
-            $this->exts->moveToElementAndType('.calendarsContainer input#endCal', $endDate);
-            sleep(1);
-            $this->exts->capture("4-advertiser-invoices-1-filter");
-            $this->exts->moveToElementAndClick('.calendarsContainer [type="submit"]');
-            sleep(15);
-            $this->exts->capture("4-advertiser-invoices-2-submitted");
-        } else if ($this->exts->exists('.calendarsContainer button')) {
-            $this->exts->moveToElementAndClick('.calendarsContainer button');
-            sleep(1);
-            if ($restrictPages != 0) {
-                $this->exts->moveToElementAndClick('.calendarsContainer button[value="last90Days"]');
-                sleep(15);
-            }
-        }
-
-        // get invoice
-        for ($paging_count = 1; $paging_count < 100; $paging_count++) {
-            $invoices = [];
-            $rows = count($this->exts->querySelectorAll('table#paidTable > tbody > tr'));
-            for ($i = 0; $i < $rows; $i++) {
-                $row = $this->exts->querySelectorAll('table#paidTable > tbody > tr')[$i];
-                $download_button = $this->exts->getElement('.dwnld-icon-alignment .dwnld-btn-enb', $row);
-                if ($download_button != null) {
-                    $invoiceName =  trim($this->exts->extract('td[id^="invoice-number"]', $row));
-                    $invoiceFileName =  !empty($invoiceName) ? $invoiceName . '.pdf' : '';
-                    $invoiceDate = trim($this->exts->extract('td[id^="invoice-date"]', $row));
-                    $amountText = trim($this->exts->extract('td[id^="invoice-total"]', $row));
-                    $invoiceAmount = preg_replace('/[^\d\.\,]/', '', $amountText);
-                    if (stripos($amountText, 'A$') !== false) {
-                        $invoiceAmount = $invoiceAmount . ' AUD';
-                    } else if (stripos($amountText, '$') !== false) {
-                        $invoiceAmount = $invoiceAmount . ' USD';
-                    } else if (stripos(urlencode($amountText), '%C2%A3') !== false) {
-                        $invoiceAmount = $invoiceAmount . ' GBP';
-                    } else {
-                        $invoiceAmount = $invoiceAmount . ' EUR';
-                    }
-
-                    $this->exts->log('--------------------------');
-                    $this->exts->log('invoiceName: ' . $invoiceName);
-                    $this->exts->log('invoiceDate: ' . $invoiceDate);
-                    $this->exts->log('invoiceAmount: ' . $invoiceAmount);
-                    $parsed_date = $this->exts->parse_date($invoiceDate, 'd-M-Y', 'Y-m-d');
-                    $this->exts->log('Date parsed: ' . $parsed_date);
-
-                    // Download invoice if it not exisited
-                    if ($this->exts->invoice_exists($invoiceName) || $this->exts->document_exists($invoiceFileName)) {
-                        $this->exts->log('Invoice existed ' . $invoiceFileName);
-                    } else {
-                        try {
-                            $this->exts->log('Click download button');
-                            $download_button->click();
-                        } catch (\Exception $exception) {
-                            $this->exts->log('Click download button by javascript');
-                            $this->exts->executeSafeScript("arguments[0].click()", [$download_button]);
-                        }
-                        sleep(1);
-                        $this->exts->moveToElementAndClick('.a-popover[aria-hidden="false"] a[id$="invoicePDF"]');
-                        sleep(5);
-                        $this->exts->wait_and_check_download('pdf');
-                        $downloaded_file = $this->exts->find_saved_file('pdf', $invoiceFileName);
-
-                        if (trim($downloaded_file) != '' && file_exists($downloaded_file)) {
-                            $this->exts->new_invoice($invoiceName, $parsed_date, $invoiceAmount, $invoiceFileName);
-                            sleep(1);
-                        } else {
-                            $this->exts->log(__FUNCTION__ . '::No download ' . $invoiceFileName);
-                        }
-                    }
-                    $this->isNoInvoice = false;
-                }
-            }
-
-            // Process next page
-            if ($this->exts->exists('ul.a-pagination li.a-last:not(.a-disabled)')) {
-                $this->exts->moveToElementAndClick('ul.a-pagination li.a-last:not(.a-disabled)');
-                sleep(10);
-            } else {
-                break;
-            }
-        }
-    }
-    private function downloadOrderInvoices($pagecount = 1)
-    {
-        $this->exts->capture('order-page');
-        $temp_paths = explode('/', $this->exts->getUrl());
-        $current_domain_country = end(explode('amazon.', $temp_paths[2]));
-
-        $rows = $this->exts->querySelectorAll('#orders-table tbody tr');
-        foreach ($rows as $row) {
-            $tags = $this->exts->querySelectorAll('td', $row);
-            $invoice_manage_button = $this->exts->querySelector('[data-test-id="manage-idu-invoice-button"] input[type="submit"]', $row);
-            if ($invoice_manage_button != null) {
-                try {
-                    $invoice_manage_button->click();
-                } catch (\Exception $exception) {
-                    $this->exts->executeSafeScript("arguments[0].click();", [$invoice_manage_button]);
-                }
-                sleep(2);
-                $this->exts->waitTillPresent('.a-popover-modal[aria-hidden="false"] kat-table-body [role="row"]');
-                sleep(2);
-
-                $popRows = $this->exts->querySelectorAll('.a-popover-modal[aria-hidden="false"] kat-table-body [role="row"]');
-                foreach ($popRows as $popRow) {
-                    $invoice_link = $this->exts->querySelector('a[href*="/invoice/download"]', $popRow);
-                    if ($invoice_link != null) {
-                        $this->isNoInvoice = false;
-                        $invoiceName = trim($this->exts->extract('td:nth-child(3)', $popRow));
-                        if (!$this->exts->invoice_exists($invoiceName)) {
-                            $invoiceFileName = !empty($invoiceName) ? $invoiceName . '.pdf' : '';
-                            $invoiceAmount = '';
-                            $invoiceDate = '';
-                            $invoiceUrl = $invoice_link->getAttribute('href');
+                // get invoice
+                for ($paging_count = 1; $paging_count < 100; $paging_count++) {
+                    $invoices = [];
+                    $rows = count($this->exts->querySelectorAll('table#paidTable > tbody > tr'));
+                    for ($i = 0; $i < $rows; $i++) {
+                        $row = $this->exts->querySelectorAll('table#paidTable > tbody > tr')[$i];
+                        $download_button = $this->exts->getElement('.dwnld-icon-alignment .dwnld-btn-enb', $row);
+                        if ($download_button != null) {
+                            $invoiceName =  trim($this->exts->extract('td[id^="invoice-number"]', $row));
+                            $invoiceFileName = $invoiceName . '.pdf';
+                            $invoiceDate = trim($this->exts->extract('td[id^="invoice-date"]', $row));
+                            $amountText = trim($this->exts->extract('td[id^="invoice-total"]', $row));
+                            $invoiceAmount = preg_replace('/[^\d\.\,]/', '', $amountText);
+                            if (stripos($amountText, 'A$') !== false) {
+                                $invoiceAmount = $invoiceAmount . ' AUD';
+                            } else if (stripos($amountText, '$') !== false) {
+                                $invoiceAmount = $invoiceAmount . ' USD';
+                            } else if (stripos(urlencode($amountText), '%C2%A3') !== false) {
+                                $invoiceAmount = $invoiceAmount . ' GBP';
+                            } else {
+                                $invoiceAmount = $invoiceAmount . ' EUR';
+                            }
 
                             $this->exts->log('--------------------------');
                             $this->exts->log('invoiceName: ' . $invoiceName);
                             $this->exts->log('invoiceDate: ' . $invoiceDate);
                             $this->exts->log('invoiceAmount: ' . $invoiceAmount);
-                            $this->exts->log('invoiceUrl: ' . $invoiceUrl);
-                            $this->exts->log('invoiceFileName: ' . $invoiceFileName);
+                            $parsed_date = $this->exts->parse_date($invoiceDate, 'd-M-Y', 'Y-m-d');
+                            $this->exts->log('Date parsed: ' . $parsed_date);
 
-                            // Huy 2021-11, If invoice url is from other domain, It required login, do below trick to avoid login form
-                            $invoice_url_paths = explode('/', $invoiceUrl);
-                            $invoice_domain_country = end(explode('amazon.', $invoice_url_paths[2]));
-                            if ($invoice_domain_country != $current_domain_country) {
-                                $invoice_url_paths[2] = str_replace($invoice_domain_country, $current_domain_country, $invoice_url_paths[2]);
-                                $invoiceUrl = join('/', $invoice_url_paths);
-                                $this->exts->log('invoice Url domain corrected: ' . $invoiceUrl);
-                            }
-
-                            $this->exts->openNewTab();
-                            $downloaded_file = $this->exts->direct_download($invoiceUrl, 'pdf', $invoiceFileName);
-                            if (trim($downloaded_file) != '' && file_exists($downloaded_file)) {
-                                $this->exts->new_invoice($invoiceName, '', '', $invoiceFileName);
-                                sleep(1);
+                            // Download invoice if it not exisited
+                            if ($this->exts->invoice_exists($invoiceName) || $this->exts->document_exists($invoiceFileName)) {
+                                $this->exts->log('Invoice existed ' . $invoiceFileName);
                             } else {
-                                $this->exts->log(__FUNCTION__ . '::No download ' . $invoiceFileName);
-                            }
+                                $this->exts->click_element($download_button);
+                                sleep(1);
+                                $this->exts->click_element('.a-popover[aria-hidden="false"] a[id$="invoicePDF"]');
+                                sleep(5);
+                                $this->exts->wait_and_check_download('pdf');
+                                $downloaded_file = $this->exts->find_saved_file('pdf', $invoiceFileName);
 
-                            // close new tab too avoid too much tabs
-                            $this->exts->switchToInitTab();
-                            sleep(2);
-                            $this->exts->closeAllTabsButThis();
-                        } else {
-                            $this->exts->log('Invoice existed - ' . $invoiceName);
+                                if (trim($downloaded_file) != '' && file_exists($downloaded_file)) {
+                                    $this->exts->new_invoice($invoiceName, $parsed_date, $invoiceAmount, $invoiceFileName);
+                                    sleep(1);
+                                } else {
+                                    $this->exts->log(__FUNCTION__ . '::No download ' . $invoiceFileName);
+                                }
+                            }
+                            $this->isNoInvoice = false;
                         }
+                    }
+
+                    // Process next page
+                    if ($this->exts->waitTillPresent('ul.a-pagination li.a-last:not(.a-disabled)')) {
+                        $this->exts->moveToElementAndClick('ul.a-pagination li.a-last:not(.a-disabled)');
+                        sleep(10);
+                    } else {
+                        break;
                     }
                 }
             }
         }
+    }
 
-        $have_next_page = $this->exts->exists('.footer .pagination-controls .a-pagination .a-last a');
-        if ($have_next_page && $pagecount < 10) {
-            $this->exts->moveToElementAndClick('.footer .pagination-controls .a-pagination .a-last a');
-            sleep(15);
-            $pagecount++;
-            $this->downloadOrderInvoices($pagecount);
+    function checkSolveCaptcha()
+    {
+        if ($this->exts->exists('form[action*="/errors/validateCaptcha"]')) {
+            $this->exts->processCaptcha('form[action*="/errors/validateCaptcha"] img', 'form[action*="/errors/validateCaptcha"] input#captchacharacters ');
+            $this->exts->capture('captcha-filled');
+            $this->exts->moveToElementAndClick('form[action*="/errors/validateCaptcha"] [type="submit"]');
+            sleep(10);
+        }
+
+        if ($this->exts->exists('form[action*="/errors/validateCaptcha"]')) {
+            $this->exts->processCaptcha('form[action*="/errors/validateCaptcha"] img', 'form[action*="/errors/validateCaptcha"] input#captchacharacters');
+            $this->exts->capture('captcha-filled');
+            $this->exts->moveToElementAndClick('form[action*="/errors/validateCaptcha"] [type="submit"]');
+            sleep(10);
+        }
+
+        if ($this->exts->exists('form[action*="/errors/validateCaptcha"]')) {
+            $this->exts->processCaptcha('form[action*="/errors/validateCaptcha"] img', 'form[action*="/errors/validateCaptcha"] input#captchacharacters');
+            $this->exts->capture('captcha-filled');
+            $this->exts->moveToElementAndClick('form[action*="/errors/validateCaptcha"] [type="submit"]');
+            sleep(10);
         }
     }
 }
