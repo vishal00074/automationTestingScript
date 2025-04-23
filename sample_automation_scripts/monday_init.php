@@ -8,6 +8,7 @@ public $webaddress_selector = 'div.choose_slug form.login-form input#slug';
 public $submit_button_selector = '.login_button-wrapper > button.submit_button';
 public $alt_submit_button_selector = 'div.email_first form.login-form button.submit_button[type="submit"]';
 public $slug_submit_button_selector = 'div.choose_slug form.login-form button.submit_button[type="submit"]';
+public $check_login_success_selector = 'div.surface-avatar-menu-component';
 public $login_tryout = 0;
 public $restrictPages = 3;
 public $account_webaddress = '';
@@ -21,114 +22,26 @@ private function initPortal($count)
     $this->restrictPages = isset($this->exts->config_array["restrictPages"]) ? (int)@$this->exts->config_array["restrictPages"] : 3;
     $this->account_webaddress = isset($this->exts->config_array["account_webaddress"]) ? trim($this->exts->config_array["account_webaddress"]) : "";
 
+    $this->account_webaddress = strtolower(str_replace(' ', '', trim($this->account_webaddress)));
     $this->exts->log('Account Web Address - ' . $this->account_webaddress);
-
     if (!empty($this->account_webaddress) && trim($this->account_webaddress) != "") {
         if (strpos($this->account_webaddress, 'http') === false) {
             $this->account_webaddress = 'https://' . $this->account_webaddress;
         }
+        if (stripos($this->account_webaddress, '.') === false) {
+            $this->account_webaddress = $this->account_webaddress . '.monday.com';
+        }
         $this->exts->log('Account Web Address - ' . $this->account_webaddress);
     }
-
+    $this->exts->loadCookiesFromFile();
     if (!empty($this->account_webaddress) && trim($this->account_webaddress) != "") {
         $this->exts->openUrl($this->account_webaddress);
     } else {
         $this->exts->openUrl($this->baseUrl);
     }
-    sleep(5);
-
-    $this->exts->capture("Home-page-without-cookie");
-
-    $isCookieLoginSuccess = false;
-    if ($this->exts->loadCookiesFromFile()) {
-        if (!empty($this->account_webaddress) && trim($this->account_webaddress) != "") {
-            $this->exts->openUrl($this->account_webaddress);
-        } else {
-            $this->exts->openUrl($this->baseUrl);
-        }
-        sleep(15);
-
-        if ($this->checkLogin()) {
-            $isCookieLoginSuccess = true;
-        } else {
-            $this->exts->clearCookies();
-            $this->clearChrome();
-            $this->exts->execute_javascript('window.sessionStorage.clear(); window.localStorage.clear();');
-            sleep(1);
-            if ($this->exts->exists('#disabled-account-component')) {
-                $this->exts->loginFailure(1);
-            }
-            if (!empty($this->account_webaddress) && trim($this->account_webaddress) != "") {
-                $this->exts->openUrl($this->account_webaddress);
-                sleep(5);
-                if ($this->exts->exists('div#google_apps_login') || $this->exts->allExists(['div.sso-component', 'div.login-with-provider-button-component button'])) {
-                    if ($this->exts->exists('div#google_apps_login')) {
-                        //This account required login with goole.
-                        $this->exts->moveToElementAndClick('div.google_button, div.login-with-provider-button-component button');
-                        sleep(10);
-                        $this->loginGoogleIfRequired();
-                    } else if ($this->exts->allExists(['div.sso-component', 'div.login-with-provider-button-component button'])) {
-                        //This account required login with SSO.
-                        $this->exts->moveToElementAndClick('div.google_button, div.login-with-provider-button-component button');
-                        sleep(10);
-                        $this->fillFormWithLoginProvider();
-                    }
-                } else {
-                    if (!$this->exts->exists($this->username_selector) && !$this->exts->exists($this->password_selector) && !$this->exts->exists($this->alt_username_selector)) {
-                        $this->exts->openUrl($this->loginUrl);
-                        sleep(5);
-                    }
-                }
-            } else {
-                $this->exts->openUrl($this->loginUrl);
-            }
-            sleep(15);
-
-            if ($this->checkLogin()) {
-                $isCookieLoginSuccess = true;
-            } else {
-                if (!empty($this->account_webaddress) && trim($this->account_webaddress) != "") {
-                    $this->exts->openUrl($this->account_webaddress);
-                    sleep(5);
-                    if (!$this->exts->exists($this->username_selector) && !$this->exts->exists($this->password_selector) && !$this->exts->exists($this->alt_username_selector)) {
-                        $this->exts->openUrl($this->loginUrl);
-                        sleep(5);
-                    }
-                } else {
-                    $this->exts->openUrl($this->loginUrl);
-                }
-            }
-        }
-    } else {
-        $this->clearChrome();
-        if (!empty($this->account_webaddress) && trim($this->account_webaddress) != "") {
-            $this->exts->openUrl($this->account_webaddress);
-            sleep(5);
-            if ($this->exts->exists('div#google_apps_login') || $this->exts->allExists(['div.sso-component', 'div.login-with-provider-button-component button'])) {
-                if ($this->exts->exists('div#google_apps_login')) {
-                    //This account required login with goole.
-                    $this->exts->moveToElementAndClick('div.google_button, div.login-with-provider-button-component button');
-                    sleep(10);
-                    $this->loginGoogleIfRequired();
-                } else if ($this->exts->allExists(['div.sso-component', 'div.login-with-provider-button-component button'])) {
-                    //This account required login with SSO.
-                    $this->exts->moveToElementAndClick('div.google_button, div.login-with-provider-button-component button');
-                    sleep(10);
-                    $this->fillFormWithLoginProvider();
-                }
-            } else {
-                if (!$this->exts->exists($this->username_selector) && !$this->exts->exists($this->password_selector) && !$this->exts->exists($this->alt_username_selector)) {
-                    $this->exts->openUrl($this->loginUrl);
-                    sleep(5);
-                }
-            }
-        } else {
-            $this->exts->openUrl($this->loginUrl);
-        }
-    }
-
-    if (!$isCookieLoginSuccess) {
-        sleep(10);
+    sleep(3);
+    $this->exts->capture('1-init-page');
+    if (!$this->checkLogin()) {
         if ($this->login_with_google == 1) {
             $this->exts->moveToElementAndClick('.social-login-provider [src*="google"]');
             sleep(7);
@@ -148,10 +61,6 @@ private function initPortal($count)
         } else {
             $this->fillForm(0);
             sleep(5);
-            $this->exts->openUrl($this->loginUrl);
-            sleep(15);
-            $this->fillForm(1);
-            sleep(5);
             if ($this->exts->exists('div#google_apps_login') || $this->exts->allExists(['div.sso-component', 'div.login-with-provider-button-component button'])) {
                 if ($this->exts->exists('div#google_apps_login')) {
                     //This account required login with goole.
@@ -169,92 +78,41 @@ private function initPortal($count)
             $this->checkFillTwoFactor();
             sleep(2);
         }
+    }
 
-        if ($this->checkLogin()) {
-            $this->exts->log(">>>>>>>>>>>>>>>Login successful!!!!");
-            $this->exts->capture("LoginSuccess");
+    if ($this->checkLogin()) {
+        $this->exts->log(">>>>>>>>>>>>>>>Login successful!!!!");
+        $this->exts->capture("LoginSuccess");
 
-            if (!empty($this->exts->config_array['allow_login_success_request'])) {
-                $this->exts->triggerLoginSuccess();
-            }
-
-        } else {
-            $this->exts->capture("LoginFailed");
-            $this->exts->log("LoginFailed " . $this->exts->getUrl());
-            if ($this->exts->exists('#disabled-account-component') || strpos(strtolower($this->exts->extract('div.notice-component.warning', null, 'innerText')), 'user is inactive') !== false) {
-                $this->exts->loginFailure(1);
-            } else if (strpos(strtolower($this->exts->extract('div.email-not-found-component', null, 'innerText')), 't find this email') !== false) {
-                $this->exts->loginFailure(1);
-            } else if (strpos(strtolower($this->exts->extract('div.notice-component.warning', null, 'innerText')), 'incorrect email or password') !== false) {
-                $this->exts->loginFailure(1);
-            } else if (strpos(strtolower($this->exts->extract('div.notice-component.warning', null, 'innerText')), 'single sign-on is required for your account') !== false) {
-                $this->exts->loginFailure(1);
-            } else if (strpos(strtolower($this->exts->extract('div.notice-component.warning', null, 'innerText')), 'unknown error, please try again') !== false) {
-                $this->exts->loginFailure(1);
-            } else {
-                $this->exts->loginFailure();
-            }
+        if (!empty($this->exts->config_array['allow_login_success_request'])) {
+            $this->exts->triggerLoginSuccess();
         }
+
+        $this->exts->success();
     } else {
-        sleep(10);
-        if ($this->checkLogin()) {
-            $this->exts->log(">>>>>>>>>>>>>>>Login successful!!!!");
-            $this->exts->capture("LoginSuccess");
-
-            if (!empty($this->exts->config_array['allow_login_success_request'])) {
-
-                $this->exts->triggerLoginSuccess();
-            }
-            
+        $this->exts->capture("LoginFailed");
+        $this->exts->log("LoginFailed " . $this->exts->getUrl());
+        if ($this->exts->exists('#disabled-account-component') || strpos(strtolower($this->exts->extract('div.notice-component.warning', null, 'innerText')), 'user is inactive') !== false) {
+            $this->exts->account_not_ready();
+        } else if (strpos(strtolower($this->exts->extract('div.email-not-found-component', null, 'innerText')), 't find this email') !== false) {
+            $this->exts->loginFailure(1);
+        } else if (strpos(strtolower($this->exts->extract('div.notice-component.warning', null, 'innerText')), 'incorrect email or password') !== false) {
+            $this->exts->loginFailure(1);
+        } else if (strpos(strtolower($this->exts->extract('div.notice-component.warning', null, 'innerText')), 'single sign-on is required for your account') !== false) {
+            $this->exts->loginFailure(1);
+        } else if (strpos(strtolower($this->exts->extract('div.notice-component.warning', null, 'innerText')), 'unknown error, please try again') !== false) {
+            $this->exts->loginFailure(1);
         } else {
-            $this->exts->capture("LoginFailed");
-            $this->exts->log("LoginFailed " . $this->exts->getUrl());
-            if ($this->exts->exists('#disabled-account-component') || strpos(strtolower($this->exts->extract('div.notice-component.warning', null, 'innerText')), 'user is inactive') !== false) {
-                $this->exts->loginFailure(1);
-            } else if (strpos(strtolower($this->exts->extract('div.email-not-found-component', null, 'innerText')), 't find this email') !== false) {
-                $this->exts->loginFailure(1);
-            } else if (strpos(strtolower($this->exts->extract('div.notice-component.warning', null, 'innerText')), 'incorrect email or password') !== false) {
-                $this->exts->loginFailure(1);
-            } else if (strpos(strtolower($this->exts->extract('div.notice-component.warning', null, 'innerText')), 'single sign-on is required for your account') !== false) {
-                $this->exts->loginFailure(1);
-            } else if (strpos(strtolower($this->exts->extract('div.notice-component.warning', null, 'innerText')), 'unknown error, please try again') !== false) {
-                $this->exts->loginFailure(1);
-            } else {
-                $this->exts->loginFailure();
-            }
+            $this->exts->loginFailure();
         }
     }
 }
 
-private function clearChrome()
-{
-    $this->exts->log("Clearing browser history, cookie, cache");
-    $this->exts->openUrl('chrome://settings/clearBrowserData');
-    sleep(10);
-    $this->exts->capture("clear-page");
-    for ($i = 0; $i < 2; $i++) {
-        $this->exts->type_key_by_xdotool('Tab');
-    }
-    $this->exts->type_key_by_xdotool('Tab');
-    $this->exts->type_key_by_xdotool('Return');
-    $this->exts->type_key_by_xdotool('a');
-    sleep(1);
-    $this->exts->type_key_by_xdotool('Return');
-    sleep(3);
-    $this->exts->capture("clear-page");
-    for ($i = 0; $i < 5; $i++) {
-        $this->exts->type_key_by_xdotool('Tab');
-    }
-    $this->exts->type_key_by_xdotool('Return');
-    sleep(15);
-    $this->exts->capture("after-clear");
-}
-
-function fillForm($count)
+private function fillForm($count)
 {
     $this->exts->log("Begin fillForm " . $count);
     try {
-        sleep(1);
+        $this->exts->waitTillPresent($this->username_selector);
         if ($this->exts->exists($this->username_selector) && $this->exts->exists($this->password_selector)) {
             sleep(1);
             $this->login_tryout = (int)$this->login_tryout + 1;
@@ -387,7 +245,7 @@ function fillForm($count)
         $this->exts->log("Exception filling loginform " . $exception->getMessage());
     }
 }
-function fillFormWithLoginProvider()
+private function fillFormWithLoginProvider()
 {
     sleep(5);
     if ($this->exts->urlContains('treeti.my.idaptive.app/login')) {
@@ -499,75 +357,6 @@ private function checkFillTwoFactor()
         }
     }
 }
-private function checkFillRecaptcha($count = 1)
-{
-    $this->exts->log(__FUNCTION__);
-    $recaptcha_iframe_selector = 'iframe[src*="/recaptcha/api2/anchor?"]';
-    $recaptcha_textarea_selector = 'textarea[name="g-recaptcha-response"]';
-    $this->exts->waitTillPresent($recaptcha_iframe_selector, 20);
-    if ($this->exts->exists($recaptcha_iframe_selector)) {
-        $iframeUrl = $this->exts->extract($recaptcha_iframe_selector, null, 'src');
-        $data_siteKey = explode('&', end(explode("&k=", $iframeUrl)))[0];
-        $this->exts->log("iframe url - " . $iframeUrl);
-        $this->exts->log("SiteKey - " . $data_siteKey);
-
-
-        $isCaptchaSolved = $this->exts->processRecaptcha($this->exts->getUrl(), $data_siteKey, false);
-        $this->exts->log("isCaptchaSolved - " . $isCaptchaSolved);
-
-
-        if ($isCaptchaSolved) {
-            // Step 1 fill answer to textarea
-            $this->exts->log(__FUNCTION__ . "::filling reCaptcha response..");
-            $recaptcha_textareas = $this->exts->querySelectorAll($recaptcha_textarea_selector);
-            for ($i = 0; $i < count($recaptcha_textareas); $i++) {
-                $this->exts->execute_javascript("arguments[0].innerHTML = '" . $this->exts->recaptcha_answer . "';", [$recaptcha_textareas[$i]]);
-            }
-            sleep(2);
-            $this->exts->capture('recaptcha-filled');
-
-
-            $gcallbackFunction = $this->exts->execute_javascript('
-                    (function() {
-                    if(document.querySelector("[data-callback]") != null){
-                    return document.querySelector("[data-callback]").getAttribute("data-callback");
-                    }
-
-
-                    var result = ""; var found = false;
-                    function recurse (cur, prop, deep) {
-                    if(deep > 5 || found){ return;}console.log(prop);
-                    try {
-                    if(cur == undefined || cur == null || cur instanceof Element || Object(cur) !== cur || Array.isArray(cur)){ return;}
-                    if(prop.indexOf(".callback") > -1){result = prop; found = true; return;
-                    } else { deep++;
-                    for (var p in cur) { recurse(cur[p], prop ? prop + "." + p : p, deep);}
-                    }
-                    } catch(ex) { console.log("ERROR in function: " + ex); return; }
-                    }
-
-
-                    recurse(___grecaptcha_cfg.clients[0], "", 0);
-                    return found ? "___grecaptcha_cfg.clients[0]." + result : null;
-                    })();
-                    ');
-            $this->exts->log('Callback function: ' . $gcallbackFunction);
-            $this->exts->log('Callback function: ' . $this->exts->recaptcha_answer);
-            if ($gcallbackFunction != null) {
-                $this->exts->execute_javascript($gcallbackFunction . '("' . $this->exts->recaptcha_answer . '");');
-                sleep(10);
-            }
-        } else {
-            // try again if recaptcha expired
-            if ($count < 3) {
-                $count++;
-                $this->checkFillRecaptcha($count);
-            }
-        }
-    } else {
-        $this->exts->log(__FUNCTION__ . '::Not found reCaptcha');
-    }
-}
 
 // -------------------- GOOGLE login
 
@@ -583,7 +372,7 @@ private function loginGoogleIfRequired()
         sleep(10);
         $this->check_solve_rejected_browser();
 
-        if ($this->exts->querySelector('input[name="password"][aria-invalid="true"], input[name="identifier"][aria-invalid="true"], input[aria-invalid="true"][name="Passwd"]') != null) {
+        if ($this->exts->querySelector('input[name="password"][aria-invalid="true"],input[aria-invalid="true"], input[name="identifier"][aria-invalid="true"], input[aria-invalid="true"][name="Passwd"]') != null) {
             $this->exts->loginFailure(1);
         }
 
@@ -646,7 +435,7 @@ private function loginGoogleIfRequired()
         $this->exts->log('URL before back to main tab: ' . $this->exts->getUrl());
         $this->exts->capture("google-login-before-back-maintab");
         if (
-            $this->exts->querySelector('input[name="password"][aria-invalid="true"], input[name="identifier"][aria-invalid="true"], input[aria-invalid="true"][name="Passwd"]') != null
+            $this->exts->querySelector('input[name="password"][aria-invalid="true"],input[aria-invalid="true"], input[name="identifier"][aria-invalid="true"], input[aria-invalid="true"][name="Passwd"]') != null
         ) {
             $this->exts->loginFailure(1);
         }
@@ -866,22 +655,22 @@ private function check_solve_rejected_browser()
 private function overwrite_user_agent($user_agent_string = 'DN')
 {
     $userAgentScript = "
-                        (function() {
-                        if ('userAgentData' in navigator) {
-                        navigator.userAgentData.getHighEntropyValues({}).then(() => {
-                        Object.defineProperty(navigator, 'userAgent', {
-                        value: '{$user_agent_string}',
-                        configurable: true
-                        });
-                        });
-                        } else {
-                        Object.defineProperty(navigator, 'userAgent', {
-                        value: '{$user_agent_string}',
-                        configurable: true
-                        });
-                        }
-                        })();
-                        ";
+    (function() {
+    if ('userAgentData' in navigator) {
+    navigator.userAgentData.getHighEntropyValues({}).then(() => {
+    Object.defineProperty(navigator, 'userAgent', {
+    value: '{$user_agent_string}',
+    configurable: true
+    });
+    });
+    } else {
+    Object.defineProperty(navigator, 'userAgent', {
+    value: '{$user_agent_string}',
+    configurable: true
+    });
+    }
+    })();
+    ";
     $this->exts->execute_javascript($userAgentScript);
 }
 
@@ -1304,40 +1093,41 @@ private function fillGoogleTwoFactor($input_selector, $message_selector, $submit
 
 // -------------------- GOOGLE login END
 
-function checkLogin()
+private function checkLogin()
 {
     $this->exts->log("Begin checkLogin ");
     $isLoggedIn = false;
     try {
-        if ($this->exts->exists('div.surface-avatar-menu-component')) {
+        $this->exts->waitTillPresent($this->check_login_success_selector, 20);
+        if ($this->exts->exists($this->check_login_success_selector)) {
 
             $isLoggedIn = true;
             if ($this->exts->getElement('div.reset-trial-component-inner') != null) {
                 $this->exts->log("LoginFailed " . $this->exts->getUrl());
-                $this->exts->loginFailure(1);
+                $this->exts->account_not_ready();
                 $isLoggedIn = false;
             }
-           
+
             $trial_expired_selector = $this->exts->getElementByText('div.pricing-message', ['free trial has expired', 'Ihre kostenlose Testversion ist abgelaufen'], null, false);
             if ($trial_expired_selector != null) {
                 $this->exts->log("LoginFailed " . $this->exts->getUrl());
-                $this->exts->loginFailure(1);
+                $this->exts->account_not_ready();
                 $isLoggedIn = false;
             }
 
-            if($isLoggedIn){
+            if ($isLoggedIn) {
                 $this->exts->log(">>>>>>>>>>>>>>>Login successful!!!!");
             }
-
-            
-           
+        } else if ($this->exts->urlContains('slug_not_found')) {
+            $this->exts->log("Slug not found " . $this->exts->getUrl());
+            $this->exts->loginFailure(1);
         }
     } catch (Exception $exception) {
         $this->exts->log("Exception checking loggedin " . $exception);
     }
     return $isLoggedIn;
 }
-function isValidEmail($email)
+private function isValidEmail($email)
 {
     return filter_var($email, FILTER_VALIDATE_EMAIL) !== false;
 }
