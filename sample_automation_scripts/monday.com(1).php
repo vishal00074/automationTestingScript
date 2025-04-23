@@ -1,4 +1,4 @@
-<?php
+<?php // updated download code getting errror in js code i have replace execute_javascript to executeSafeScript added  public variable isNoInvoice
 
 /**
  * Chrome Remote via Chrome devtool protocol script, for specific process/portal
@@ -71,6 +71,9 @@ class PortalScriptCDP
     public $login_tryout = 0;
     public $restrictPages = 3;
     public $account_webaddress = '';
+    public $isNoInvoice = true;
+
+    
 
     private function initPortal($count)
     {
@@ -1401,6 +1404,8 @@ class PortalScriptCDP
                 $this->exts->log("Invoice Url: " . $invoiceUrl);
                 $this->exts->log("Invoice FileName: " . $invoiceFileName);
                 $this->exts->log("________________________________________________________________");
+
+                $this->isNoInvoice = false;
 
                 if ($this->exts->exists('a[href*="/show_invoice.jsp?ref="]')) {
                     $invoiceUrl = $this->exts->getElement('a[href*="/show_invoice.jsp?ref="]')->getAttribute('href');
