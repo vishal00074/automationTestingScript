@@ -1,14 +1,14 @@
-public $baseUrl = 'https://app.couponcarrier.io/';
-public $loginUrl = 'https://app.couponcarrier.io/login';
-public $invoicePageUrl = 'https://app.couponcarrier.io/#/settings/billing';
+public $baseUrl = 'https://www.cesu.urssaf.fr/decla/index.html';
+public $loginUrl = 'https://www.cesu.urssaf.fr/decla/index.html?page=page_se_connecter&LANG=FR';
+public $invoicePageUrl = 'https://www.cesu.urssaf.fr/decla/index.html?page=page_empl_mes_declarations&LANG=FR';
 
-public $username_selector = 'input[name="username"]';
-public $password_selector = 'input[name="password"]';
+public $username_selector = 'input#identifiantCompte';
+public $password_selector = 'input#motPasseCompte';
 public $remember_me_selector = '';
-public $submit_login_selector = 'input[type="submit"]';
+public $submit_login_selector = 'button#connexion_button';
 
 public $check_login_failed_selector = 'div.alert-danger';
-public $check_login_success_selector = 'a[href="/logout"]';
+public $check_login_success_selector = 'td.no_cesu';
 
 public $isNoInvoice = true;
 
@@ -34,13 +34,7 @@ private function initPortal($count)
         $this->exts->log(">>>>>>>>>>>>>>>Login successful!!!!");
         $this->exts->capture("LoginSuccess");
 
-
-
         $this->exts->openUrl($this->invoicePageUrl);
-        sleep(15);
-
-        $this->exts->moveToElementAndClick('div.row div.text-right button:nth-child(2)');
-
         $this->downloadInvoices();
         // Final, check no invoice
         if ($this->isNoInvoice) {
@@ -55,7 +49,10 @@ private function initPortal($count)
         $error_text = strtolower($this->exts->extract($this->check_login_failed_selector));
 
         $this->exts->log(__FUNCTION__ . '::Error text: ' . $error_text);
-        if (stripos($error_text, strtolower('Invalid credentials')) !== false) {
+        if (
+            stripos($error_text, strtolower('Identifiant / mot de passe non reconnus')) !== false ||
+            stripos($error_text, strtolower('Username/Password not recognized')) !== false
+        ) {
             $this->exts->loginFailure(1);
         } else {
             $this->exts->loginFailure();
@@ -121,62 +118,45 @@ private function downloadInvoices($count = 1)
 {
     $this->exts->log(__FUNCTION__);
 
-    $this->exts->waitTillPresent('table tbody tr');
+    $this->exts->waitTillPresent('div#resultatsAffiches div[id*="div_declaration"]');
     $this->exts->capture("4-invoices-classic");
 
-    $invoices = [];
-    $rows = $this->exts->getElements('table tbody tr');
-    foreach ($rows as $key => $row) {
-        $invoiceLink = $this->exts->getElement('a', $row);
-        if ($invoiceLink != null) {
-            $invoiceUrl = $invoiceLink->getAttribute("href");
-            preg_match('/in_[a-zA-Z0-9]+/', $invoiceUrl, $matches);
-            if (count($matches) > 0) {
-                $invoiceName = $matches[0];
-            } else {
-                $invoiceName = basename($invoiceUrl);
-            }
-
-            $invoiceDate = $this->exts->extract('td:nth-child(1)', $row);
-            $invoiceAmount = $this->exts->extract('td:nth-child(2)', $row);
-
-            array_push($invoices, array(
-                'invoiceName' => $invoiceName,
-                'invoiceDate' => $invoiceDate,
-                'invoiceAmount' => $invoiceAmount,
-                'invoiceUrl' => $invoiceUrl,
-            ));
-            $this->isNoInvoice = false;
-        }
+    for ($i = 0; $i < 10; $i++) {
+        $this->exts->execute_javascript('window.scrollBy(0, 1000);');
+        sleep(2);
     }
+    $this->exts->capture("invoices-list");
+    $this->exts->execute_javascript("window.scrollTo({ top: 0, behavior: 'smooth' });");
+    sleep(5);
+    $rows = $this->exts->getElements('div#resultatsAffiches div[id*="div_declaration"]');
+    foreach ($rows as $key => $row) {
+        $invoiceBtn = $this->exts->getElement('button[id*="affichagePdf"]', $row);
+        if ($invoiceBtn != null) {
+            $invoiceUrl = '';
+            $invoiceName = $this->exts->extract('span[name="numCheque"]', $row);
+            $invoiceDate = $this->exts->extract('span[name="periode"]', $row);
+            $invoiceAmount = $this->exts->extract('span[name="total_net_paye_PAS"]', $row);
 
-    $this->exts->log('Invoices found: ' . count($invoices));
-    foreach ($invoices as $invoice) {
-        $this->exts->log('--------------------------');
-        $this->exts->log('invoiceName: ' . $invoice['invoiceName']);
-        $this->exts->log('invoiceDate: ' . $invoice['invoiceDate']);
-        $this->exts->log('invoiceAmount: ' . $invoice['invoiceAmount']);
-        $this->exts->log('invoiceUrl: ' . $invoice['invoiceUrl']);
+            $this->exts->log('--------------------------');
+            $this->exts->log('invoiceName: ' . $invoiceName);
+            $this->exts->log('invoiceDate: ' . $invoiceDate);
+            $this->exts->log('invoiceAmount: ' .  $invoiceAmount);
+            $this->exts->log('invoiceUrl: ' . $invoiceUrl);
 
-        $invoiceFileName = !empty($invoice['invoiceName']) ?  $invoice['invoiceName'] . '.pdf' : '';
-        $invoice['invoiceDate'] = $this->exts->parse_date($invoice['invoiceDate'], 'd.m.Y', 'Y-m-d');
-        $this->exts->log('Date parsed: ' . $invoice['invoiceDate']);
+            $this->isNoInvoice = false;
 
-        $this->exts->openUrl($invoice['invoiceUrl']);
-        sleep(4);
-        $this->exts->waitTillPresent('div.invoice-title');
-        $this->exts->execute_javascript('window.print();');
-        sleep(4);
-        $file_ext = $this->exts->get_file_extension($invoiceFileName);
+            $invoiceFileName = !empty($invoiceName) ? $invoiceName . '.pdf' : '';
+            $invoiceDate = $this->exts->parse_date($invoiceDate, 'd.m.Y', 'Y-m-d');
+            $this->exts->log('Date parsed: ' .  $invoiceDate);
 
-        $this->exts->wait_and_check_download($file_ext);
-
-        $downloaded_file = $this->exts->find_saved_file($file_ext, $invoiceFileName);
-        if (trim($downloaded_file) != '' && file_exists($downloaded_file)) {
-            $this->exts->new_invoice($invoice['invoiceName'], $invoice['invoiceDate'], $invoice['invoiceAmount'], $invoiceFileName);
-            sleep(1);
-        } else {
-            $this->exts->log(__FUNCTION__ . '::No download ' . $invoiceFileName);
+            $downloaded_file = $this->exts->click_and_download($invoiceBtn, 'pdf', $invoiceFileName);
+            sleep(2);
+            if (trim($downloaded_file) != '' && file_exists($downloaded_file)) {
+                $this->exts->new_invoice($invoiceUrl,  $invoiceDate, $invoiceAmount, $downloaded_file);
+                sleep(1);
+            } else {
+                $this->exts->log(__FUNCTION__ . '::No download ' . $invoiceFileName);
+            }
         }
     }
 }
