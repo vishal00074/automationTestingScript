@@ -133,24 +133,7 @@ class PortalScriptCDP
                     sleep(4);
                 }
 
-                for ($i = 0; $i < 7; $i++) {
-                    if ($this->exts->exists('img.captcha')) {
-                        $this->exts->capture('captcha-found-' . $i);
-                        $this->exts->processCaptcha('img.captcha', 'input[name="captcha"]');
-                        $this->exts->capture('captcha-filled');
-                        $this->waitForSelectors("form[action*='/captcha'] [type='submit']", 5, 3);
-                        if ($this->exts->exists('form[action*="/captcha"] [type="submit"]')) {
-                            $this->exts->click_element('form[action*="/captcha"] [type="submit"]');
-                        }
-                        sleep(15);
-                    } else {
-                        break;
-                    }
-                    if ($this->exts->exists('img.captcha')) {
-                        $this->exts->openUrl($this->baseUrl);
-                        sleep(15);
-                    }
-                }
+                $this->solveCaptcha();
             }
 
             $this->cookieConsent();
@@ -272,6 +255,52 @@ class PortalScriptCDP
                 $this->exts->account_not_ready();
             } else {
                 $this->exts->loginFailure();
+            }
+        }
+    }
+
+    public function solveCaptcha()
+    {
+        for ($i = 0; $i < 7; $i++) {
+
+            if ($this->exts->exists('img.captcha') && $i != 0) {
+                $this->exts->openUrl($this->baseUrl);
+                sleep(15);
+            }
+
+            if ($this->exts->exists('img.captcha')) {
+                $this->exts->capture('captcha-found-' . $i);
+                $this->exts->processCaptcha('img.captcha', 'input[name="captcha"]');
+                $this->exts->capture('captcha-filled');
+                $this->waitForSelectors("form[action*='/captcha'] [type='submit']", 5, 3);
+                if ($this->exts->exists('form[action*="/captcha"] [type="submit"]')) {
+                    $this->exts->click_element('form[action*="/captcha"] [type="submit"]');
+                }
+                sleep(15);
+            } else {
+                break;
+            }
+        }
+
+
+        $captchaErrorText = strtolower($this->exts->extract('div[class="fm-formerror error-body"] p:nth-child(3)'));
+
+        $this->exts->log(__FUNCTION__ . '::captcha Error text: ' . $captchaErrorText);
+        if (stripos($captchaErrorText, strtolower('Bitte sieh Dir das Bild an und')) !== false) {
+            for ($i = 0; $i < 5; $i++) {
+                $this->exts->moveToElementAndClick('a[href*="cprx/captcha"]');
+
+                $this->exts->processCaptcha('img.captcha', 'input[name="captcha"]');
+                $this->exts->capture('captcha-filled');
+                $this->waitForSelectors("form[action*='/captcha'] [type='submit']", 5, 3);
+                if ($this->exts->exists('form[action*="/captcha"] [type="submit"]')) {
+                    $this->exts->click_element('form[action*="/captcha"] [type="submit"]');
+                    sleep(15);
+                }
+
+                if (!$this->exts->exists('img.captcha')) {
+                    break;
+                }
             }
         }
     }

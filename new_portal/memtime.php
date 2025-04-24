@@ -164,7 +164,6 @@ class PortalScriptCDP
                 $isLoggedIn = true;
             }
         } catch (Exception $exception) {
-
             $this->exts->log("Exception checking loggedin " . $exception);
         }
         return $isLoggedIn;
