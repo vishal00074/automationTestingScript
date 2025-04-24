@@ -1,4 +1,4 @@
-<?php
+<?php // created   solveCaptcha function to hanlde captcha in case iamge is not getting. fixed no_invoice issue
 
 /**
  * Chrome Remote via Chrome devtool protocol script, for specific process/portal
@@ -291,7 +291,7 @@ class PortalScriptCDP
                 $this->exts->moveToElementAndClick('a[href*="cprx/captcha"]');
 
                 $this->exts->processCaptcha('img.captcha', 'input[name="captcha"]');
-                $this->exts->capture('captcha-filled');
+                $this->exts->capture('captcha-filled-again-' . $i);
                 $this->waitForSelectors("form[action*='/captcha'] [type='submit']", 5, 3);
                 if ($this->exts->exists('form[action*="/captcha"] [type="submit"]')) {
                     $this->exts->click_element('form[action*="/captcha"] [type="submit"]');
@@ -641,7 +641,7 @@ class PortalScriptCDP
                     'invoiceUrl' => $invoiceUrl,
                     'downloadBtn' => $downloadBtn
                 ));
-                $this->isNoInvoice = false;
+                $this->totalInvoices++;
             }
         }
 

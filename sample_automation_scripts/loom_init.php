@@ -14,9 +14,9 @@ public $login_with_apple = 0;
 
 public $isNoInvoice = true;
 /**
- * Entry Method thats called for a portal
- * @param Integer $count Number of times portal is retried.
- */
+    * Entry Method thats called for a portal
+    * @param Integer $count Number of times portal is retried.
+    */
 private function initPortal($count)
 {
     $this->exts->log('Begin initPortal ' . $count);
@@ -156,7 +156,7 @@ private function checkFillLogin()
             $this->exts->moveToElementAndType($this->password_selector, $this->password);
             sleep(1);
             $this->exts->capture("2-password-filled");
-            $this->exts->moveToElementAndClick('button[id="login-submit"]');
+            $this->exts->moveToElementAndClick('button[id="login-submit"], button#email-signup-button:not(:disabled)');
             sleep(7);
             $this->exts->capture("2-after-password-submit");
 
@@ -1132,6 +1132,7 @@ private function checkFillAppleTwoFactor()
     }
 }
 // ================================== END LOGIN WITH APPLE ==================================
+
 
 // Custom Exists function to check element found or not
 private function isExists($selector = '')

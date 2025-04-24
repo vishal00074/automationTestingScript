@@ -1,4 +1,4 @@
-<?php
+<?php // updated login submit button 
 
 /**
  * Chrome Remote via Chrome devtool protocol script, for specific process/portal
@@ -220,7 +220,7 @@ class PortalScriptCDP
                 $this->exts->moveToElementAndType($this->password_selector, $this->password);
                 sleep(1);
                 $this->exts->capture("2-password-filled");
-                $this->exts->moveToElementAndClick('button[id="login-submit"]');
+                $this->exts->moveToElementAndClick('button[id="login-submit"], button#email-signup-button:not(:disabled)');
                 sleep(7);
                 $this->exts->capture("2-after-password-submit");
 
