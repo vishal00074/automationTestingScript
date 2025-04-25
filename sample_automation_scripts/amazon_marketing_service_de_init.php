@@ -283,11 +283,10 @@ private function fillForm($count)
                     ) {
                         $this->exts->loginFailure(1);
                     }
-                    
                 }
             } else {
-                if ($this->exts->getElement($this->remember_me) != null && $this->exts->getElement($this->remember_me)->isDisplayed()) {
-                    $checkboxElements = $this->exts->getElements($this->remember_me);
+                if ($this->exts->getElement($this->remember_me) != null) {
+                    $this->exts->click_by_xdotool($this->remember_me);
                 }
 
                 if ($this->exts->getElement($this->username_selector) != null && $this->exts->getElement("input#ap_email[type=\"hidden\"]") == null) {

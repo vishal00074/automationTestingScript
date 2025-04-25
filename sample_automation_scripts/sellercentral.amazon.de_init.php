@@ -99,12 +99,12 @@ private function initPortal($count)
         $this->exts->log('::Otp Expired Message:: ' . $isOtpExpired);
         sleep(5);
         $this->exts->capture('otp-page-1');
-        
+
         if (stripos($isOtpExpired, strtolower("Your One Time Password (OTP) has expired. Please request another from the ‘Didn't receive the One Time Password?’ link below.")) !== false) {
 
             $this->exts->moveToElementAndClick('a[id="auth-get-new-otp-link"]');
             sleep(4);
-            $this->exts->waitTillPresent('input[id="auth-send-code"]');
+            $this->waitFor('input[id="auth-send-code"]');
             $this->exts->moveToElementAndClick('input[id="auth-send-code"]');
             sleep(10);
 
@@ -115,12 +115,15 @@ private function initPortal($count)
             sleep(20);
             $this->exts->moveToElementAndClick('a[id="auth-get-new-otp-link"]');
             sleep(4);
-            $this->exts->waitTillPresent('input[id="auth-send-code"]');
+            $this->waitFor('input[id="auth-send-code"]');
             $this->exts->moveToElementAndClick('input[id="auth-send-code"]');
             sleep(10);
 
             $this->checkFillTwoFactor();
         }
+
+
+
 
         if ($this->exts->exists('form#auth-account-fixup-phone-form a#ap-account-fixup-phone-skip-link')) {
             $this->exts->moveToElementAndClick('form#auth-account-fixup-phone-form a#ap-account-fixup-phone-skip-link');
@@ -229,7 +232,7 @@ private function checkFillLogin()
         sleep(1);
 
         $this->exts->moveToElementAndClick('input#continue');
-        sleep(5);
+        sleep(10);
 
         if ($this->exts->exists($this->password_selector)) {
             $this->exts->log("Enter Password");
@@ -246,7 +249,7 @@ private function checkFillLogin()
             $this->exts->capture("2-login-page-filled");
             $this->exts->moveToElementAndClick($this->submit_login_selector);
             sleep(3);
-            $this->exts->waitTillPresent('#auth-error-message-box', 30);
+            $this->waitFor('#auth-error-message-box', 30);
             if ($this->exts->exists('#auth-error-message-box')) {
                 $this->exts->loginFailure(1);
             }
@@ -263,6 +266,15 @@ private function checkFillLogin()
         $this->exts->capture("2-login-page-not-found");
     }
 }
+
+public function waitFor($selector, $seconds = 7)
+{
+    for ($wait = 0; $wait < 2 && $this->exts->executeSafeScript("return !!document.querySelector('" . $selector . "');") != 1; $wait++) {
+        $this->exts->log('Waiting for Selectors.....');
+        sleep($seconds);
+    }
+}
+
 private function checkFillTwoFactor()
 {
     $this->exts->capture("2.0-two-factor-checking");
@@ -417,7 +429,7 @@ private function isIncorrectCredential()
 }
 private function processCaptcha($captcha_image_selector, $captcha_input_selector)
 {
-    $this->exts->waitTillPresent('img#auth-captcha-image, img[alt="captcha"], img[src*="captcha"]', 50);
+    $this->waitFor('img#auth-captcha-image, img[alt="captcha"], img[src*="captcha"]', 50);
     $this->exts->log("--IMAGE CAPTCHA--");
     if ($this->exts->exists($captcha_image_selector)) {
         $image_path = $this->exts->captureElement($this->exts->process_uid, $captcha_image_selector);
