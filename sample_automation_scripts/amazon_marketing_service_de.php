@@ -1,4 +1,4 @@
-<?php
+<?php // i have removed undefined function isDisplayed and handle empty invoice name condition 
 
 /**
  * Chrome Remote via Chrome devtool protocol script, for specific process/portal
@@ -57,7 +57,7 @@ class PortalScriptCDP
         }
     }
 
-    // Server-Portal-ID: 16488 - Last modified: 29.01.2025 14:36:35 UTC - User: 1
+    // Server-Portal-ID: 16488 - Last modified: 02.04.2025 14:31:36 UTC - User: 1
 
     public $baseUrl = "https://advertising.amazon.de/";
     public $orderPageUrl = "https://advertising.amazon.de/billing/history?ref_=ams_head_billing";
@@ -346,11 +346,10 @@ class PortalScriptCDP
                         ) {
                             $this->exts->loginFailure(1);
                         }
-                       
                     }
                 } else {
-                    if ($this->exts->getElement($this->remember_me) != null && $this->exts->getElement($this->remember_me)->isDisplayed()) {
-                        $checkboxElements = $this->exts->getElements($this->remember_me);
+                    if ($this->exts->getElement($this->remember_me) != null) {
+                        $this->exts->click_by_xdotool($this->remember_me);
                     }
 
                     if ($this->exts->getElement($this->username_selector) != null && $this->exts->getElement("input#ap_email[type=\"hidden\"]") == null) {
@@ -713,7 +712,7 @@ class PortalScriptCDP
             $download_button = $this->exts->getElement('div[role="gridcell"]:nth-child(9), .dwnld-icon-alignment .dwnld-btn-enb', $row);
             if ($download_button != null) {
                 $invoiceName = trim($this->exts->extract('div[role="gridcell"]:nth-child(2), td[id^="invoice-number"]', $row));
-                $invoiceFileName = $invoiceName . '.pdf';
+                $invoiceFileName = !empty($invoiceName) ? $invoiceName . '.pdf': '';
                 $invoiceDate = trim($this->exts->extract('div[role="gridcell"]:nth-child(4), td[id^="invoice-date"]', $row));
                 $amountText = trim($this->exts->extract('div[role="gridcell"]:nth-child(8), td[id^="invoice-total"]', $row));
                 $invoiceAmount = preg_replace('/[^\d\.\,]/', '', $amountText);

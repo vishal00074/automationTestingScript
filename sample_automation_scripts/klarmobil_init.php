@@ -21,7 +21,7 @@ private function initPortal($count)
     $this->accept_consent();
 
 
-    if ($this->exts->exists('header .user__link a[href*="/onlineservice"]')) {
+    if ($this->isExists('header .user__link a[href*="/onlineservice"]')) {
         $this->exts->moveToElementAndClick('header .user__link a[href*="/onlineservice"]');
     }
     sleep(5);
@@ -45,7 +45,7 @@ private function initPortal($count)
         $this->exts->openUrl($this->invoicePageUrl);
         $this->checkFillLogin();
 
-        if ($this->checkLogin()){
+        if ($this->checkLogin()) {
             sleep(3);
             $this->exts->log(__FUNCTION__ . '::User logged in');
             $this->exts->capture("3-login-success");
@@ -61,7 +61,7 @@ private function initPortal($count)
             // Aufgrund zu vieler fehlerhafter Login-Versuche wurde der Login zu Ihrer Sicherheit bis
             if (strpos(strtolower($this->exts->extract('span.status-message__text')), 'deine eingegebene e-mail-adresse und das passwort') !== false) {
                 $this->exts->loginFailure();
-            } else if ($this->exts->urlContains('onlineservice/fehler') && $this->exts->exists('a[href*="logout"]') || $this->exts->urlContains('/onlineservice/benutzer-verknuepfen')) {
+            } else if ($this->exts->urlContains('onlineservice/fehler') && $this->isExists('a[href*="logout"]') || $this->exts->urlContains('/onlineservice/benutzer-verknuepfen')) {
                 $this->exts->account_not_ready();
             } else if (
                 $this->exts->urlContains('onlineservice/info') &&
@@ -72,7 +72,7 @@ private function initPortal($count)
                 $this->exts->account_not_ready();
             } else if ($this->exts->urlContains('benutzer-verknuepfen') || $this->exts->urlContains('user-link')) {
                 $this->exts->account_not_ready();
-            } else if ($this->exts->exists('div#error-cs-email-invalid') || $this->exts->exists('span[id*="error-element-password"]')) {
+            } else if ($this->isExists('div#error-cs-email-invalid') || $this->isExists('span[id*="error-element-password"]')) {
                 $this->exts->loginFailure(1);
             } else {
                 $this->exts->capture("else-login-failed-page");
@@ -109,9 +109,9 @@ private function accept_consent($reload_page = false)
     $this->exts->switchToDefault();
     if ($this->exts->check_exist_by_chromedevtool('iframe[src*="privacy"]')) {
         $this->switchToFrame('iframe[src*="privacy"]');
-        $this->exts->waitTillPresent('button[aria-label*="Alle akzeptieren"]', 30);
-        if ($this->exts->exists('button[aria-label*="Alle akzeptieren"]')) {
-            $this->exts->click_element('button[aria-label*="Alle akzeptieren"]');
+        $this->waitFor('button[aria-label*="Alle akzeptieren"]', 30);
+        if ($this->isExists('button[aria-label*="Alle akzeptieren"]')) {
+            $this->exts->click_by_xdotool('button[aria-label*="Alle akzeptieren"]');
             sleep(5);
         }
 
@@ -120,6 +120,30 @@ private function accept_consent($reload_page = false)
             $this->exts->refresh();
             sleep(15);
         }
+    }
+}
+
+// Custom Exists function to check element found or not
+private function isExists($selector = '')
+{
+    $safeSelector = addslashes($selector);
+    $this->exts->log('Element:: ' . $safeSelector);
+    $isElement = $this->exts->execute_javascript('!!document.querySelector("' . $safeSelector . '")');
+    if ($isElement) {
+        $this->exts->log('Element Found');
+        return true;
+    } else {
+        $this->exts->log('Element not Found');
+        return false;
+    }
+}
+
+
+public function waitFor($selector, $seconds = 10)
+{
+    for ($wait = 0; $wait < 2 && $this->exts->executeSafeScript("return !!document.querySelector('" . $selector . "');") != 1; $wait++) {
+        $this->exts->log('Waiting for Selectors.....');
+        sleep($seconds);
     }
 }
 
@@ -146,7 +170,7 @@ public function switchToFrame($query_string)
 
 private function checkFillLogin()
 {
-    $this->exts->waitTillPresent($this->username_selector);
+    $this->waitFor($this->username_selector);
     if ($this->exts->getElement($this->username_selector) != null) {
         $this->exts->capture("2-login-page");
 
@@ -167,7 +191,7 @@ private function checkFillLogin()
         sleep(5); // Portal itself has one second delay after showing toast
         $this->solve_login_cloudflare();
 
-        if ($this->exts->exists($this->submit_login_selector)) {
+        if ($this->isExists($this->submit_login_selector)) {
             $this->exts->click_by_xdotool($this->submit_login_selector);
         }
     } else {
@@ -207,7 +231,7 @@ public  function checkLogin()
             $this->exts->log('Waiting for login.....');
             sleep(10);
         }
-        if ($this->exts->exists($this->check_login_success_selector)) {
+        if ($this->isExists($this->check_login_success_selector)) {
             $this->exts->log(">>>>>>>>>>>>>>>Login successful!!!!");
             $isLoggedIn = true;
         }

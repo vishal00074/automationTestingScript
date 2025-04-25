@@ -1,4 +1,4 @@
-<?php // added checkLogin function replace waitTillPresent with custom js wait
+<?php //use custom js isExists and waitFor function  updated download code extracted invoice date and ammount
 
 /**
  * Chrome Remote via Chrome devtool protocol script, for specific process/portal
@@ -57,7 +57,7 @@ class PortalScriptCDP
         }
     }
 
-    // Server-Portal-ID: 7524 - Last modified: 26.03.2025 14:28:29 UTC - User: 1
+    // Server-Portal-ID: 7524 - Last modified: 15.04.2025 13:31:13 UTC - User: 1
 
     public $baseUrl = 'https://klarmobil.de/';
     public $invoicePageUrl = 'https://www.klarmobil.de/online-service/meine-rechnungen';
@@ -82,7 +82,7 @@ class PortalScriptCDP
         $this->accept_consent();
 
 
-        if ($this->exts->exists('header .user__link a[href*="/onlineservice"]')) {
+        if ($this->isExists('header .user__link a[href*="/onlineservice"]')) {
             $this->exts->moveToElementAndClick('header .user__link a[href*="/onlineservice"]');
         }
         sleep(5);
@@ -106,7 +106,7 @@ class PortalScriptCDP
             $this->exts->openUrl($this->invoicePageUrl);
             $this->checkFillLogin();
 
-            if ($this->checkLogin()){
+            if ($this->checkLogin()) {
                 sleep(3);
                 $this->exts->log(__FUNCTION__ . '::User logged in');
                 $this->exts->capture("3-login-success");
@@ -116,7 +116,7 @@ class PortalScriptCDP
                 $this->accept_consent();
                 $this->check_multil_contract();
 
-                if ($this->exts->exists('[data-qa="no-permission-skeleton"]')) {
+                if ($this->isExists('[data-qa="no-permission-skeleton"]')) {
                     $this->exts->no_permission();
                 }
 
@@ -131,7 +131,7 @@ class PortalScriptCDP
                 // Aufgrund zu vieler fehlerhafter Login-Versuche wurde der Login zu Ihrer Sicherheit bis
                 if (strpos(strtolower($this->exts->extract('span.status-message__text')), 'deine eingegebene e-mail-adresse und das passwort') !== false) {
                     $this->exts->loginFailure();
-                } else if ($this->exts->urlContains('onlineservice/fehler') && $this->exts->exists('a[href*="logout"]') || $this->exts->urlContains('/onlineservice/benutzer-verknuepfen')) {
+                } else if ($this->exts->urlContains('onlineservice/fehler') && $this->isExists('a[href*="logout"]') || $this->exts->urlContains('/onlineservice/benutzer-verknuepfen')) {
                     $this->exts->account_not_ready();
                 } else if (
                     $this->exts->urlContains('onlineservice/info') &&
@@ -142,7 +142,7 @@ class PortalScriptCDP
                     $this->exts->account_not_ready();
                 } else if ($this->exts->urlContains('benutzer-verknuepfen') || $this->exts->urlContains('user-link')) {
                     $this->exts->account_not_ready();
-                } else if ($this->exts->exists('div#error-cs-email-invalid') || $this->exts->exists('span[id*="error-element-password"]')) {
+                } else if ($this->isExists('div#error-cs-email-invalid') || $this->isExists('span[id*="error-element-password"]')) {
                     $this->exts->loginFailure(1);
                 } else {
                     $this->exts->capture("else-login-failed-page");
@@ -179,9 +179,9 @@ class PortalScriptCDP
         $this->exts->switchToDefault();
         if ($this->exts->check_exist_by_chromedevtool('iframe[src*="privacy"]')) {
             $this->switchToFrame('iframe[src*="privacy"]');
-            $this->exts->waitTillPresent('button[aria-label*="Alle akzeptieren"]', 30);
-            if ($this->exts->exists('button[aria-label*="Alle akzeptieren"]')) {
-                $this->exts->click_element('button[aria-label*="Alle akzeptieren"]');
+            $this->waitFor('button[aria-label*="Alle akzeptieren"]', 30);
+            if ($this->isExists('button[aria-label*="Alle akzeptieren"]')) {
+                $this->exts->click_by_xdotool('button[aria-label*="Alle akzeptieren"]');
                 sleep(5);
             }
 
@@ -190,6 +190,30 @@ class PortalScriptCDP
                 $this->exts->refresh();
                 sleep(15);
             }
+        }
+    }
+
+    // Custom Exists function to check element found or not
+    private function isExists($selector = '')
+    {
+        $safeSelector = addslashes($selector);
+        $this->exts->log('Element:: ' . $safeSelector);
+        $isElement = $this->exts->execute_javascript('!!document.querySelector("' . $safeSelector . '")');
+        if ($isElement) {
+            $this->exts->log('Element Found');
+            return true;
+        } else {
+            $this->exts->log('Element not Found');
+            return false;
+        }
+    }
+
+
+    public function waitFor($selector, $seconds = 10)
+    {
+        for ($wait = 0; $wait < 2 && $this->exts->executeSafeScript("return !!document.querySelector('" . $selector . "');") != 1; $wait++) {
+            $this->exts->log('Waiting for Selectors.....');
+            sleep($seconds);
         }
     }
 
@@ -216,7 +240,7 @@ class PortalScriptCDP
 
     private function checkFillLogin()
     {
-        $this->exts->waitTillPresent($this->username_selector);
+        $this->waitFor($this->username_selector);
         if ($this->exts->getElement($this->username_selector) != null) {
             $this->exts->capture("2-login-page");
 
@@ -237,7 +261,7 @@ class PortalScriptCDP
             sleep(5); // Portal itself has one second delay after showing toast
             $this->solve_login_cloudflare();
 
-            if ($this->exts->exists($this->submit_login_selector)) {
+            if ($this->isExists($this->submit_login_selector)) {
                 $this->exts->click_by_xdotool($this->submit_login_selector);
             }
         } else {
@@ -277,7 +301,7 @@ class PortalScriptCDP
                 $this->exts->log('Waiting for login.....');
                 sleep(10);
             }
-            if ($this->exts->exists($this->check_login_success_selector)) {
+            if ($this->isExists($this->check_login_success_selector)) {
                 $this->exts->log(">>>>>>>>>>>>>>>Login successful!!!!");
                 $isLoggedIn = true;
             }
@@ -290,7 +314,7 @@ class PortalScriptCDP
 
     private function check_multil_contract()
     {
-        if ($this->exts->exists('[data-qa="period"] select[disabled]')) {
+        if ($this->isExists('[data-qa="period"] select[disabled]')) {
             $this->exts->moveToElementAndClick('.sub-navigation li a[href*="/meine-rechnungen"]');
             sleep(15);
         }
@@ -299,7 +323,7 @@ class PortalScriptCDP
             $this->exts->execute_javascript('arguments[0].style.display = "none";', [$cookie]);
         }
 
-        if ($this->exts->exists('.select-billing-account [data-qa$="-billing-account-option"].collapsed')) {
+        if ($this->isExists('.select-billing-account [data-qa$="-billing-account-option"].collapsed')) {
             $this->exts->moveToElementAndClick('.select-billing-account [data-qa$="-billing-account-option"].collapsed');
             sleep(2);
         }
@@ -310,7 +334,7 @@ class PortalScriptCDP
             foreach ($contracts as $contract_label) {
                 sleep(5);
                 $this->exts->log('Processing contract: ' . $contract_label);
-                if ($this->exts->exists('.select-billing-account [data-qa$="-billing-account-option"].collapsed')) {
+                if ($this->isExists('.select-billing-account [data-qa$="-billing-account-option"].collapsed')) {
                     $this->exts->moveToElementAndClick('.select-billing-account [data-qa$="-billing-account-option"].collapsed');
                     sleep(2);
                 }
@@ -336,7 +360,7 @@ class PortalScriptCDP
     {
         $this->exts->update_process_lock();
         sleep(5);
-        $this->exts->waitTillPresent('[dataqa="invoice-item"]', 25);
+        $this->waitFor('[dataqa="invoice-item"]', 10);
         $this->exts->capture("4-invoices-page");
 
         $invoice_sections = $this->exts->getElements('[dataqa="invoice-item"]');
@@ -349,8 +373,8 @@ class PortalScriptCDP
                 $invoiceName = end(explode('.', $invoiceName));
                 $invoiceName = trim($invoiceName);
                 $invoiceFileName = !empty($invoiceName) ? $invoiceName . '.pdf' : '';
-                $invoiceDate = '';
-                $invoiceAmount = '';
+                $invoiceDate = $this->exts->extract('span.title-text span.title span:nth-child(1)', $invoice_section);
+                $invoiceAmount = $this->exts->extract('span.title-text span.title span:nth-child(2)', $invoice_section);
 
                 $this->exts->log('--------------------------');
                 $this->exts->log('invoiceName: ' . $invoiceName);
