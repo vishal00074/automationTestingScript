@@ -62,15 +62,12 @@ class PortalScriptCDP
     public $baseUrl = 'https://www.remove.bg/dashboard';
     public $loginUrl = 'https://www.remove.bg/dashboard';
     public $invoiceUrl = 'https://www.remove.bg/profile#payment-billing';
-
     public $username_selector = '#user_email';
     public $password_selector = '#user_password';
     public $submit_btn = 'div.actions button';
     public $check_login_success_selector = 'a[href="#payment-billing"], a[href*="users/sign_out"], a[href*="/profile"], a[id*="userProfile"], ul > div > div > button > div';
     public $noInvoice = true;
     public $restrictPages = 3;
-
-
     public $isNoInvoice = true;
 
 
@@ -102,8 +99,6 @@ class PortalScriptCDP
         }
 
         if (!$isCookieLoginSuccess) {
-
-
             $this->exts->log("initPortal:: could not click on login link, try opening login URL");
             $this->exts->openUrl($this->baseUrl);
             $this->waitFor('a#sso-sign-in-btn');
@@ -544,7 +539,7 @@ class PortalScriptCDP
                 $this->exts->log('invoiceAmount: ' . $invoice['invoiceAmount']);
                 $this->exts->log('invoiceUrl: ' . $invoice['invoiceUrl']);
 
-                $invoiceFileName = !empty($invoice['invoiceName']) ? $invoice['invoiceName'] . '.pdf': '';
+                $invoiceFileName = !empty($invoice['invoiceName']) ? $invoice['invoiceName'] . '.pdf' : '';
                 $invoice['invoiceDate'] = $this->exts->parse_date($invoice['invoiceDate'], 'Y-m-d', 'Y-m-d');
                 $this->exts->log('Date parsed: ' . $invoice['invoiceDate']);
 
