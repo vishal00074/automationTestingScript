@@ -82,12 +82,12 @@ class PortalScriptCDP
     private function initPortal($count)
     {
 
-        $this->exts->temp_keep_useragent = $this->exts->send_websocket_event(
-            $this->exts->current_context->webSocketDebuggerUrl,
-            "Network.setUserAgentOverride",
-            '',
-            ["userAgent" => "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/119.0.0.0 Safari/537.36"]
-        );
+        // $this->exts->temp_keep_useragent = $this->exts->send_websocket_event(
+        //     $this->exts->current_context->webSocketDebuggerUrl,
+        //     "Network.setUserAgentOverride",
+        //     '',
+        //     ["userAgent" => "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/119.0.0.0 Safari/537.36"]
+        // );
 
         $isCookieLoaded = false;
         if ($this->exts->loadCookiesFromFile()) {
@@ -174,30 +174,6 @@ class PortalScriptCDP
                 $this->exts->loginFailure();
             }
         }
-    }
-
-    private function clearChrome()
-    {
-        $this->exts->log("Clearing browser history, cookie, cache");
-        $this->exts->openUrl('chrome://settings/clearBrowserData');
-        sleep(10);
-        $this->exts->capture("clear-page");
-        for ($i = 0; $i < 2; $i++) {
-            $this->exts->type_key_by_xdotool('Tab');
-        }
-        $this->exts->type_key_by_xdotool('Tab');
-        $this->exts->type_key_by_xdotool('Return');
-        $this->exts->type_key_by_xdotool('a');
-        sleep(1);
-        $this->exts->type_key_by_xdotool('Return');
-        sleep(3);
-        $this->exts->capture("clear-page");
-        for ($i = 0; $i < 5; $i++) {
-            $this->exts->type_key_by_xdotool('Tab');
-        }
-        $this->exts->type_key_by_xdotool('Return');
-        sleep(15);
-        $this->exts->capture("after-clear");
     }
 
     private function splitName($name)
@@ -299,13 +275,13 @@ class PortalScriptCDP
                 if ($this->exts->exists("a[id*=milesMore-toggle]")) {
                     $this->exts->click_element("a[id*=milesMore-toggle]");
                     sleep(4);
-                    $this->fillForm_1($count);
+                    $this->fillFormId($count);
                 }
             } else {
                 if ($this->exts->exists("a[id*=lufthansaID-toggle]")) {
                     $this->exts->click_element("a[id*=lufthansaID-toggle]");
                     sleep(4);
-                    $this->fillForm_1($count);
+                    $this->fillFormId($count);
                 }
             }
         } catch (\Exception $exception) {
@@ -414,24 +390,6 @@ class PortalScriptCDP
         return $isLoggedIn;
     }
 
-    private function multiple_user_agent($i = null)
-    {
-        $user_agent = [
-            '0' => 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/133.0.0.0 Safari/537.36',
-            '1' => 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/108.0.0.0 Safari/537.36',
-            '2' => 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/117.0.0.0 Safari/537.36',
-            '3' => 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/130.0.0.0 Safari/537.36',
-            '4' => 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36',
-            '5' => 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/132.0.0.0 Safari/537.36',
-            '6' => 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/119.0.0.0 Safari/537.36',
-        ];
-
-        if ($i === null) {
-            return count($user_agent);
-        }
-
-        return isset($user_agent[$i]) ? $user_agent[$i] : null;
-    }
 
     private function waitForSelectors($selector, $max_attempt, $sec)
     {
@@ -576,7 +534,7 @@ class PortalScriptCDP
 
                     $this->exts->new_invoice($receipt_id, '', '', $downloaded_file);
                 } else {
-                    $this->exts->log(__FUNCTION__ . " :: Not Valid PDF - " . $filename);
+                    $this->exts->log(__FUNCTION__ . " :: Not Valid PDF - " . $fileName);
                 }
             } else {
                 $this->exts->log(__FUNCTION__ . " :: No File Downloaded ? - " . $downloaded_file);
@@ -587,11 +545,11 @@ class PortalScriptCDP
                 $this->exts->switchToTab(end($handles));
                 $this->exts->closeCurrentTab();
                 $handles = $this->exts->get_all_tabs();
-                $this->exts->switchToTab($handles[$current_tab - 1]);
+                // $this->exts->switchToTab($handles[$current_tab - 1]);
             }
             $this->exts->log(__FUNCTION__ . " : Current url is : " . $this->exts->getUrl());
         } else {
-            $this->exts->log(__FUNCTION__ . " :: No PDF file for this booking - " . $invoice['bookingCode']);
+            $this->exts->log(__FUNCTION__ . " :: No PDF file for this booking - ");
         }
     }
 
