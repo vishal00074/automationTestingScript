@@ -110,11 +110,11 @@ class PortalScriptCDP
                 $this->loginGoogleIfRequired();
             } else {
                 $this->exts->openUrl($this->loginUrl);
-                $this->exts->waitTillPresent('div[class*="member-profile__details"]', 10);
+                $this->waitFor('button[class*="member-profile__details"]', 5);
 
-                if ($this->exts->exists('div[class*="member-profile__details"]')) {
+                if ($this->exts->exists('button[class*="member-profile__details"]')) {
                     $this->exts->log('****************CLICK ACCOUNT LOGIN WITH COOKIE*****************');
-                    $this->exts->moveToElementAndClick('div[class*="member-profile__details"]');
+                    $this->exts->moveToElementAndClick('button[class*="member-profile__details"]');
                     sleep(10);
                 }
 
@@ -211,6 +211,8 @@ class PortalScriptCDP
             $this->exts->moveToElementAndClick($this->submit_login_selector);
             sleep(10);
 
+            $this->checkAndSolveFunCaptcha();
+
             for ($i = 0; $i < 15; $i++) {
                 $count = $i + 1;
                 if ($this->exts->exists('input#input__phone_verification_pin') || $this->exts->exists('a[id="try-another-way"]')) {
@@ -231,7 +233,6 @@ class PortalScriptCDP
             $this->exts->capture("2-login-page-not-found");
         }
     }
-
 
 
     private function waitForSelectors($selector, $max_attempt, $sec)
@@ -271,18 +272,15 @@ class PortalScriptCDP
                 $this->switchToFrame('iframe[data-e2e="enforcement-frame"]');
                 sleep(1);
             }
-            if ($this->exts->exists('#fc-iframe-wrap')) {
-                $this->switchToFrame('#fc-iframe-wrap');
+
+            if ($this->exts->exists('iframe[id="game-core-frame"]')) {
+                $this->switchToFrame('iframe[id="game-core-frame"]');
                 sleep(1);
             }
 
-            if ($this->exts->exists('#CaptchaFrame')) {
-                $this->switchToFrame('#CaptchaFrame');
-                // Click button to show images challenge
-                if ($this->exts->exists('#home_children_button')) {
-                    $this->exts->moveToElementAndClick('#home_children_button');
-                    sleep(7);
-                }
+            if ($this->exts->exists('button[data-theme="home.verifyButton"]')) {
+                $this->exts->moveToElementAndClick('button[data-theme="home.verifyButton"]');
+                sleep(10);
             }
             $this->exts->switchToDefault();
             sleep(1);
@@ -1486,10 +1484,18 @@ class PortalScriptCDP
         return $this->exts->exists($this->check_login_success_selector);
     }
 
+    public function waitFor($selector, $seconds = 10)
+    {
+        for ($wait = 0; $wait < 2 && $this->exts->executeSafeScript("return !!document.querySelector('" . $selector . "');") != 1; $wait++) {
+            $this->exts->log('Waiting for Selectors.....');
+            sleep($seconds);
+        }
+    }
+
     public $invoices = array();
     private function processInvoices($paging_count = 1)
     {
-        $this->exts->waitTillPresent('table > tbody > tr', 30);
+        $this->waitFor('table > tbody > tr', 15);
 
         $this->exts->capture("4-invoices-page-" . $paging_count);
 
@@ -1539,7 +1545,7 @@ class PortalScriptCDP
             $this->exts->log('invoiceAmount: ' . $invoice['invoiceAmount']);
             $this->exts->log('invoiceUrl: ' . $invoice['invoiceUrl']);
 
-            $invoiceFileName =!empty($invoice['invoiceName']) ? $invoice['invoiceName'] . '.pdf': '';
+            $invoiceFileName = !empty($invoice['invoiceName']) ? $invoice['invoiceName'] . '.pdf' : '';
             $invoice['invoiceDate'] = $this->exts->parse_date($invoice['invoiceDate'], 'd.m.Y', 'Y-m-d');
             $this->exts->log('Date parsed: ' . $invoice['invoiceDate']);
 
@@ -1548,7 +1554,7 @@ class PortalScriptCDP
                 continue;
             }
             $this->exts->openNewTab($invoice['invoiceUrl']);
-            $this->exts->waitTillPresent('button#print-button', 30);
+            $this->waitFor('button#print-button', 30);
             if ($this->company_detail != '') {
                 if ($this->exts->exists('.company-billing-info-updater button.add-billing-details-btn:not(.hidden)')) {
                     $this->exts->moveToElementAndClick('.company-billing-info-updater button.add-billing-details-btn');
@@ -1590,7 +1596,7 @@ class PortalScriptCDP
 
     private function processInvoicestransactions()
     {
-        $this->exts->waitTillPresent('div.invoices-table__list  [role="row"]', 30);
+        $this->waitFor('div.invoices-table__list  [role="row"]', 15);
 
         $this->exts->capture("4-invoices-pagetransactions");
         $invoices = [];
@@ -1634,7 +1640,7 @@ class PortalScriptCDP
             $this->exts->log('invoiceAmount: ' . $invoice['invoiceAmount']);
             $this->exts->log('invoiceUrl: ' . $invoice['invoiceUrl']);
 
-            $invoiceFileName = !empty($invoice['invoiceName']) ? $invoice['invoiceName'] . '.pdf': '';
+            $invoiceFileName = !empty($invoice['invoiceName']) ? $invoice['invoiceName'] . '.pdf' : '';
             $invoice['invoiceDate'] = $this->exts->parse_date($invoice['invoiceDate'], 'd.m.Y', 'Y-m-d');
             $this->exts->log('Date parsed: ' . $invoice['invoiceDate']);
 

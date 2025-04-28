@@ -1,4 +1,4 @@
-<?php // remove undefined variable support_restart  updated check_login_failed_selector i have migrated the script and trigger loginFailedConfirmed in case incorrect email and password and invalid otp
+<?php // updated download code extract invoice name and added config valurable log 
 
 /**
  * Chrome Remote via Chrome devtool protocol script, for specific process/portal
@@ -56,7 +56,9 @@ class PortalScriptCDP
             echo 'Script execution failed.. ' . "\n";
         }
     }
-    
+
+    // Server-Portal-ID: 10251 - Last modified: 11.04.2025 14:09:01 UTC - User: 1
+
     public $baseUrl = "https://www.amazon.es";
     public $orderPageUrl = "https://www.amazon.es/gp/css/order-history/ref=nav_youraccount_orders";
     public $messagePageUrl = "https://www.amazon.es/gp/message?e=UTF8&cl=1&ref_=ya_d_l_msg_center#!/inbox";
@@ -115,6 +117,20 @@ class PortalScriptCDP
             $this->start_page = isset($this->exts->config_array["start_page"]) ? $this->exts->config_array["start_page"] : '';
             $this->last_invoice_date = isset($this->exts->config_array["last_invoice_date"]) ? $this->exts->config_array["last_invoice_date"] : '';
             $this->procurment_report = isset($this->exts->config_array["procurment_report"]) ? (int)$this->exts->config_array["procurment_report"] : 0;
+
+
+            $this->exts->log('amazon_download_overview ' . $this->amazon_download_overview);
+            $this->exts->log('download_invoice_from_message ' . $this->download_invoice_from_message);
+            $this->exts->log('auto_request_invoice ' . $this->auto_request_invoice);
+            $this->exts->log('only_years ' . $this->only_years);
+            $this->exts->log('auto_tagging ' . $this->auto_tagging);
+            $this->exts->log('marketplace_invoice_tags ' . $this->marketplace_invoice_tags);
+            $this->exts->log('order_overview_tags ' . $this->order_overview_tags);
+            $this->exts->log('amazon_invoice_tags ' . $this->amazon_invoice_tags);
+            $this->exts->log('start_page ' . $this->start_page);
+            $this->exts->log('last_invoice_date ' . $this->last_invoice_date);
+            $this->exts->log('procurment_report ' . $this->procurment_report);
+
 
             $this->invalid_filename_pattern = '';
             if (!empty($this->invalid_filename_keywords)) {
@@ -1149,11 +1165,11 @@ class PortalScriptCDP
                                                                     $popups = $this->exts->querySelectorAll("div.a-popover.a-popover-no-header.a-arrow-bottom");
                                                                     if (count($popups) > 0) {
                                                                         $this->exts->execute_javascript("
-																		var popups = document.querySelectorAll(\"div.a-popover.a-popover-no-header.a-arrow-bottom\");
-																		for(var i=0; i<popups.length; i++) {
-																			popups[i].remove();
-																		}
-																	");
+																	var popups = document.querySelectorAll(\"div.a-popover.a-popover-no-header.a-arrow-bottom\");
+																	for(var i=0; i<popups.length; i++) {
+																		popups[i].remove();
+																	}
+																");
                                                                     }
                                                                     continue;
                                                                 }
@@ -1291,11 +1307,11 @@ class PortalScriptCDP
 
                                                                 //Remove invoice triggered popups
                                                                 $this->exts->execute_javascript("
-																var popups = document.querySelectorAll(\"div.a-popover.a-popover-no-header.a-arrow-bottom\");
-																for(var i=0; i<popups.length; i++) {
-																	popups[i].remove();
-																}
-															");
+															var popups = document.querySelectorAll(\"div.a-popover.a-popover-no-header.a-arrow-bottom\");
+															for(var i=0; i<popups.length; i++) {
+																popups[i].remove();
+															}
+														");
                                                             } else {
                                                                 $links = $this->exts->querySelectorAll("div.orderSummary a.a-link-normal", $rowItem);
                                                                 if (count($links) > 0) {
@@ -1311,11 +1327,11 @@ class PortalScriptCDP
                                                                 $popups = $this->exts->querySelectorAll("div.a-popover.a-popover-no-header.a-arrow-bottom");
                                                                 if (count($popups) > 0) {
                                                                     $this->exts->execute_javascript("
-																	var popups = document.querySelectorAll(\"div.a-popover.a-popover-no-header.a-arrow-bottom\");
-																	for(var i=0; i<popups.length; i++) {
-																		popups[i].remove();
-																	}
-																");
+																var popups = document.querySelectorAll(\"div.a-popover.a-popover-no-header.a-arrow-bottom\");
+																for(var i=0; i<popups.length; i++) {
+																	popups[i].remove();
+																}
+															");
                                                                 }
                                                             }
 
@@ -1588,8 +1604,11 @@ class PortalScriptCDP
                             for ($i = 0; $i < $count_order_card; $i++) {
                                 $order_card_invoice_dropdown = $this->exts->getElements('.order-card a[href*="/ajax/invoice/"]')[$i];
                                 $temp_url = $order_card_invoice_dropdown->getAttribute('href');
-                                $temp_array = explode('orderId=', $temp_url);
-                                $order_invoice_name = end($temp_array);
+
+                                $parsedUrl = parse_url($temp_url);
+                                parse_str($parsedUrl['query'], $queryParams);
+
+                                $order_invoice_name = $queryParams['orderId'];
                                 $temp_array = explode('&', $order_invoice_name);
                                 $order_invoice_name = reset($temp_array);
 
@@ -2144,11 +2163,11 @@ class PortalScriptCDP
                 $popups = $this->exts->querySelectorAll('.a-popover.a-popover-no-header.a-arrow-right');
                 if (count($popups) > 0) {
                     $this->exts->execute_javascript("
-			var popups = document.querySelectorAll(\".a-popover.a-popover-no-header.a-arrow-right\");
-			for(var i=0; i<popups.length; i++) {
-				popups[i].remove();
-			}
-		");
+		var popups = document.querySelectorAll(\".a-popover.a-popover-no-header.a-arrow-right\");
+		for(var i=0; i<popups.length; i++) {
+			popups[i].remove();
+		}
+	");
                 }
             }
         } while ($this->exts->exists('.report-table-footer button[data-testid="next-button"]') && !$this->exts->exists('.report-table-footer button[data-testid="next-button"][disabled]') && $pageNum > 1);
