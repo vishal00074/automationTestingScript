@@ -82,12 +82,12 @@ class PortalScriptCDP
     private function initPortal($count)
     {
 
-        // $this->exts->temp_keep_useragent = $this->exts->send_websocket_event(
-        //     $this->exts->current_context->webSocketDebuggerUrl,
-        //     "Network.setUserAgentOverride",
-        //     '',
-        //     ["userAgent" => "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/119.0.0.0 Safari/537.36"]
-        // );
+        $this->exts->temp_keep_useragent = $this->exts->send_websocket_event(
+            $this->exts->current_context->webSocketDebuggerUrl,
+            "Network.setUserAgentOverride",
+            '',
+            ["userAgent" => "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/119.0.0.0 Safari/537.36"]
+        );
 
         $isCookieLoaded = false;
         if ($this->exts->loadCookiesFromFile()) {
@@ -99,17 +99,17 @@ class PortalScriptCDP
 
         sleep(10);
 
-        if ($this->exts->exists('maui-link-button[variant="close"]')) {
+        if ($this->isExists('maui-link-button[variant="close"]')) {
             $this->exts->click_by_xdotool('maui-link-button[variant="close"]');
             sleep(5);
         }
 
-        if ($this->exts->exists('button#cm-acceptAll')) {
+        if ($this->isExists('button#cm-acceptAll')) {
             $this->exts->click_by_xdotool('button#cm-acceptAll');
             sleep(5);
         }
 
-        if ($this->exts->exists('.consent-manager-inner button#cm-selectSpecific')) {
+        if ($this->isExists('.consent-manager-inner button#cm-selectSpecific')) {
             $this->exts->click_by_xdotool('.consent-manager-inner button#cm-selectSpecific');
             sleep(10);
         }
@@ -121,24 +121,24 @@ class PortalScriptCDP
 
             $this->waitForSelectors("maui-link-button[variant='close']", 10, 2);
 
-            if ($this->exts->exists('maui-link-button[variant="close"]')) {
+            if ($this->isExists('maui-link-button[variant="close"]')) {
                 $this->exts->click_by_xdotool('maui-link-button[variant="close"]');
                 sleep(5);
             }
 
-            if ($this->exts->exists('button#cm-acceptAll')) {
+            if ($this->isExists('button#cm-acceptAll')) {
                 $this->exts->click_by_xdotool('button#cm-acceptAll');
                 sleep(5);
             }
-            if ($this->exts->exists('.consent-manager-inner button#cm-selectSpecific')) {
+            if ($this->isExists('.consent-manager-inner button#cm-selectSpecific')) {
                 $this->exts->click_by_xdotool('.consent-manager-inner button#cm-selectSpecific');
                 sleep(5);
             }
-            if ($this->exts->exists('button[data-identifier-track="login-flag-modal_click_login-flag-modal-close"]')) {
+            if ($this->isExists('button[data-identifier-track="login-flag-modal_click_login-flag-modal-close"]')) {
                 $this->exts->click_by_xdotool('button[data-identifier-track="login-flag-modal_click_login-flag-modal-close"]');
                 sleep(5);
             }
-            if ($this->exts->exists('div.one-id-login a')) {
+            if ($this->isExists('div.one-id-login a')) {
                 $this->exts->click_by_xdotool('div.one-id-login a');
             }
 
@@ -147,7 +147,7 @@ class PortalScriptCDP
 
             $this->waitForSelectors("a[name='welcome_skipMigration']", 10, 2);
 
-            if ($this->exts->exists('a[name="welcome_skipMigration"]')) {
+            if ($this->isExists('a[name="welcome_skipMigration"]')) {
                 $this->exts->click_by_xdotool('a[name="welcome_skipMigration"]');
                 sleep(20);
             }
@@ -176,6 +176,20 @@ class PortalScriptCDP
         }
     }
 
+    private function isExists($selector = '')
+    {
+        $safeSelector = addslashes($selector);
+        $this->exts->log('Element:: ' . $safeSelector);
+        $isElement = $this->exts->execute_javascript('!!document.querySelector("' . $safeSelector . '")');
+        if ($isElement) {
+            $this->exts->log('Element Found');
+            return true;
+        } else {
+            $this->exts->log('Element not Found');
+            return false;
+        }
+    }
+
     private function splitName($name)
     {
         $name = trim($name);
@@ -191,7 +205,7 @@ class PortalScriptCDP
             $this->exts->type_key_by_xdotool("ctrl+l");
             $this->exts->type_key_by_xdotool("Return");
             sleep(15);
-            if ($this->exts->exists($this->username_selector)) {
+            if ($this->isExists($this->username_selector)) {
                 sleep(2);
 
                 $this->exts->log("Enter Username");
@@ -201,7 +215,7 @@ class PortalScriptCDP
                 $this->exts->type_text_by_xdotool($this->username);
                 sleep(2);
 
-                if ($this->exts->exists($this->continue_btn)) {
+                if ($this->isExists($this->continue_btn)) {
                     $this->exts->click_by_xdotool($this->continue_btn);
                     sleep(7);
                 }
@@ -213,7 +227,7 @@ class PortalScriptCDP
                 $this->exts->type_text_by_xdotool($this->password);
                 sleep(2);
 
-                if ($this->exts->exists($this->continue_btn)) {
+                if ($this->isExists($this->continue_btn)) {
                     $this->exts->click_by_xdotool($this->submit_btn);
                 }
                 sleep(10);
@@ -231,7 +245,7 @@ class PortalScriptCDP
         $this->exts->log("Begin fillForm " . $count);
         try {
 
-            if ($this->exts->exists($this->id_selector)) {
+            if ($this->isExists($this->id_selector)) {
                 sleep(2);
                 $this->exts->capture("1-pre-login");
 
@@ -240,7 +254,7 @@ class PortalScriptCDP
                 $this->exts->type_text_by_xdotool($this->username);
                 sleep(2);
 
-                if ($this->exts->exists($this->id_continue_btn)) {
+                if ($this->isExists($this->id_continue_btn)) {
                     $this->exts->click_by_xdotool($this->id_continue_btn);
                     sleep(5);
                 }
@@ -253,7 +267,7 @@ class PortalScriptCDP
 
                 $this->exts->capture("2-login-page-filled");
 
-                if ($this->exts->exists($this->id_submit_btn)) {
+                if ($this->isExists($this->id_submit_btn)) {
                     $this->exts->click_by_xdotool($this->id_submit_btn);
                 }
                 sleep(10);
@@ -272,13 +286,13 @@ class PortalScriptCDP
         try {
             sleep(3);
             if ((int)@$this->lufthansa_id == 0) {
-                if ($this->exts->exists("a[id*=milesMore-toggle]")) {
+                if ($this->isExists("a[id*=milesMore-toggle]")) {
                     $this->exts->click_element("a[id*=milesMore-toggle]");
                     sleep(4);
                     $this->fillFormId($count);
                 }
             } else {
-                if ($this->exts->exists("a[id*=lufthansaID-toggle]")) {
+                if ($this->isExists("a[id*=lufthansaID-toggle]")) {
                     $this->exts->click_element("a[id*=lufthansaID-toggle]");
                     sleep(4);
                     $this->fillFormId($count);
@@ -295,7 +309,7 @@ class PortalScriptCDP
         $this->exts->log(__FUNCTION__);
         $recaptcha_iframe_selector = 'iframe[src*="/recaptcha/api2/anchor?"]';
         $recaptcha_textarea_selector = 'textarea[name="g-recaptcha-response"]';
-        if ($this->exts->exists($recaptcha_iframe_selector)) {
+        if ($this->isExists($recaptcha_iframe_selector)) {
             $iframeUrl = $this->exts->extract($recaptcha_iframe_selector, null, 'src');
             $data_siteKey = explode('&', end(explode("&k=", $iframeUrl)))[0];
             $this->exts->log("iframe url  - " . $iframeUrl);
@@ -347,7 +361,7 @@ class PortalScriptCDP
 
     private function checkAndSolveGeeTestCaptcha()
     {
-        if ($this->exts->exists("div[id='captcha-box']")) {
+        if ($this->isExists("div[id='captcha-box']")) {
             $this->exts->log("Found captcha, process to solve");
             $geetestKey = $this->exts->execute_javascript("return window.GeeGT;");
             $api_server = 'api-na.geetest.com';
@@ -379,7 +393,7 @@ class PortalScriptCDP
         $isLoggedIn = false;
         try {
             $this->waitForSelectors($this->logout_btn, 10, 2);
-            if ($this->exts->exists($this->logout_btn) || $this->exts->exists($this->logout_btn_1)) {
+            if ($this->isExists($this->logout_btn) || $this->isExists($this->logout_btn_1)) {
                 $this->exts->log(">>>>>>>>>>>>>>>Login successful!!!!");
                 $isLoggedIn = true;
             }
@@ -409,11 +423,11 @@ class PortalScriptCDP
         try {
             $this->waitForSelectors(".bookingCard", 10, 2);
 
-            if (!$this->exts->exists('.bookingCard') && !$this->exts->exists('div.geetest_radar_tip, a[id*=lufthansaID-toggle]')) {
+            if (!$this->isExists('.bookingCard') && !$this->isExists('div.geetest_radar_tip, a[id*=lufthansaID-toggle]')) {
                 $this->exts->execute_javascript('window.location.reload();');
             }
 
-            if ($this->exts->exists('.bookingCard')) {
+            if ($this->isExists('.bookingCard')) {
                 sleep(5);
                 $this->exts->capture("2-download-invoice");
                 $invoices = array();
@@ -448,7 +462,7 @@ class PortalScriptCDP
                             $this->exts->log($bookingCode);
                             $parsed_date = $this->exts->parse_date($receiptDate, 'd F Y', 'Y-m-d');
                             $this->exts->log($parsed_date);
-                            $receiptFileName = $bookingCode . '.pdf';
+                            $receiptFileName = !empty($bookingCode) ? $bookingCode . '.pdf' : '';
                             $this->exts->log(__FUNCTION__ . " : receiptFileName is " . $receiptFileName);
                             $this->exts->log(__FUNCTION__ . " : firstName is " . $firstName);
                             $this->exts->log(__FUNCTION__ . " : lastName is " . $lastName);
@@ -466,7 +480,7 @@ class PortalScriptCDP
 
                     $this->exts->closeCurrentTab();
                     // check and go to next page if have paging
-                    if ($this->exts->exists('.bookingList .paginationList li.pageActive + li.pageContainer')) {
+                    if ($this->isExists('.bookingList .paginationList li.pageActive + li.pageContainer')) {
                         $this->exts->click_element('.bookingList .paginationList li.pageActive + li.pageContainer');
                         sleep(15);
                     } else {
@@ -506,7 +520,7 @@ class PortalScriptCDP
             $this->isNoInvoice = false;
             $fileName = '';
             if ($receipt_id != '') {
-                $fileName = $receipt_id . '.pdf';
+                $fileName = !empty($receipt_id) ? $receipt_id . '.pdf' : '';
             }
             $this->exts->click_element('#dlBoardingPass');
             sleep(5);
@@ -573,7 +587,7 @@ class PortalScriptCDP
             }
             sleep(15);
             $invoiceName = $this->exts->extract('div.travel-document-id');
-            $invoiceFileName = $invoiceName . '.pdf';
+            $invoiceFileName = !empty($invoiceName) ? $invoiceName . '.pdf' : '';
 
             // Download invoice if it not exisited
             if ($this->exts->invoice_exists($invoiceName)) {
