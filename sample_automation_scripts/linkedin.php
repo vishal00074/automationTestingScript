@@ -1,596 +1,755 @@
 <?php
-// Server-Portal-ID: 331 - Last modified: 10.12.2024 14:55:53 UTC - User: 1
 
-/*Define constants used in script*/
-public $baseUrl = 'https://www.linkedin.com';
-public $loginUrl = 'https://www.linkedin.com/login?fromSignIn=true&trk=guest_homepage-basic_nav-header-signin';
-public $username_selector = 'input[name="session_key"][type="text"]';
-public $password_selector = 'input[name="session_password"]';
-public $submit_login_selector = 'button[data-litms-control-urn="login-submit"]';
-public $check_login_failed_selector = '#error-for-password a[href*="/request-password-reset"], #error-for-username:not(.hidden), #error-for-password:not(.hidden)';
-public $check_login_success_selector = 'a[href*="/logout"], li#profile-nav-item button#nav-settings__dropdown-trigger, #notifications-nav-item a, .global-nav__me .artdeco-dropdown__trigger';
-
-public $isNoInvoice = true;
-public $restrictPages = 3;
-public $login_with_google = 0;
-public $company_detail = '';
 /**
- * Entry Method thats called for a portal
- * @param Integer $count Number of times portal is retried.
+ * Chrome Remote via Chrome devtool protocol script, for specific process/portal
+ *
+ * @package uwa
+ *
+ * @copyright   GetMyInvoices
  */
-private function initPortal($count) {
-    $this->exts->log('Begin initPortal '.$count);
-    $this->login_with_google = isset($this->exts->config_array["login_with_google"]) ? (int)$this->exts->config_array["login_with_google"] : $this->login_with_google;
-    $this->restrictPages = isset($this->exts->config_array["restrictPages"]) ? (int)@$this->exts->config_array["restrictPages"] : 3;
-    $this->company_detail = isset($this->exts->config_array["company_detail"]) ? trim($this->exts->config_array["company_detail"]) : '';
-    // Load cookies
-    $this->exts->loadCookiesFromFile();
-    sleep(1);
-    $this->exts->openUrl($this->baseUrl);
-    sleep(15);
-    if($this->exts->exists('[type="COOKIE_CONSENT"] [action-type="ACCEPT"]')){
-        $this->exts->moveToElementAndClick('[type="COOKIE_CONSENT"] [action-type="ACCEPT"]');
-        sleep(3);
+
+define('KERNEL_ROOT', '/var/www/remote-chrome/utils/');
+
+$gmi_browser_core = realpath('/var/www/remote-chrome/utils/GmiChromeManager.php');
+require_once($gmi_browser_core);
+class PortalScriptCDP
+{
+
+    private $exts;
+    public $setupSuccess = false;
+    private $chrome_manage;
+    private $username;
+    private $password;
+
+    public function __construct($mode, $portal_name, $process_uid, $username, $password)
+    {
+        $this->username = $username;
+        $this->password = $password;
+
+        $this->exts = new GmiChromeManager();
+        $this->exts->screen_capture_location = '/var/www/remote-chrome/screens/';
+        $this->exts->init($mode, $portal_name, $process_uid, $username, $password);
+        $this->setupSuccess = true;
     }
-    $this->exts->capture('1-init-page');
-    
-    
-    // If user hase not logged in from cookie, clear cookie, open the login url and do login
-    if($this->exts->getElement($this->check_login_success_selector) == null) {
-        $this->exts->log('NOT logged via cookie');
-        // $this->exts->clearCookies();
-        if($this->login_with_google == 1){
-            $this->exts->openUrl('https://www.linkedin.com/checkpoint/lg/sign-in-another-account');
-            sleep(15);
-            if($this->exts->exists('button#sign-in-with-google-button')){
-                $this->exts->moveToElementAndClick('button#sign-in-with-google-button');
-            } else {
-                $this->exts->moveToElementAndClick('div.alternate-signin__btn--google');
+
+    /**
+     * Method that called first for executing portal script, this method should not be altered by Users.
+     */
+    public function run()
+    {
+        if ($this->setupSuccess) {
+            try {
+                // Start portal script execution
+                $this->initPortal(0);
+            } catch (\Exception $exception) {
+                $this->exts->log('Exception: ' . $exception->getMessage());
+                $this->exts->capture("error");
+                var_dump($exception);
             }
-            sleep(5);
-            $this->loginGoogleIfRequired();
+
+
+            $this->exts->log('Execution completed');
+
+            $this->exts->process_completed();
+            $this->exts->dump_session_files();
         } else {
-            $this->exts->openUrl($this->loginUrl);
-            sleep(10);
-            $this->checkFillRecaptcha();
-            $this->checkFillRecaptcha();
-            if($this->exts->exists('div[class*="member-profile__details"]')){
-                $this->exts->log('****************CLICK ACCOUNT LOGIN WITH COOKIE*****************');
-                $this->exts->moveToElementAndClick('div[class*="member-profile__details"]');
-                sleep(10);
-            }
-            if($this->exts->exists('[type="COOKIE_CONSENT"] [action-type="ACCEPT"]')){
-                $this->exts->moveToElementAndClick('[type="COOKIE_CONSENT"] [action-type="ACCEPT"]');
-                sleep(3);
-            }
-            $this->checkFillLogin();
-            sleep(10);
-
-            
-
-            if($this->checkFillRecaptcha() && $this->exts->exists('iframe.iframe--authentication')){
-                $this->switchToFrame('iframe.iframe--authentication');
-                if(!$this->exts->exists($this->check_login_failed_selector)){
-                    // If after login submit, recaptcha showed.
-                    // Solve it and check fill login again
-                    $this->checkFillLogin();
-                }
-            }
-            
-            $this->checkTwoFactorAuth(1);
-            
-            
-            // Some time this site showed a form to confirm email and phone number, just simple click DONE
-            if($this->exts->exists('.cp-manage-account .cp-challenge #password-prompt-wrapper button')){
-                $this->exts->moveToElementAndClick('.cp-manage-account .cp-challenge #password-prompt-wrapper button');
-                sleep(10);
-            } else if($this->exts->urlContainsAny(['/check/add', '/check/manage']) && $this->exts->exists('.cp-challenge .cp-actions button[class*="secondary-action"][type="button"]')){
-                // Click SKIP button
-                $this->exts->moveToElementAndClick('.cp-challenge .cp-actions button[class*="secondary-action"][type="button"]');
-                sleep(10);
-            }
-            if($this->exts->exists('[role="main"] form#remember-me-prompt__form-primary [data-cie-control-urn="checkpoint_remember_me_save_info_yes"]')){
-                $this->exts->moveToElementAndClick('[role="main"] form#remember-me-prompt__form-primary [data-cie-control-urn="checkpoint_remember_me_save_info_yes"]');
-                sleep(10);
-            }
-            if($this->exts->urlContainsAny(['linkedin.com/check/bounced-email']) && $this->exts->exists('.cp-bounced-email button.secondary-action-new')){
-                // Click SKIP button
-                $this->exts->moveToElementAndClick('.cp-bounced-email button.secondary-action-new');
-                sleep(10);
-            }
+            echo 'Script execution failed.. ' . "\n";
         }
     }
-    
-    // then check user logged in or not
-    if($this->exts->getElement($this->check_login_success_selector) != null) {
-        sleep(3);
-        $this->exts->log(__FUNCTION__.'::User logged in');
-        if($this->exts->exists('[type="COOKIE_CONSENT"] [action-type="ACCEPT"]')){
+
+    // Server-Portal-ID: 331 - Last modified: 26.03.2025 14:23:38 UTC - User: 1
+
+    public $baseUrl = 'https://www.linkedin.com';
+    public $loginUrl = 'https://www.linkedin.com/login?fromSignIn=true&trk=guest_homepage-basic_nav-header-signin';
+    public $username_selector = 'input[id="username"]';
+    public $password_selector = 'input[id="password"]';
+    public $submit_login_selector = 'button[data-litms-control-urn="login-submit"]';
+    public $check_login_failed_selector = '#error-for-password a[href*="/request-password-reset"], #error-for-username:not(.hidden), #error-for-password:not(.hidden)';
+    public $check_login_success_selector = 'a[href*="/logout"], li#profile-nav-item button#nav-settings__dropdown-trigger, #notifications-nav-item a, .global-nav__me .artdeco-dropdown__trigger';
+
+    public $isNoInvoice = true;
+    public $restrictPages = 3;
+    public $login_with_google = 0;
+    public $company_detail = '';
+    /**
+     * Entry Method thats called for a portal
+     * @param Integer $count Number of times portal is retried.
+     */
+    private function initPortal($count)
+    {
+        $this->exts->log('Begin initPortal ' . $count);
+        $this->login_with_google = isset($this->exts->config_array["login_with_google"]) ? (int) $this->exts->config_array["login_with_google"] : $this->login_with_google;
+        $this->restrictPages = isset($this->exts->config_array["restrictPages"]) ? (int) @$this->exts->config_array["restrictPages"] : 3;
+        $this->company_detail = isset($this->exts->config_array["company_detail"]) ? trim($this->exts->config_array["company_detail"]) : '';
+        // Load cookies
+        $this->exts->loadCookiesFromFile();
+        sleep(1);
+        $this->exts->openUrl($this->baseUrl);
+        $this->waitForSelectors('[type="COOKIE_CONSENT"] [action-type="ACCEPT"]', 15, 2);
+
+        if ($this->exts->exists('[type="COOKIE_CONSENT"] [action-type="ACCEPT"]')) {
             $this->exts->moveToElementAndClick('[type="COOKIE_CONSENT"] [action-type="ACCEPT"]');
             sleep(3);
         }
-        $this->exts->capture("3-login-success");
-        
-        
-        // Open invoices url and download invoice
-        $this->exts->openUrl('https://www.linkedin.com/payments/purchasehistory?trk=');
-        sleep(10);
+        $this->exts->capture('1-init-page');
 
-        $this->exts->execute_javascript('let selectBox = document.querySelector("select#customDateOption-purchaseHistoryForm");
-                                            selectBox.value = "custom";
-                                            selectBox.dispatchEvent(new Event("change"));');
 
-        $this->processInvoices();
-        $this->exts->openUrl('https://www.linkedin.com/manage/purchases-payments/transactions');
-        sleep(10);
-        $this->processInvoicestransactions();
-        // Final, check no invoice
-        if($this->isNoInvoice){
-            $this->exts->no_invoice();
-        }
-        $this->exts->success();
-    } else {
-        $this->exts->log(__FUNCTION__.'::Use login failed: ' . $this->exts->getUrl());
-        if($this->exts->getElement($this->check_login_failed_selector) != null) {
-            $this->exts->loginFailure(1);
-        } else if($this->exts->exists('[name="pageKey"][content="d_checkpoint_lg_accountRestricted"]')){
-            $this->exts->account_not_ready();
-        } else {
-            $this->exts->loginFailure();
-        }
-    }
-}
-private function checkFillLogin() {
-    if($this->exts->getElement($this->password_selector) != null) {
-        sleep(3);
-        $this->exts->capture("2-login-page");
-        if($this->exts->exists($this->username_selector)){
-            $this->exts->log("Enter Username");
-            $this->exts->moveToElementAndType($this->username_selector, $this->username);
-            sleep(4);
-        }
-        
-        $this->exts->log("Enter Password");
-        $this->exts->moveToElementAndType($this->password_selector, $this->password);
-        sleep(4);
-        
-        $this->exts->capture("2-login-page-filled");
-        $this->exts->moveToElementAndClick($this->submit_login_selector);
-        sleep(5);
+        // If user hase not logged in from cookie, clear cookie, open the login url and do login
+        if ($this->exts->getElement($this->check_login_success_selector) == null) {
+            $this->exts->log('NOT logged via cookie');
+            // $this->exts->clearCookies();
+            if ($this->login_with_google == 1) {
+                $this->exts->openUrl('https://www.linkedin.com/checkpoint/lg/sign-in-another-account');
+                sleep(15);
+                if ($this->exts->exists('button#sign-in-with-google-button')) {
+                    $this->exts->moveToElementAndClick('button#sign-in-with-google-button');
+                } else {
+                    $this->exts->moveToElementAndClick('div.alternate-signin__btn--google');
+                }
+                sleep(5);
+                $this->loginGoogleIfRequired();
+            } else {
+                $this->exts->openUrl($this->loginUrl);
+                $this->waitFor('button[class*="member-profile__details"]', 5);
 
-      
-    
-        
-        $funcaptcha_displayed = $this->processFunCaptchaByClicking();
-        if($funcaptcha_displayed){
-            $this->processFunCaptchaByClicking();
-            $this->processFunCaptchaByClicking();
-            $this->processFunCaptchaByClicking();
-            $this->processFunCaptchaByClicking();
-            $funcaptcha_displayed = $this->processFunCaptchaByClicking();
-        }
+                if ($this->exts->exists('button[class*="member-profile__details"]')) {
+                    $this->exts->log('****************CLICK ACCOUNT LOGIN WITH COOKIE*****************');
+                    $this->exts->moveToElementAndClick('button[class*="member-profile__details"]');
+                    sleep(10);
+                }
 
-        if($funcaptcha_displayed){
-            $this->processFunCaptchaByClicking();
-            $this->processFunCaptchaByClicking();
-            $this->processFunCaptchaByClicking();
-            $this->processFunCaptchaByClicking();
-            $this->processFunCaptchaByClicking();
-            $this->processFunCaptchaByClicking();
-            $this->processFunCaptchaByClicking();
-        }
-        $this->cookiePopup();
-        
-    } else {
-        $this->exts->log(__FUNCTION__.'::Login page not found');
-        $this->exts->capture("2-login-page-not-found");
-    }
-}
+                if ($this->exts->exists('[type="COOKIE_CONSENT"] [action-type="ACCEPT"]')) {
+                    $this->exts->moveToElementAndClick('[type="COOKIE_CONSENT"] [action-type="ACCEPT"]');
+                    sleep(3);
+                }
+                $this->checkFillLogin();
+                sleep(10);
+                $this->checkTwoFactorAuth(1);
 
-private function cookiePopup()
-{
-    if($this->exts->exists('[type="COOKIE_CONSENT"] [action-type="ACCEPT"]')){
-        $this->exts->log('COOKIE CONSENT Page found');
-        $this->exts->moveToElementAndClick('[type="COOKIE_CONSENT"] [action-type="ACCEPT"]');
-        sleep(3);
-    }
-}
-
-private function checkAndSolveFunCaptcha() {
-    $this->exts->log("Begin solving fun captcha" . $count);
-    $input = "input[name='fc-token']";
-    $formInput=  'input[name="captchaUserResponseToken"]';
-    $url = $this->exts->getUrl();
-    if ($this->exts->exists("iframe#captcha-internal")){
-        $this->switchToFrame("iframe#captcha-internal");
-        if ($this->exts->exists("iframe#arkoseframe")){
-            $this->switchToFrame("iframe#arkoseframe");
-            sleep(1);
-        }
-        if ($this->exts->exists('iframe[data-e2e="enforcement-frame"]')){
-            $this->switchToFrame('iframe[data-e2e="enforcement-frame"]');
-            sleep(1);
-        }
-        if ($this->exts->exists('#fc-iframe-wrap')){
-            $this->switchToFrame('#fc-iframe-wrap');
-            sleep(1);
-        }
-
-        if ($this->exts->exists('#CaptchaFrame')){
-            $this->switchToFrame('#CaptchaFrame');
-            // Click button to show images challenge
-            if($this->exts->exists('#home_children_button')){
-                $this->exts->moveToElementAndClick('#home_children_button');
-                sleep(7);
+                // Some time this site showed a form to confirm email and phone number, just simple click DONE
+                if ($this->exts->exists('.cp-manage-account .cp-challenge #password-prompt-wrapper button')) {
+                    $this->exts->moveToElementAndClick('.cp-manage-account .cp-challenge #password-prompt-wrapper button');
+                    sleep(10);
+                } else if ($this->exts->urlContainsAny(['/check/add', '/check/manage']) && $this->exts->exists('.cp-challenge .cp-actions button[class*="secondary-action"][type="button"]')) {
+                    // Click SKIP button
+                    $this->exts->moveToElementAndClick('.cp-challenge .cp-actions button[class*="secondary-action"][type="button"]');
+                    sleep(10);
+                }
+                if ($this->exts->exists('[role="main"] form#remember-me-prompt__form-primary [data-cie-control-urn="checkpoint_remember_me_save_info_yes"]')) {
+                    $this->exts->moveToElementAndClick('[role="main"] form#remember-me-prompt__form-primary [data-cie-control-urn="checkpoint_remember_me_save_info_yes"]');
+                    sleep(10);
+                }
+                if ($this->exts->urlContainsAny(['linkedin.com/check/bounced-email']) && $this->exts->exists('.cp-bounced-email button.secondary-action-new')) {
+                    // Click SKIP button
+                    $this->exts->moveToElementAndClick('.cp-bounced-email button.secondary-action-new');
+                    sleep(10);
+                }
             }
         }
-        $this->exts->switchToDefault();
-        sleep(1);
-    }
-    if($this->exts->exists('iframe.iframe--authentication')){
-        $this->switchToFrame('iframe.iframe--authentication');
-    }
-    if ($this->exts->exists('iframe#captcha-internal')) {
-        $this->switchToFrame('iframe#captcha-internal');
-        sleep(3);
-        if ($this->exts->exists('iframe#arkoseframe')){
-            $this->switchToFrame('iframe#arkoseframe');
-        }
-        if ($this->exts->exists('iframe[data-e2e="enforcement-frame"]')){
-            $this->switchToFrame('iframe[data-e2e="enforcement-frame"]');
-            sleep(1);
-        }
-        sleep(3);
-        if($this->exts->exists($input)){
-            $value = $this->exts->getElement($input)->getAttribute("value");
-            $this->exts->log("value " . $value);
-            $params = explode("|", $value);
-            
-            $pkKey = null;
-            $surl = null;
-            
-            foreach ($params as $i => $param) {
-                if (strpos($param, "pk=") === 0)
-                    $pkKey = explode("=", $param)[1];
-                else if (strpos($param, "surl=") === 0)
-                    $surl = explode("=", $param)[1];
-            }
-            
-            $this->exts->log("Found value pk-key " . $pkKey . " and surl " . $surl);
-            $token = $this->exts->processFunCaptcha(null, null, $pkKey, 'https://linkedin-api.arkoselabs.com', $url, false);
-            if($token == null){
-                $token = $this->exts->processFunCaptcha(null, null, $pkKey, 'https://linkedin-api.arkoselabs.com', $url, false);
-            }
-            $this->exts->switchToDefault();
-            sleep(1);
-            if($this->exts->exists('iframe.iframe--authentication')){
-                $this->switchToFrame('iframe.iframe--authentication');
-            }
-            $this->exts->moveToElementAndType($formInput, $token);
-            $this->exts->execute_javascript('document.querySelector("form#captcha-challenge").submit();');
-            sleep(15);
-            return true;
-        }
-    } else {
-        $this->exts->log("No captcha found, continue process");
-    }
-    $this->exts->switchToDefault();
-    return false;
-}
 
-private function processFunCaptchaByClicking() {
-    $this->exts->log("Checking Funcaptcha");
-    $language_code = $this->exts->extract('[data-locale]', null, "data-locale");
-    // if($this->exts->exists('div.funcaptcha-modal:not([class*="hidden"])')) {
-    // 	$this->exts->capture("funcaptcha");
-    // 	// Captcha located in multi layer frame, go inside
-    // 	if ($this->exts->exists('.funcaptcha-frame')){
-    // 		$this->switchToFrame('.funcaptcha-frame');
-    // 	}
-    if ($this->exts->exists('iframe.iframe--authentication')) {
-        $this->switchToFrame('iframe.iframe--authentication');
-        sleep(1);
-    }
-    if ($this->exts->exists("iframe#captcha-internal")){
-        $this->switchToFrame("iframe#captcha-internal");
-        if ($this->exts->exists("iframe#arkoseframe")){
-            $this->switchToFrame("iframe#arkoseframe");
-            sleep(1);
-        }
-        if ($this->exts->exists('iframe[data-e2e="enforcement-frame"]')){
-            $this->switchToFrame('iframe[data-e2e="enforcement-frame"]');
-            sleep(1);
-        }else{
-            $this->exts->log("funcaptcha without content - reload iframe");
-            $this->exts->switchToDefault();
-            if ($this->exts->exists('iframe.iframe--authentication')) {
-                $this->switchToFrame('iframe.iframe--authentication');
-                sleep(1);
+        $this->waitForSelectors($this->check_login_success_selector, 20, 2);
+
+        // then check user logged in or not
+        if ($this->exts->getElement($this->check_login_success_selector) != null) {
+            sleep(3);
+            $this->exts->log(__FUNCTION__ . '::User logged in');
+
+            if ($this->exts->exists('[type="COOKIE_CONSENT"] [action-type="ACCEPT"]')) {
+                $this->exts->moveToElementAndClick('[type="COOKIE_CONSENT"] [action-type="ACCEPT"]');
+                sleep(3);
             }
-            if ($this->exts->exists("iframe#captcha-internal")){
-                $this->switchToFrame("iframe#captcha-internal");
-            }
-            // reload frame to get content
-            $javascript_expression = '
-                var captcha_iframe = document.querySelector("iframe#arkoseframe");
-                captcha_iframe.src = captcha_iframe.src;
-            ';
-            $devTools->execute(
-                'Runtime.evaluate',
-                ['expression' => $javascript_expression]
-            );
+            $this->exts->capture("3-login-success");
+
+
+            // Open invoices url and download invoice
+            $this->exts->openUrl('https://www.linkedin.com/payments/purchasehistory?trk=');
             sleep(10);
-            $this->exts->switchToDefault();
-            if ($this->exts->exists('iframe.iframe--authentication')) {
-                $this->switchToFrame('iframe.iframe--authentication');
-                sleep(1);
+
+            $this->exts->execute_javascript('let selectBox = document.querySelector("select#customDateOption-purchaseHistoryForm");
+            selectBox.value = "custom";
+            selectBox.dispatchEvent(new Event("change"));
+        ');
+
+            $this->processInvoices();
+
+            $this->exts->openUrl('https://www.linkedin.com/manage/purchases-payments/transactions');
+            sleep(10);
+            $this->processInvoicestransactions();
+            // Final, check no invoice
+            if ($this->isNoInvoice) {
+                $this->exts->no_invoice();
             }
-            if ($this->exts->exists("iframe#captcha-internal")){
-                $this->switchToFrame("iframe#captcha-internal");
+            $this->exts->success();
+        } else {
+            $this->exts->log(__FUNCTION__ . '::Use login failed: ' . $this->exts->getUrl());
+            if ($this->exts->getElement($this->check_login_failed_selector) != null) {
+                $this->exts->loginFailure(1);
+            } else if ($this->exts->exists('[name="pageKey"][content="d_checkpoint_lg_accountRestricted"]')) {
+                $this->exts->account_not_ready();
+            } else {
+                $this->exts->loginFailure();
             }
-            if ($this->exts->exists("iframe#arkoseframe")){
+        }
+    }
+
+    private function checkFillLogin()
+    {
+        if ($this->exts->getElement($this->password_selector) != null) {
+            sleep(3);
+            $this->exts->capture("2-login-page");
+            if ($this->exts->exists($this->username_selector)) {
+                $this->exts->log("Enter Username");
+                $this->exts->moveToElementAndType($this->username_selector, $this->username);
+                sleep(4);
+            }
+
+            $this->exts->log("Enter Password");
+            $this->exts->moveToElementAndType($this->password_selector, $this->password);
+            sleep(4);
+
+            $this->exts->capture("2-login-page-filled");
+            $this->exts->moveToElementAndClick($this->submit_login_selector);
+            sleep(10);
+
+            $this->checkAndSolveFunCaptcha();
+
+            for ($i = 0; $i < 15; $i++) {
+                $count = $i + 1;
+                if ($this->exts->exists('input#input__phone_verification_pin') || $this->exts->exists('a[id="try-another-way"]')) {
+                    break;
+                }
+                $this->exts->log("Trying to solve captcha: " . $count);
+                $this->processFunCaptchaByClicking();
+                sleep(5);
+            }
+            $this->cookiePopup();
+
+            if ($this->exts->exists('a[id="try-another-way"]')) {
+                $this->exts->moveToElementAndClick('a[id="try-another-way"]');
+                sleep(5);
+            }
+        } else {
+            $this->exts->log(__FUNCTION__ . '::Login page not found');
+            $this->exts->capture("2-login-page-not-found");
+        }
+    }
+
+
+    private function waitForSelectors($selector, $max_attempt, $sec)
+    {
+        for (
+            $wait = 0;
+            $wait < $max_attempt && $this->exts->executeSafeScript("return !!document.querySelector('" . $selector . "');") != 1;
+            $wait++
+        ) {
+            $this->exts->log('Waiting for Selectors!!!!!!');
+            sleep($sec);
+        }
+    }
+
+    private function cookiePopup()
+    {
+        if ($this->exts->exists('[type="COOKIE_CONSENT"] [action-type="ACCEPT"]')) {
+            $this->exts->log('COOKIE CONSENT Page found');
+            $this->exts->moveToElementAndClick('[type="COOKIE_CONSENT"] [action-type="ACCEPT"]');
+            sleep(3);
+        }
+    }
+
+    private function checkAndSolveFunCaptcha($count = 0)
+    {
+        $this->exts->log("Begin solving fun captcha" . $count);
+        $input = "input[name='fc-token']";
+        $formInput = 'input[name="captchaUserResponseToken"]';
+        $url = $this->exts->getUrl();
+        if ($this->exts->exists("iframe#captcha-internal")) {
+            $this->switchToFrame("iframe#captcha-internal");
+            if ($this->exts->exists("iframe#arkoseframe")) {
                 $this->switchToFrame("iframe#arkoseframe");
                 sleep(1);
             }
-            if ($this->exts->exists('iframe[data-e2e="enforcement-frame"]')){
+            if ($this->exts->exists('iframe[data-e2e="enforcement-frame"]')) {
                 $this->switchToFrame('iframe[data-e2e="enforcement-frame"]');
                 sleep(1);
             }
-        }
-        if ($this->exts->exists('#fc-iframe-wrap')){
-            $this->switchToFrame('#fc-iframe-wrap');
+
+            if ($this->exts->exists('iframe[id="game-core-frame"]')) {
+                $this->switchToFrame('iframe[id="game-core-frame"]');
+                sleep(1);
+            }
+
+            if ($this->exts->exists('button[data-theme="home.verifyButton"]')) {
+                $this->exts->moveToElementAndClick('button[data-theme="home.verifyButton"]');
+                sleep(10);
+            }
+            $this->exts->switchToDefault();
             sleep(1);
         }
+        if ($this->exts->exists('iframe.iframe--authentication')) {
+            $this->switchToFrame('iframe.iframe--authentication');
+        }
+        if ($this->exts->exists('iframe#captcha-internal')) {
+            $this->switchToFrame('iframe#captcha-internal');
+            sleep(3);
+            if ($this->exts->exists('iframe#arkoseframe')) {
+                $this->switchToFrame('iframe#arkoseframe');
+            }
+            if ($this->exts->exists('iframe[data-e2e="enforcement-frame"]')) {
+                $this->switchToFrame('iframe[data-e2e="enforcement-frame"]');
+                sleep(1);
+            }
+            sleep(3);
+            if ($this->exts->exists($input)) {
+                $value = $this->exts->getElement($input)->getAttribute("value");
+                $this->exts->log("value " . $value);
+                $params = explode("|", $value);
 
-        if ($this->exts->exists('#CaptchaFrame')){
-            $this->switchToFrame('#CaptchaFrame');
-            // Click button to show images challenge
-            if($this->exts->exists('#home_children_button')){
-                $this->exts->moveToElementAndClick('#home_children_button');
-                sleep(2);
-            } else if($this->exts->exists('#wrong_children_button')){
-                $this->exts->moveToElementAndClick('#wrong_children_button');
-                sleep(5);
+                $pkKey = null;
+                $surl = null;
+
+                foreach ($params as $i => $param) {
+                    if (strpos($param, "pk=") === 0)
+                        $pkKey = explode("=", $param)[1];
+                    else if (strpos($param, "surl=") === 0)
+                        $surl = explode("=", $param)[1];
+                }
+
+                $this->exts->log("Found value pk-key " . $pkKey . " and surl " . $surl);
+                $token = $this->exts->processFunCaptcha(null, null, $pkKey, 'https://linkedin-api.arkoselabs.com', $url, false);
+                if ($token == null) {
+                    $token = $this->exts->processFunCaptcha(null, null, $pkKey, 'https://linkedin-api.arkoselabs.com', $url, false);
+                }
+                $this->exts->switchToDefault();
+                sleep(1);
+                if ($this->exts->exists('iframe.iframe--authentication')) {
+                    $this->switchToFrame('iframe.iframe--authentication');
+                }
+                $this->exts->moveToElementAndType($formInput, $token);
+                $this->exts->execute_javascript('document.querySelector("form#captcha-challenge").submit();');
+                sleep(15);
+                return true;
+            }
+        } else {
+            $this->exts->log("No captcha found, continue process");
+        }
+        $this->exts->switchToDefault();
+        return false;
+    }
+
+    private function processFunCaptchaByClicking()
+    {
+        $this->exts->log("Checking Funcaptcha");
+
+        $this->waitForSelectors('[data-locale]', 15, 2);
+
+        $language_code = $this->exts->extract('[data-locale]', null, "data-locale");
+
+        if ($this->exts->exists('iframe.iframe--authentication')) {
+            $this->switchToFrame('iframe.iframe--authentication');
+            sleep(1);
+        }
+        if ($this->exts->exists("iframe#captcha-internal")) {
+            $this->switchToFrame("iframe#captcha-internal");
+            sleep(1);
+            if ($this->exts->exists("iframe#arkoseframe")) {
+                $this->switchToFrame("iframe#arkoseframe");
+                sleep(1);
+            }
+            if ($this->exts->exists('iframe[data-e2e="enforcement-frame"]')) {
+                $this->switchToFrame('iframe[data-e2e="enforcement-frame"]');
+                sleep(1);
+            } else {
+                $this->exts->log("funcaptcha without content - reload iframe");
                 $this->exts->switchToDefault();
                 if ($this->exts->exists('iframe.iframe--authentication')) {
                     $this->switchToFrame('iframe.iframe--authentication');
                     sleep(1);
                 }
-                if ($this->exts->exists("iframe#captcha-internal")){
+                if ($this->exts->exists("iframe#captcha-internal")) {
                     $this->switchToFrame("iframe#captcha-internal");
-                    if ($this->exts->exists("iframe#arkoseframe")){
-                        $this->switchToFrame("iframe#arkoseframe");
-                        sleep(1);
+                }
+
+                $javascript_expression = '
+                (function() {
+                    var captcha_iframe = document.querySelector("iframe#arkoseframe");
+                    if (captcha_iframe) {
+                        captcha_iframe.contentWindow.location.reload();
                     }
-                    if ($this->exts->exists('#fc-iframe-wrap')){
-                        $this->switchToFrame('#fc-iframe-wrap');
-                    }
-                    $this->exts->moveToElementAndClick('a.reloadBtn');
-                    sleep(8);
+                })();
+            ';
+
+                $this->exts->execute_javascript(
+                    'Runtime.evaluate',
+                    ['expression' => $javascript_expression]
+                );
+
+                sleep(10);
+                $this->exts->switchToDefault();
+                if ($this->exts->exists('iframe.iframe--authentication')) {
+                    $this->switchToFrame('iframe.iframe--authentication');
+                    sleep(1);
+                }
+                if ($this->exts->exists("iframe#captcha-internal")) {
+                    $this->switchToFrame("iframe#captcha-internal");
+                }
+                if ($this->exts->exists("iframe#arkoseframe")) {
+                    $this->switchToFrame("iframe#arkoseframe");
+                    sleep(1);
+                }
+                if ($this->exts->exists('iframe[data-e2e="enforcement-frame"]')) {
+                    $this->switchToFrame('iframe[data-e2e="enforcement-frame"]');
+                    sleep(1);
                 }
             }
-            $captcha_instruction = 'Pick the image that is the correct way up';
-            $this->exts->log('language_code: '.$language_code.' Instruction: '. $captcha_instruction);
-            $this->exts->switchToDefault();
-            if ($this->exts->exists('iframe.iframe--authentication')) {
-                $this->switchToFrame('iframe.iframe--authentication');
+
+            if ($this->exts->exists('#fc-iframe-wrap')) {
+                $this->switchToFrame('#fc-iframe-wrap');
                 sleep(1);
             }
-            // if ($this->exts->exists("iframe#captcha-internal")){
-            // 	$this->switchToFrame("iframe#captcha-internal");
-            // }
-            // if ($this->exts->exists("iframe#arkoseframe")){
-            // 	$this->switchToFrame("iframe#arkoseframe");
-            // 	sleep(1);
-            // }
 
-            $captcha_wraper_selector = 'iframe#captcha-internal';
-            // $coordinates = $this->exts->processClickCaptcha($captcha_wraper_selector, $captcha_instruction, '', $json_result=true);// use $language_code and $captcha_instruction if they changed captcha content
-            // if($coordinates == ''){
-            //     $coordinates = $this->exts->processClickCaptcha($captcha_wraper_selector, $captcha_instruction, '', $json_result=true);
-            // }
-            // if($coordinates != ''){
-            //     $wraper = $this->exts->getElement($captcha_wraper_selector);
-            //     $actions = $this->exts->webdriver->action();
-            //     $this->exts->log('Clicking X/Y: '.$coordinates[0]['x'].'/'.$coordinates[0]['y']);
-            //     $actions->moveToElement($wraper, intval($coordinates[0]['x']), intval($coordinates[0]['y']))->click()->perform();
-            //     sleep(3);
-            // }
+            if ($this->exts->exists('#CaptchaFrame')) {
+                $this->switchToFrame('#CaptchaFrame');
+                // Click button to show images challenge
+                if ($this->exts->exists('#home_children_button')) {
+                    $this->exts->moveToElementAndClick('#home_children_button');
+                    sleep(2);
+                } else if ($this->exts->exists('#wrong_children_button')) {
+                    $this->exts->moveToElementAndClick('#wrong_children_button');
+                    sleep(5);
+                    $this->exts->switchToDefault();
+                    if ($this->exts->exists('iframe.iframe--authentication')) {
+                        $this->switchToFrame('iframe.iframe--authentication');
+                        sleep(1);
+                    }
+                    if ($this->exts->exists("iframe#captcha-internal")) {
+                        $this->switchToFrame("iframe#captcha-internal");
+                        if ($this->exts->exists("iframe#arkoseframe")) {
+                            $this->switchToFrame("iframe#arkoseframe");
+                            sleep(1);
+                        }
+                        if ($this->exts->exists('#fc-iframe-wrap')) {
+                            $this->switchToFrame('#fc-iframe-wrap');
+                        }
+                        $this->exts->moveToElementAndClick('a.reloadBtn');
+                        sleep(8);
+                    }
+                }
+                $captcha_instruction = 'Pick the image that is the correct way up';
+                $this->exts->log('language_code: ' . $language_code . ' Instruction: ' . $captcha_instruction);
+                $this->exts->switchToDefault();
+                if ($this->exts->exists('iframe.iframe--authentication')) {
+                    $this->switchToFrame('iframe.iframe--authentication');
+                    sleep(1);
+                }
+                if ($this->exts->exists("iframe#captcha-internal")) {
+                    $this->switchToFrame("iframe#captcha-internal");
+                }
+                if ($this->exts->exists("iframe#arkoseframe")) {
+                    $this->switchToFrame("iframe#arkoseframe");
+                    sleep(1);
+                }
+                $this->exts->switchToDefault();
+                $captcha_wraper_selector = 'iframe#captcha-internal';
+                if ($this->exts->exists($captcha_wraper_selector)) {
+                    $this->exts->log('before cordinates');
+                    $coordinates = $this->getCoordinates($captcha_wraper_selector, $captcha_instruction, '', $json_result = true); // use $language_code and $captcha_instruction if they changed captcha content
+                    $this->exts->log('after cordinates');
+                    if ($coordinates == '') {
+                        $coordinates = $this->getCoordinates($captcha_wraper_selector, $captcha_instruction, '', $json_result = true);
+                    }
+                    if ($coordinates != '') {
+                        $wraper = $this->exts->getElement($captcha_wraper_selector);
+                        if ($wraper != null) {
+                            foreach ($coordinates as $coordinate) {
+                                $this->exts->click_by_xdotool($captcha_wraper_selector, (int) $coordinate['x'], (int) $coordinate['y']);
+                            }
+                            sleep(5);
+                        }
+                    }
+                }
+            }
+            $this->exts->switchToDefault();
+            return true;
         }
         $this->exts->switchToDefault();
-        return true;
-    }
-    $this->exts->switchToDefault();
-    return false;
-}
-private function checkFillRecaptcha($count=1) {
-    $this->exts->log(__FUNCTION__);
-    $this->switchToFrame('iframe#captcha-internal');
-    $recaptcha_iframe_selector = 'iframe[src*="/recaptcha/api2/anchor?"]';
-    $recaptcha_textarea_selector = 'textarea[name="g-recaptcha-response"]';
-    if($this->exts->exists($recaptcha_iframe_selector)) {
-        $iframeUrl = $this->exts->extract($recaptcha_iframe_selector, null, 'src');
-        $data_siteKey = explode('&', end(explode("&k=", $iframeUrl)))[0];
-        $this->exts->log("iframe url  - " . $iframeUrl);
-        $this->exts->log("SiteKey - " . $data_siteKey);
-        
-        $isCaptchaSolved = $this->exts->processRecaptcha($this->exts->getUrl(), $data_siteKey, false);
-        $this->exts->log("isCaptchaSolved - " . $isCaptchaSolved);
-        
-        if($isCaptchaSolved) {
-            // Step 1 fill answer to textarea
-            $this->exts->log(__FUNCTION__."::filling reCaptcha response..");
-            $recaptcha_textareas =  $this->exts->getElements($recaptcha_textarea_selector);
-            for ($i=0; $i < count($recaptcha_textareas); $i++) {
-                $this->exts->execute_javascript("arguments[0].innerHTML = '" .$this->exts->recaptcha_answer. "';", [$recaptcha_textareas[$i]]);
-            }
-            sleep(2);
-            $this->exts->capture('recaptcha-filled');
-            
-            // Step 2, check if callback function need executed
-            $gcallbackFunction = $this->exts->execute_javascript('
-                if(document.querySelector("[data-callback]") != null){
-                    return document.querySelector("[data-callback]").getAttribute("data-callback");
-                }
-
-                var result = ""; var found = false;
-                function recurse (cur, prop, deep) {
-                    if(deep > 5 || found){ return;}console.log(prop);
-                    try {
-                        if(prop.indexOf(".callback") > -1){result = prop; found = true; return;
-                        } else { if(cur == undefined || cur == null || cur instanceof Element || Object(cur) !== cur || Array.isArray(cur)){ return;}deep++;
-                            for (var p in cur) { recurse(cur[p], prop ? prop + "." + p : p, deep);}
-                        }
-                    } catch(ex) { console.log("ERROR in function: " + ex); return; }
-                }
-
-                recurse(___grecaptcha_cfg.clients[0], "", 0);
-                return found ? "___grecaptcha_cfg.clients[0]." + result : null;
-            ');
-            $this->exts->log('Callback function: '.$gcallbackFunction);
-            if($gcallbackFunction != null){
-                $this->exts->execute_javascript($gcallbackFunction.'("'.$this->exts->recaptcha_answer.'");');
-                sleep(10);
-            }
-        } else {
-            // Only call this if recaptcha service expired.
-            if($count < 5){
-                $count++;
-                $this->checkFillRecaptcha($count);
-            }
-        }
-        return true;
-    } else {
-        $this->exts->log(__FUNCTION__.'::Not found reCaptcha');
         return false;
     }
-}
-private function checkLogin(){
-    $this->exts->capture('check-login');
-    return $this->exts->exists($this->check_login_success_selector);
-}
-private function checkTwoFactorAuth($count = 1) {
-    
-    $this->exts->log(__FUNCTION__ . ' Begin ' . $count);
-    $is_recaptcha = $this->exts->getElement('div#nocaptcha iframe[src*="https://www.google.com/recaptcha/api2/anchor?"]');
-    
-    
-    $isCodeVerificationFrm = $this->exts->getElement('form[name="ATOPinChallengeForm"]');
-    $isCodeVerificationFrmV1 = $this->exts->getElement('form[name="TwoStepVerificationForm"] input#verification-code');
-    $isCodeVerificationFrmV2 = $this->exts->getElement('form#email-pin-challenge input[name="pin"]');
-    $isCodeVerificationFrmV3 = $this->exts->getElement('input#input__phone_verification_pin');
-    
-    
-    if($is_recaptcha != null && stripos($this->exts->getUrl(), '/uas/consumer-captcha-v2?challengeId') !== false) {
-        $this->exts->log( __FUNCTION__ . " Found recaptcha");
-        $this->exts->loginFailure();
-    } else if($isCodeVerificationFrm != null && stripos($this->exts->getUrl(), '/uas/consumer-email-challenge') !== false) {
-        
-        $two_factor_input_selector = "input[name='PinVerificationForm_pinParam']";
-        $two_factor_msg = '';
-        $submit_button_selector = 'input#btn-primary[type="submit"]';
-        $ele = $this->exts->getElement('form[name="ATOPinChallengeForm"] h2');
-        if($ele != null) {
-            $two_factor_msg = $ele->getText();
-        }
-        $this->handleTwoFactorCode($two_factor_input_selector, $two_factor_msg, $submit_button_selector);
-    } else if($isCodeVerificationFrmV1 != null && stripos($this->exts->getUrl(), 'consumer-two-step') !== false) {
-        $two_factor_input_selector = "input[name='PinVerificationForm_pinParam']";
-        $two_factor_msg = '';
-        $submit_button_selector = 'form[name="TwoStepVerificationForm"] input#btn-primary';
-        $ele = $this->exts->getElement('div#main h2');
-        if($ele != null) {
-            $two_factor_msg = $ele->getText();
-        }
-        $this->handleTwoFactorCode($two_factor_input_selector, $two_factor_msg, $submit_button_selector);
-    } else if($isCodeVerificationFrmV2 != null && stripos($this->exts->getUrl(), 'checkpoint') !== false) {
-        $two_factor_input_selector = "form#email-pin-challenge input[name='pin']";
-        $two_factor_msg = '';
-        $submit_button_selector = 'form#email-pin-challenge button#email-pin-submit-button';
-        $ele = $this->exts->getElement('form#email-pin-challenge h2.form__subtitle');
-        if($ele != null) {
-            $two_factor_msg = $ele->getText();
-        }
-        $this->handleTwoFactorCode($two_factor_input_selector, $two_factor_msg, $submit_button_selector);
-    } else if($isCodeVerificationFrmV3 != null && stripos($this->exts->getUrl(), 'checkpoint') !== false) {
-        $two_factor_input_selector = "form#two-step-challenge input[name='pin']";
-        $two_factor_msg = '';
-        $submit_button_selector = 'form#two-step-challenge button#two-step-submit-button';
-        $ele = $this->exts->getElement('div.app__content h1.content__header');
-        if($ele != null) {
-            $two_factor_msg = $ele->getText();
-        }
-        $this->handleTwoFactorCode($two_factor_input_selector, $two_factor_msg, $submit_button_selector);
-    } else if($this->exts->getElement('//p[contains(text(),"notification to your signed in devices") or contains(text(),"Wir haben eine Mitteilung an Ihre eingeloggten")]', null, 'xpath') != null){
-        $two_factor_message_selector = '//p[contains(text(),"notification to your signed in devices") or contains(text(),"Wir haben eine Mitteilung an Ihre eingeloggten")]';
-        $this->exts->two_factor_notif_msg_en = "";
-            
-        $this->exts->two_factor_notif_msg_en = $this->exts->two_factor_notif_msg_en.$this->exts->getElements($two_factor_message_selector, null, 'xpath')[0]->getText();
-        
-        $this->exts->two_factor_notif_msg_en = trim($this->exts->two_factor_notif_msg_en);
-        $this->exts->two_factor_notif_msg_de = $this->exts->two_factor_notif_msg_en;
-        $this->exts->log("Message:\n".$this->exts->two_factor_notif_msg_en);
-        $two_factor_code = trim($this->exts->fetchTwoFactorCode());
-        if(!empty($two_factor_code) && trim($two_factor_code) != '') {
-            $this->exts->log("checkFillTwoFactor: Entering two_factor_code.".$two_factor_code);
-            sleep(15);
-            if($this->exts->getElement($two_factor_message_selector, null, 'xpath') == null){
-                $this->exts->log("Two factor solved");
-            } else if ($this->exts->two_factor_attempts < 3) {
-                $this->exts->two_factor_attempts++;
-                $this->checkTwoFactorAuth($two_factor_message_selector);
+
+    private function getCoordinates(
+        $captcha_image_selector,
+        $instruction = '',
+        $lang_code = '',
+        $json_result = false,
+        $image_dpi = 75
+    ) {
+        $this->exts->log("--GET Coordinates By 2CAPTCHA--");
+        $response = '';
+        $image_path = $this->exts->captureElement($this->exts->process_uid, $captcha_image_selector);
+        $source_image = imagecreatefrompng($image_path);
+        imagejpeg($source_image, $this->exts->screen_capture_location . $this->exts->process_uid . '.jpg', $image_dpi);
+
+        $cmd = $this->exts->config_array['click_captcha_shell_script'] . " --PROCESS_UID::" . $this->exts->process_uid . " --CAPTCHA_INSTRUCTION::" . urlencode($instruction) . " --LANG_CODE::" . urlencode($lang_code) . " --JSON_RESULT::" . urlencode($json_result);
+        $this->exts->log('Executing command : ' . $cmd);
+        exec($cmd, $output, $return_var);
+        $this->exts->log('Command Result : ' . print_r($output, true));
+
+        if (!empty($output)) {
+            $output = trim($output[0]);
+            if ($json_result) {
+                if (strpos($output, '"status":1') !== false) {
+                    $response = json_decode($output, true);
+                    $response = $response['request'];
+                }
             } else {
-                $this->exts->log("Two factor can not solved");
-            }
-        } else {
-            $this->exts->log("Not received two factor code");
-        }
-    } else {
-        $feed_button = $this->exts->getElement('div.not-found__main-cta a[href*="linkedin.com/feed/"]');
-        if($feed_button != null) {
-            $this->exts->moveToElementAndClick('div.not-found__main-cta a[href*="linkedin.com/feed/"]');
-            sleep(5);
-        }
-        
-        if($this->exts->getElement("form.country-code-list-form input[name=\"phoneNumber\"]") != null && $this->exts->getElement("div.cp-actions button.secondary-action") != null) {
-            $this->exts->moveToElementAndClick("div.cp-actions button.secondary-action");
-        }
-    }
-}
-private function handleTwoFactorCode($two_factor_input_selector, $two_factor_msg, $submit_button_selector) {
-    
-    $this->exts->log(__FUNCTION__ . ' Begin ' . ', ' . $two_factor_msg);
-    $this->exts->two_factor_notif_msg_en = $two_factor_msg;
-    $this->exts->two_factor_notif_msg_de = $two_factor_msg;
-    
-    if($this->exts->two_factor_attempts == 2) {
-        $this->exts->two_factor_notif_msg_en = $this->exts->two_factor_notif_msg_en . $this->exts->two_factor_notif_msg_retry_en;
-        $this->exts->two_factor_notif_msg_de = $this->exts->two_factor_notif_msg_de . $this->exts->two_factor_notif_msg_retry_de;
-    }
-    $two_factor_code = trim($this->exts->fetchTwoFactorCode());
-    if(trim($two_factor_code) != "" && !empty($two_factor_code)) {
-        try {
-            $this->exts->log(__FUNCTION__ . "::Entering two_factor_code.");
-            $this->exts->getElement($two_factor_input_selector)->sendKeys($two_factor_code);
-            
-            $this->exts->log("SIGNIN_PAGE: Clicking the [SIGN_IN] button.");
-            $this->exts->moveToElementAndClick($submit_button_selector);
-            sleep(10);
-            
-            if($this->exts->getElement($two_factor_input_selector) != null && $this->exts->two_factor_attempts < 3) {
-                $this->exts->two_factor_attempts++;
-                $this->exts->notification_uid = "";
-                $this->handleTwoFactorCode($two_factor_input_selector, $two_factor_msg, $submit_button_selector);
-            } else {
-                if($this->exts->getElement("form.country-code-list-form input[name=\"phoneNumber\"]") != null && $this->exts->getElement("div.cp-actions button.secondary-action") != null) {
-                    $this->exts->moveToElementAndClick("div.cp-actions button.secondary-action");
+                if (strpos($output, 'coordinates:') !== false) {
+                    $array = explode("coordinates:", $output);
+                    $response = trim(end($array));
+                    $coordinates = [];
+                    $pairs = explode(';', $response);
+                    foreach ($pairs as $pair) {
+                        preg_match('/x=(\d+),y=(\d+)/', $pair, $matches);
+                        if (!empty($matches)) {
+                            $coordinates[] = ['x' => (int) $matches[1], 'y' => (int) $matches[2]];
+                        }
+                    }
+                    $this->exts->log('>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>');
+                    $this->exts->log(print_r($coordinates, true));
+                    return $coordinates;
                 }
             }
-        } catch (\Exception $exception) {
-            $this->exts->log('processTwoFactorAuth::ERROR while taking snapshot');
+        }
+
+        if ($response == '') {
+            $this->exts->log("Can not get result from API");
+        }
+        return $response;
+    }
+
+    private function checkFillRecaptcha($count = 1)
+    {
+        $this->exts->log(__FUNCTION__);
+        $this->switchToFrame('iframe#captcha-internal');
+        $recaptcha_iframe_selector = 'iframe[src*="/recaptcha/api2/anchor?"]';
+        $recaptcha_textarea_selector = 'textarea[name="g-recaptcha-response"]';
+        if ($this->exts->exists($recaptcha_iframe_selector)) {
+            $iframeUrl = $this->exts->extract($recaptcha_iframe_selector, null, 'src');
+            $data_siteKey = explode('&', end(explode("&k=", $iframeUrl)))[0];
+            $this->exts->log("iframe url  - " . $iframeUrl);
+            $this->exts->log("SiteKey - " . $data_siteKey);
+
+            $isCaptchaSolved = $this->exts->processRecaptcha($this->exts->getUrl(), $data_siteKey, false);
+            $this->exts->log("isCaptchaSolved - " . $isCaptchaSolved);
+
+            if ($isCaptchaSolved) {
+                // Step 1 fill answer to textarea
+                $this->exts->log(__FUNCTION__ . "::filling reCaptcha response..");
+                $recaptcha_textareas = $this->exts->getElements($recaptcha_textarea_selector);
+                for ($i = 0; $i < count($recaptcha_textareas); $i++) {
+                    $this->exts->execute_javascript("arguments[0].innerHTML = '" . $this->exts->recaptcha_answer . "';", [$recaptcha_textareas[$i]]);
+                }
+                sleep(2);
+                $this->exts->capture('recaptcha-filled');
+
+                // Step 2, check if callback function need executed
+                $gcallbackFunction = $this->exts->execute_javascript('
+		        if(document.querySelector("[data-callback]") != null){
+				    document.querySelector("[data-callback]").getAttribute("data-callback");
+			    } else {
+				    var result = ""; var found = false;
+				    function recurse (cur, prop, deep) {
+				        if(deep > 5 || found){ 
+                            return;
+                        }
+                        console.log(prop);
+				        try {
+				            if(prop.indexOf(".callback") > -1){
+                                result = prop; 
+                                found = true; 
+                                return;
+				            } else { 
+                                if(cur == undefined || cur == null || cur instanceof Element || Object(cur) !== cur || Array.isArray(cur)){ 
+                                    return;
+                                }
+                                deep++;
+				                for (var p in cur) { 
+                                    recurse(cur[p], prop ? prop + "." + p : p, deep);
+                                }
+				            }
+				        } catch(ex) { 
+                            console.log("ERROR in function: " + ex); 
+                            return; 
+                        }
+				    }
+
+				    recurse(___grecaptcha_cfg.clients[0], "", 0);
+				    found ? "___grecaptcha_cfg.clients[0]." + result : null;
+			    }
+		    ');
+                $this->exts->log('Callback function: ' . $gcallbackFunction);
+                if ($gcallbackFunction != null) {
+                    $this->exts->execute_javascript($gcallbackFunction . '("' . $this->exts->recaptcha_answer . '");');
+                    sleep(10);
+                }
+            } else {
+                // Only call this if recaptcha service expired.
+                if ($count < 5) {
+                    $count++;
+                    $this->checkFillRecaptcha($count);
+                }
+            }
+            return true;
+        } else {
+            $this->exts->log(__FUNCTION__ . '::Not found reCaptcha');
+            return false;
         }
     }
-}
+
+    public function switchToFrame($query_string)
+    {
+        $this->exts->log(__FUNCTION__ . " Begin with " . $query_string);
+        $frame = null;
+        if (is_string($query_string)) {
+            $frame = $this->exts->queryElement($query_string);
+        }
+
+        if ($frame != null) {
+            $frame_context = $this->exts->get_frame_excutable_context($frame);
+            if ($frame_context != null) {
+                $this->exts->current_context = $frame_context;
+                return true;
+            }
+        } else {
+            $this->exts->log(__FUNCTION__ . " Frame not found " . $query_string);
+        }
+
+        return false;
+    }
+
+    private function checkTwoFactorAuth($count = 1)
+    {
+
+        $this->exts->log(__FUNCTION__ . ' Begin ' . $count);
+        $is_recaptcha = $this->exts->getElement('div#nocaptcha iframe[src*="https://www.google.com/recaptcha/api2/anchor?"]');
+
+
+        $isCodeVerificationFrm = $this->exts->getElement('form[name="ATOPinChallengeForm"]');
+        $isCodeVerificationFrmV1 = $this->exts->getElement('form[name="TwoStepVerificationForm"] input#verification-code');
+        $isCodeVerificationFrmV2 = $this->exts->getElement('form#email-pin-challenge input[name="pin"]');
+        $isCodeVerificationFrmV3 = $this->exts->getElement('input#input__phone_verification_pin');
+
+
+        if ($is_recaptcha != null && stripos($this->exts->getUrl(), '/uas/consumer-captcha-v2?challengeId') !== false) {
+            $this->exts->log(__FUNCTION__ . " Found recaptcha");
+            $this->exts->loginFailure();
+        } else if ($isCodeVerificationFrm != null && stripos($this->exts->getUrl(), '/uas/consumer-email-challenge') !== false) {
+
+            $two_factor_input_selector = "input[name='PinVerificationForm_pinParam']";
+            $two_factor_msg = '';
+            $submit_button_selector = 'input#btn-primary[type="submit"]';
+            $ele = $this->exts->getElement('form[name="ATOPinChallengeForm"] h2');
+            if ($ele != null) {
+                $two_factor_msg = $ele->getText();
+            }
+            $this->handleTwoFactorCode($two_factor_input_selector, $two_factor_msg, $submit_button_selector);
+        } else if ($isCodeVerificationFrmV1 != null && stripos($this->exts->getUrl(), 'consumer-two-step') !== false) {
+            $two_factor_input_selector = "input[name='PinVerificationForm_pinParam']";
+            $two_factor_msg = '';
+            $submit_button_selector = 'form[name="TwoStepVerificationForm"] input#btn-primary';
+            $ele = $this->exts->getElement('div#main h2');
+            if ($ele != null) {
+                $two_factor_msg = $ele->getText();
+            }
+            $this->handleTwoFactorCode($two_factor_input_selector, $two_factor_msg, $submit_button_selector);
+        } else if ($isCodeVerificationFrmV2 != null && stripos($this->exts->getUrl(), 'checkpoint') !== false) {
+            $two_factor_input_selector = "form#email-pin-challenge input[name='pin']";
+            $two_factor_msg = '';
+            $submit_button_selector = 'form#email-pin-challenge button#email-pin-submit-button';
+            $ele = $this->exts->getElement('form#email-pin-challenge h2.form__subtitle');
+            if ($ele != null) {
+                $two_factor_msg = $ele->getText();
+            }
+            $this->handleTwoFactorCode($two_factor_input_selector, $two_factor_msg, $submit_button_selector);
+        } else if ($isCodeVerificationFrmV3 != null && stripos($this->exts->getUrl(), 'checkpoint') !== false) {
+            $two_factor_input_selector = "form#two-step-challenge input[name='pin']";
+            $two_factor_msg = '';
+            $submit_button_selector = 'form#two-step-challenge button#two-step-submit-button';
+            $ele = $this->exts->getElement('div.app__content h1.content__header');
+            if ($ele != null) {
+                $two_factor_msg = $ele->getText();
+            }
+            $this->handleTwoFactorCode($two_factor_input_selector, $two_factor_msg, $submit_button_selector);
+        } else if ($this->exts->getElement('//p[contains(text(),"notification to your signed in devices") or contains(text(),"Wir haben eine Mitteilung an Ihre eingeloggten")]', null, 'xpath') != null) {
+            $two_factor_message_selector = '//p[contains(text(),"notification to your signed in devices") or contains(text(),"Wir haben eine Mitteilung an Ihre eingeloggten")]';
+            $this->exts->two_factor_notif_msg_en = "";
+
+            $this->exts->two_factor_notif_msg_en = $this->exts->two_factor_notif_msg_en . $this->exts->getElements($two_factor_message_selector, null, 'xpath')[0]->getText();
+
+            $this->exts->two_factor_notif_msg_en = trim($this->exts->two_factor_notif_msg_en);
+            $this->exts->two_factor_notif_msg_de = $this->exts->two_factor_notif_msg_en;
+            $this->exts->log("Message:\n" . $this->exts->two_factor_notif_msg_en);
+            $two_factor_code = trim($this->exts->fetchTwoFactorCode());
+            if (!empty($two_factor_code) && trim($two_factor_code) != '') {
+                $this->exts->log("checkFillTwoFactor: Entering two_factor_code." . $two_factor_code);
+                sleep(15);
+                if ($this->exts->getElement($two_factor_message_selector, null, 'xpath') == null) {
+                    $this->exts->log("Two factor solved");
+                } else if ($this->exts->two_factor_attempts < 3) {
+                    $this->exts->two_factor_attempts++;
+                    $this->checkTwoFactorAuth($two_factor_message_selector);
+                } else {
+                    $this->exts->log("Two factor can not solved");
+                }
+            } else {
+                $this->exts->log("Not received two factor code");
+            }
+        } else {
+            $feed_button = $this->exts->getElement('div.not-found__main-cta a[href*="linkedin.com/feed/"]');
+            if ($feed_button != null) {
+                $this->exts->moveToElementAndClick('div.not-found__main-cta a[href*="linkedin.com/feed/"]');
+                sleep(5);
+            }
+
+            if ($this->exts->getElement("form.country-code-list-form input[name=\"phoneNumber\"]") != null && $this->exts->getElement("div.cp-actions button.secondary-action") != null) {
+                $this->exts->moveToElementAndClick("div.cp-actions button.secondary-action");
+            }
+        }
+    }
+
+    private function handleTwoFactorCode($two_factor_input_selector, $two_factor_msg, $submit_button_selector)
+    {
+
+        $this->exts->log(__FUNCTION__ . ' Begin ' . ', ' . $two_factor_msg);
+        $this->exts->two_factor_notif_msg_en = $two_factor_msg;
+        $this->exts->two_factor_notif_msg_de = $two_factor_msg;
+
+        if ($this->exts->two_factor_attempts == 2) {
+            $this->exts->two_factor_notif_msg_en = $this->exts->two_factor_notif_msg_en . $this->exts->two_factor_notif_msg_retry_en;
+            $this->exts->two_factor_notif_msg_de = $this->exts->two_factor_notif_msg_de . $this->exts->two_factor_notif_msg_retry_de;
+        }
+        $two_factor_code = trim($this->exts->fetchTwoFactorCode());
+        if (trim($two_factor_code) != "" && !empty($two_factor_code)) {
+            try {
+                $this->exts->log(__FUNCTION__ . "::Entering two_factor_code.");
+                $this->exts->moveToElementAndType($two_factor_input_selector, $two_factor_code);
+
+                $this->exts->log("SIGNIN_PAGE: Clicking the [SIGN_IN] button.");
+                $this->exts->moveToElementAndClick($submit_button_selector);
+                sleep(10);
+
+                if ($this->exts->getElement($two_factor_input_selector) != null && $this->exts->two_factor_attempts < 3) {
+                    $this->exts->two_factor_attempts++;
+                    $this->exts->notification_uid = "";
+                    $this->handleTwoFactorCode($two_factor_input_selector, $two_factor_msg, $submit_button_selector);
+                } else {
+                    if ($this->exts->getElement("form.country-code-list-form input[name=\"phoneNumber\"]") != null && $this->exts->getElement("div.cp-actions button.secondary-action") != null) {
+                        $this->exts->moveToElementAndClick("div.cp-actions button.secondary-action");
+                    }
+                }
+            } catch (\Exception $exception) {
+                $this->exts->log('processTwoFactorAuth::ERROR while taking snapshot');
+            }
+        }
+    }
 
     // -------------------- GOOGLE login
     public $google_username_selector = 'input[name="identifier"]';
@@ -885,22 +1044,22 @@ private function handleTwoFactorCode($two_factor_input_selector, $two_factor_msg
     private function overwrite_user_agent($user_agent_string = 'DN')
     {
         $userAgentScript = "
-            (function() {
-                if ('userAgentData' in navigator) {
-                    navigator.userAgentData.getHighEntropyValues({}).then(() => {
-                        Object.defineProperty(navigator, 'userAgent', { 
-                            value: '{$user_agent_string}', 
-                            configurable: true 
-                        });
-                    });
-                } else {
+        (function() {
+            if ('userAgentData' in navigator) {
+                navigator.userAgentData.getHighEntropyValues({}).then(() => {
                     Object.defineProperty(navigator, 'userAgent', { 
                         value: '{$user_agent_string}', 
                         configurable: true 
                     });
-                }
-            })();
-        ";
+                });
+            } else {
+                Object.defineProperty(navigator, 'userAgent', { 
+                    value: '{$user_agent_string}', 
+                    configurable: true 
+                });
+            }
+        })();
+    ";
         $this->exts->execute_javascript($userAgentScript);
     }
 
@@ -1110,8 +1269,7 @@ private function handleTwoFactorCode($two_factor_input_selector, $two_factor_msg
             } else if ($this->exts->exists('li [data-challengetype="4"][data-sendauthzenprompt="true"]:not([data-challengeunavailable="true"]), li [data-challengetype="39"][data-challengeid="10"]:not([data-challengeunavailable="true"])')) {
                 // We recommend method type = 4 and [data-sendauthzenprompt="true"] is  Tap YES on your smartphone or tablet
                 $this->exts->click_by_xdotool('li [data-challengetype="4"][data-sendauthzenprompt="true"]:not([data-challengeunavailable="true"]), li [data-challengetype="39"]:not([data-challengeunavailable="true"])');
-            }
-            else if ($this->exts->exists('li [data-challengetype="4"][data-sendauthzenprompt="true"]:not([data-challengeunavailable="true"]), li [data-challengetype="39"][data-challengeid="12"]:not([data-challengeunavailable="true"])')) {
+            } else if ($this->exts->exists('li [data-challengetype="4"][data-sendauthzenprompt="true"]:not([data-challengeunavailable="true"]), li [data-challengetype="39"][data-challengeid="12"]:not([data-challengeunavailable="true"])')) {
                 // We recommend method type = 4 and [data-sendauthzenprompt="true"] is  Tap YES on your smartphone or tablet
                 $this->exts->click_by_xdotool('li [data-challengetype="4"][data-sendauthzenprompt="true"]:not([data-challengeunavailable="true"]), li [data-challengetype="39"]:not([data-challengeunavailable="true"])');
             } else if ($this->exts->exists('li [data-challengetype="5"]:not([data-challengeunavailable="true"])')) {
@@ -1320,176 +1478,186 @@ private function handleTwoFactorCode($two_factor_input_selector, $two_factor_msg
         }
     }
     // -------------------- GOOGLE login END
+    private function checkLogin()
+    {
+        $this->exts->capture('check-login');
+        return $this->exts->exists($this->check_login_success_selector);
+    }
 
-public $invoices = array();
-private function processInvoices($paging_count=1) {
-    sleep(10);
-    $this->exts->capture("4-invoices-page-".$paging_count);
-    
-    
-    $rows = $this->exts->getElements('table > tbody > tr');
-    foreach ($rows as $row) {
-        $tags = $this->exts->getElements('td', $row);
-        if(count($tags) >= 4 && $this->exts->getElement('button.view-receipt[data-order-id]', $row) != null) {
-            $invoiceName = $this->exts->getElement('button.view-receipt[data-order-id]', $row)->getAttribute('data-order-id');
-            $invoiceUrl = 'https://www.linkedin.com/payments/receipt/' . $invoiceName;
-            $invoiceDate = trim($tags[0]->getAttribute('innerText'));
-            $invoiceAmount = trim(preg_replace('/[^\d\.\,]/', '', $tags[3]->getAttribute('innerText'))) . ' EUR';
-            
-            array_push($this->invoices, array(
-                'invoiceName'=>$invoiceName,
-                'invoiceDate'=>$invoiceDate,
-                'invoiceAmount'=>$invoiceAmount,
-                'invoiceUrl'=>$invoiceUrl
-            ));
-            $this->isNoInvoice = false;
+    public function waitFor($selector, $seconds = 10)
+    {
+        for ($wait = 0; $wait < 2 && $this->exts->executeSafeScript("return !!document.querySelector('" . $selector . "');") != 1; $wait++) {
+            $this->exts->log('Waiting for Selectors.....');
+            sleep($seconds);
         }
     }
-    
-    if($this->restrictPages == 0 && $paging_count < 20 && $this->exts->getElement('a#next-order-history') != null){
-        $paging_count++;
-        $this->exts->moveToElementAndClick('a#next-order-history');
-        sleep(5);
-        $this->processInvoices($paging_count);
-    }else if($this->restrictPages > 0 && $paging_count < 4 && $this->exts->getElement('a#next-order-history') != null){
-        $paging_count++;
-        $this->exts->moveToElementAndClick('a#next-order-history');
-        sleep(5);
-        $this->processInvoices($paging_count);
-    } else {
-        $this->downloadInvoices();
-    }
-}
-public function downloadInvoices() {
-    // Download all invoices
 
-    $this->exts->log('Invoices found: '.count($this->invoices));
-    foreach ($this->invoices as $invoice) {
-        $this->exts->log('--------------------------');
-        $this->exts->log('invoiceName: '.$invoice['invoiceName']);
-        $this->exts->log('invoiceDate: '.$invoice['invoiceDate']);
-        $this->exts->log('invoiceAmount: '.$invoice['invoiceAmount']);
-        $this->exts->log('invoiceUrl: '.$invoice['invoiceUrl']);
-        
-        $invoiceFileName = $invoice['invoiceName'].'.pdf';
-        $invoice['invoiceDate'] = $this->exts->parse_date($invoice['invoiceDate'], 'd.m.Y','Y-m-d');
-        $this->exts->log('Date parsed: '.$invoice['invoiceDate']);
-        
-        if($this->exts->invoice_exists($invoice['invoiceName'])){
-            $this->exts->log('Invoice EXISTS');
-            continue;
-        }
-        $this->exts->openUrl($invoice['invoiceUrl']);
-        sleep(3);
-        if($this->company_detail != ''){
-            if($this->exts->exists('.company-billing-info-updater button.add-billing-details-btn:not(.hidden)')){
-                $this->exts->moveToElementAndClick('.company-billing-info-updater button.add-billing-details-btn');
-                sleep(3);
-                $edit_area = $this->exts->getElement('.company-billing-info-updater #company-billing-info');
-                $this->exts->execute_javascript("arguments[0].innerHTML=''", [$edit_area]);
-                $this->exts->moveToElementAndClick('.company-billing-info-updater #company-billing-info');
-                $this->exts->webdriver->getKeyboard()->releaseKey($this->company_detail);
-                sleep(1);
-                $this->exts->moveToElementAndClick('.company-billing-info-updater button.company-button[type="submit"]');
-            } else if($this->exts->exists('.company-billing-info-updater a.edit:not(.hidden)')){
-                $this->exts->moveToElementAndClick('.company-billing-info-updater a.edit:not(.hidden)');
-                sleep(3);
-                $edit_area = $this->exts->getElement('.company-billing-info-updater #company-billing-info');
-                $this->exts->execute_javascript("arguments[0].innerHTML=''", [$edit_area]);
-                $this->exts->moveToElementAndClick('.company-billing-info-updater #company-billing-info');
-                $this->exts->webdriver->getKeyboard()->releaseKey($this->company_detail);
-                sleep(1);
-                $this->exts->moveToElementAndClick('.company-billing-info-updater button.company-button[type="submit"]');
-            }
-            sleep(3);
-        }
-        $downloaded_file = $this->exts->download_current($invoiceFileName);
-        if(trim($downloaded_file) != '' && file_exists($downloaded_file)){
-            $this->exts->new_invoice($invoice['invoiceName'], $invoice['invoiceDate'], $invoice['invoiceAmount'], $invoiceFileName);
-            sleep(1);
-        } else {
-            $this->exts->log(__FUNCTION__.'::No download '.$invoiceFileName);
-        }
-    }
-}
+    public $invoices = array();
+    private function processInvoices($paging_count = 1)
+    {
+        $this->waitFor('table > tbody > tr', 15);
 
-private function processInvoicestransactions() {
-    sleep(25);
+        $this->exts->capture("4-invoices-page-" . $paging_count);
 
-    $this->exts->capture("4-invoices-pagetransactions");
-    $invoices = [];
-
-    $rows = $this->exts->getElements('div.invoices-table__list  [role="row"]');
-    foreach ($rows as $row) {
-        $tags = $this->exts->getElements('[role="cell"]', $row);
-        if(count($tags) >= 7 && $this->exts->getElement('button[id*="menu-trigger"]', $tags[6]) != null) {
-            $invoice_menu_action = $this->exts->getElement('button[id*="menu-trigger"]', $tags[6]);
-            try{
-                $this->exts->log('Click download button');
-                $invoice_menu_action->click();
-            } catch(\Exception $exception){
-                $this->exts->log('Click download button by javascript');
-                $this->exts->execute_javascript("arguments[0].click()", [$invoice_menu_action]);
-            }
-            sleep(2);
-            if($this->exts->exists('a[download*="LNKD_INVOICE"]')){
-                $invoiceUrl = $this->exts->getElement('a[download*="LNKD_INVOICE"]')->getAttribute("href");
-                $invoiceName = trim($tags[3]->getAttribute('innerText'));
+        $rows = $this->exts->getElements('table > tbody > tr');
+        foreach ($rows as $row) {
+            $tags = $this->exts->getElements('td', $row);
+            if (count($tags) >= 4 && $this->exts->getElement('button.view-receipt[data-order-id]', $row) != null) {
+                $invoiceName = $this->exts->getElement('button.view-receipt[data-order-id]', $row)->getHtmlAttribute('data-order-id');
+                $invoiceUrl = 'https://www.linkedin.com/payments/receipt/' . $invoiceName;
                 $invoiceDate = trim($tags[0]->getAttribute('innerText'));
-                $invoiceAmount = trim(preg_replace('/[^\d\.\,]/', '', $tags[1]->getAttribute('innerText'))) . ' EUR';
+                $invoiceAmount = trim(preg_replace('/[^\d\.\,]/', '', $tags[3]->getAttribute('innerText'))) . ' EUR';
 
-                array_push($invoices, array(
-                    'invoiceName'=>$invoiceName,
-                    'invoiceDate'=>$invoiceDate,
-                    'invoiceAmount'=>$invoiceAmount,
-                    'invoiceUrl'=>$invoiceUrl
+                array_push($this->invoices, array(
+                    'invoiceName' => $invoiceName,
+                    'invoiceDate' => $invoiceDate,
+                    'invoiceAmount' => $invoiceAmount,
+                    'invoiceUrl' => $invoiceUrl
                 ));
                 $this->isNoInvoice = false;
             }
         }
-    }
 
-    // Download all invoices
-    $this->exts->log('Invoices found: '.count($invoices));
-    foreach ($invoices as $invoice) {
-        $this->exts->log('--------------------------');
-        $this->exts->log('invoiceName: '.$invoice['invoiceName']);
-        $this->exts->log('invoiceDate: '.$invoice['invoiceDate']);
-        $this->exts->log('invoiceAmount: '.$invoice['invoiceAmount']);
-        $this->exts->log('invoiceUrl: '.$invoice['invoiceUrl']);
-
-        $invoiceFileName = $invoice['invoiceName'].'.pdf';
-        $invoice['invoiceDate'] = $this->exts->parse_date($invoice['invoiceDate'], 'd.m.Y','Y-m-d');
-        $this->exts->log('Date parsed: '.$invoice['invoiceDate']);
-        
-        $downloaded_file = $this->exts->direct_download($invoice['invoiceUrl'], 'pdf', $invoiceFileName);
-        if(trim($downloaded_file) != '' && file_exists($downloaded_file)){
-            $this->exts->new_invoice($invoice['invoiceName'], $invoice['invoiceDate'], $invoice['invoiceAmount'], $invoiceFileName);
-            sleep(1);
+        if ($this->restrictPages == 0 && $paging_count < 20 && $this->exts->getElement('a#next-order-history') != null) {
+            $paging_count++;
+            $this->exts->moveToElementAndClick('a#next-order-history');
+            sleep(5);
+            $this->processInvoices($paging_count);
+        } else if ($this->restrictPages > 0 && $paging_count < 4 && $this->exts->getElement('a#next-order-history') != null) {
+            $paging_count++;
+            $this->exts->moveToElementAndClick('a#next-order-history');
+            sleep(5);
+            $this->processInvoices($paging_count);
         } else {
-            $this->exts->log(__FUNCTION__.'::No download '.$invoiceFileName);
+            $this->downloadInvoices();
+        }
+    }
+    public function downloadInvoices()
+    {
+        // Download all invoices
+        $this->exts->log('Download Invoices');
+
+        $this->exts->log('Invoices found: ' . count($this->invoices));
+        foreach ($this->invoices as $invoice) {
+            $this->exts->log('--------------------------');
+            $this->exts->log('invoiceName: ' . $invoice['invoiceName']);
+            $this->exts->log('invoiceDate: ' . $invoice['invoiceDate']);
+            $this->exts->log('invoiceAmount: ' . $invoice['invoiceAmount']);
+            $this->exts->log('invoiceUrl: ' . $invoice['invoiceUrl']);
+
+            $invoiceFileName = !empty($invoice['invoiceName']) ? $invoice['invoiceName'] . '.pdf' : '';
+            $invoice['invoiceDate'] = $this->exts->parse_date($invoice['invoiceDate'], 'd.m.Y', 'Y-m-d');
+            $this->exts->log('Date parsed: ' . $invoice['invoiceDate']);
+
+            if ($this->exts->invoice_exists($invoice['invoiceName'])) {
+                $this->exts->log('Invoice EXISTS');
+                continue;
+            }
+            $this->exts->openNewTab($invoice['invoiceUrl']);
+            $this->waitFor('button#print-button', 30);
+            if ($this->company_detail != '') {
+                if ($this->exts->exists('.company-billing-info-updater button.add-billing-details-btn:not(.hidden)')) {
+                    $this->exts->moveToElementAndClick('.company-billing-info-updater button.add-billing-details-btn');
+                    sleep(3);
+                    $edit_area = $this->exts->getElement('.company-billing-info-updater #company-billing-info');
+                    $this->exts->execute_javascript("arguments[0].innerHTML=''", [$edit_area]);
+                    $this->exts->moveToElementAndClick('.company-billing-info-updater #company-billing-info');
+                    $this->exts->type_text_by_xdotool($this->company_detail);
+                    sleep(1);
+                    $this->exts->moveToElementAndClick('.company-billing-info-updater button.company-button[type="submit"]');
+                } else if ($this->exts->exists('.company-billing-info-updater a.edit:not(.hidden)')) {
+                    $this->exts->moveToElementAndClick('.company-billing-info-updater a.edit:not(.hidden)');
+                    sleep(3);
+                    $edit_area = $this->exts->getElement('.company-billing-info-updater #company-billing-info');
+                    $this->exts->execute_javascript("arguments[0].innerHTML=''", [$edit_area]);
+                    $this->exts->moveToElementAndClick('.company-billing-info-updater #company-billing-info');
+                    $this->exts->type_text_by_xdotool($this->company_detail);
+                    sleep(1);
+                    $this->exts->moveToElementAndClick('.company-billing-info-updater button.company-button[type="submit"]');
+                }
+                sleep(3);
+            }
+            //$downloaded_file = $this->exts->download_current($invoiceFileName);
+            $downloaded_file = $this->exts->click_and_print('button#print-button', $invoiceFileName);
+
+            if (trim($downloaded_file) != '' && file_exists($downloaded_file)) {
+                $this->exts->new_invoice($invoice['invoiceName'], $invoice['invoiceDate'], $invoice['invoiceAmount'], $invoiceFileName);
+                sleep(1);
+            } else {
+                $this->exts->log(__FUNCTION__ . '::No download ' . $invoiceFileName);
+            }
+
+            $this->exts->switchToInitTab();
+            sleep(3);
+            $this->exts->closeAllTabsButThis();
+            sleep(2);
+        }
+    }
+
+    private function processInvoicestransactions()
+    {
+        $this->waitFor('div.invoices-table__list  [role="row"]', 15);
+
+        $this->exts->capture("4-invoices-pagetransactions");
+        $invoices = [];
+
+        $rows = $this->exts->getElements('div.invoices-table__list  [role="row"]');
+        foreach ($rows as $row) {
+            $tags = $this->exts->getElements('[role="cell"]', $row);
+            if (count($tags) >= 7 && $this->exts->getElement('button[id*="menu-trigger"]', $tags[6]) != null) {
+                $invoice_menu_action = $this->exts->getElement('button[id*="menu-trigger"]', $tags[6]);
+                try {
+                    $this->exts->log('Click download button');
+                    $invoice_menu_action->click();
+                } catch (\Exception $exception) {
+                    $this->exts->log('Click download button by javascript');
+                    $this->exts->execute_javascript("arguments[0].click()", [$invoice_menu_action]);
+                }
+                sleep(2);
+                if ($this->exts->exists('a[download*="LNKD_INVOICE"]')) {
+                    $invoiceUrl = $this->exts->getElement('a[download*="LNKD_INVOICE"]')->getAttribute("href");
+                    $invoiceName = trim($tags[3]->getAttribute('innerText'));
+                    $invoiceDate = trim($tags[0]->getAttribute('innerText'));
+                    $invoiceAmount = trim(preg_replace('/[^\d\.\,]/', '', $tags[1]->getAttribute('innerText'))) . ' EUR';
+
+                    array_push($invoices, array(
+                        'invoiceName' => $invoiceName,
+                        'invoiceDate' => $invoiceDate,
+                        'invoiceAmount' => $invoiceAmount,
+                        'invoiceUrl' => $invoiceUrl
+                    ));
+                    $this->isNoInvoice = false;
+                }
+            }
+        }
+
+        // Download all invoices
+        $this->exts->log('Invoices found: ' . count($invoices));
+        foreach ($invoices as $invoice) {
+            $this->exts->log('--------------------------');
+            $this->exts->log('invoiceName: ' . $invoice['invoiceName']);
+            $this->exts->log('invoiceDate: ' . $invoice['invoiceDate']);
+            $this->exts->log('invoiceAmount: ' . $invoice['invoiceAmount']);
+            $this->exts->log('invoiceUrl: ' . $invoice['invoiceUrl']);
+
+            $invoiceFileName = !empty($invoice['invoiceName']) ? $invoice['invoiceName'] . '.pdf' : '';
+            $invoice['invoiceDate'] = $this->exts->parse_date($invoice['invoiceDate'], 'd.m.Y', 'Y-m-d');
+            $this->exts->log('Date parsed: ' . $invoice['invoiceDate']);
+
+            $downloaded_file = $this->exts->direct_download($invoice['invoiceUrl'], 'pdf', $invoiceFileName);
+            if (trim($downloaded_file) != '' && file_exists($downloaded_file)) {
+                $this->exts->new_invoice($invoice['invoiceName'], $invoice['invoiceDate'], $invoice['invoiceAmount'], $invoiceFileName);
+                sleep(1);
+            } else {
+                $this->exts->log(__FUNCTION__ . '::No download ' . $invoiceFileName);
+            }
         }
     }
 }
 
+exec("docker rm -f selenium-node-111");
+exec("docker run -d --shm-size 2g -p 5902:5900 -p 9990:9999 -e TZ=Europe/Berlin -e SE_NODE_SESSION_TIMEOUT=86400 -e LANG=de -e GRID_TIMEOUT=0 -e GRID_BROWSER_TIMEOUT=0 -e SCREEN_WIDTH=1920 -e SCREEN_HEIGHT=1080 --name selenium-node-111 -v /var/www/remote-chrome/downloads:/home/seluser/Downloads/111 remote-chrome:v1");
 
-public function switchToFrame($query_string)
-{
-    $this->exts->log(__FUNCTION__ . " Begin with " . $query_string);
-    $frame = null;
-    if (is_string($query_string)) {
-        $frame = $this->exts->queryElement($query_string);
-    }
-
-    if ($frame != null) {
-        $frame_context = $this->exts->get_frame_excutable_context($frame);
-        if ($frame_context != null) {
-            $this->exts->current_context = $frame_context;
-            return true;
-        }
-    } else {
-        $this->exts->log(__FUNCTION__ . " Frame not found " . $query_string);
-    }
-
-    return false;
-}
+$browserSelected = 'chrome';
+$portal = new PortalScriptCDP($browserSelected, 'test_remote_chrome', '111', 'office@sayaq-adventures-muenchen.com', 'Sayaq#2022');
+$portal->run();

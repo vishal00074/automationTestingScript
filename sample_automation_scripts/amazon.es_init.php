@@ -57,6 +57,20 @@ private function initPortal($count)
         $this->last_invoice_date = isset($this->exts->config_array["last_invoice_date"]) ? $this->exts->config_array["last_invoice_date"] : '';
         $this->procurment_report = isset($this->exts->config_array["procurment_report"]) ? (int)$this->exts->config_array["procurment_report"] : 0;
 
+
+        $this->exts->log('amazon_download_overview ' . $this->amazon_download_overview);
+        $this->exts->log('download_invoice_from_message ' . $this->download_invoice_from_message);
+        $this->exts->log('auto_request_invoice ' . $this->auto_request_invoice);
+        $this->exts->log('only_years ' . $this->only_years);
+        $this->exts->log('auto_tagging ' . $this->auto_tagging);
+        $this->exts->log('marketplace_invoice_tags ' . $this->marketplace_invoice_tags);
+        $this->exts->log('order_overview_tags ' . $this->order_overview_tags);
+        $this->exts->log('amazon_invoice_tags ' . $this->amazon_invoice_tags);
+        $this->exts->log('start_page ' . $this->start_page);
+        $this->exts->log('last_invoice_date ' . $this->last_invoice_date);
+        $this->exts->log('procurment_report ' . $this->procurment_report);
+
+
         $this->invalid_filename_pattern = '';
         if (!empty($this->invalid_filename_keywords)) {
             $this->invalid_filename_pattern = '';
@@ -120,6 +134,9 @@ private function initPortal($count)
 
     if (!$isCookieLoginSuccess) {
         if ($this->checkLogin()) {
+            $this->exts->openUrl($this->orderPageUrl);
+            sleep(5);
+
             $this->exts->capture("LoginSuccess");
 
             if (!empty($this->exts->config_array['allow_login_success_request'])) {
@@ -135,12 +152,13 @@ private function initPortal($count)
 
             sleep(5);
             if ($this->checkLogin()) {
+                $this->exts->openUrl($this->orderPageUrl);
+                sleep(5);
                 $this->exts->capture("LoginSuccess");
 
                 if (!empty($this->exts->config_array['allow_login_success_request'])) {
                     $this->exts->triggerLoginSuccess();
                 }
-
                 $this->exts->success();
             } else {
                 $this->exts->log(__FUNCTION__ . '::Use login failed');
@@ -170,6 +188,8 @@ private function initPortal($count)
             }
         }
     } else {
+        $this->exts->openUrl($this->orderPageUrl);
+        sleep(5);
         $this->exts->capture("LoginSuccess");
 
         if (!empty($this->exts->config_array['allow_login_success_request'])) {
