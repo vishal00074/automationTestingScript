@@ -256,74 +256,64 @@ class PortalScriptCDP
     private function processInvoices($count = 1)
     {
         sleep(5);
-        if ($this->exts->getElement('div.buyer-menu-invoices table tbody tr a[href*="/invoices/"]') != null) {
-            $this->exts->log('Invoices found');
-            $this->exts->capture("4-page-opened");
-            $invoices = [];
 
-            $rows = $this->exts->getElements('div.buyer-menu-invoices table tbody tr');
-            foreach ($rows as $row) {
-                $invoiceUrl =  $this->exts->getElement('a[href*="/de/invoices/"]');
-                if ($invoiceUrl != null) {
-                    $invoiceLink = $invoiceUrl->getAttribute('href');
+        $this->exts->log('Invoices found');
+        $this->exts->capture("4-page-opened");
+        $invoices = [];
 
-                    $invoiceName = $this->exts->extract('dtd:nth-child(3)', $row);
-                    $invoiceDate = $this->exts->extract('td:nth-child(1)', $row);
-                    $invoiceAmount = $this->exts->extract('td:nth-child(4)', $row);
+        $rows = $this->exts->getElements('div.buyer-menu-invoices table tbody tr');
+        foreach ($rows as $row) {
+            $invoiceUrl =  $this->exts->getElement('a[href*="/de/invoices/"]');
+            if ($invoiceUrl != null) {
+                $invoiceLink = $invoiceUrl->getAttribute('href');
 
-                    array_push($invoices, array(
-                        'invoiceName' => $invoiceName,
-                        'invoiceDate' => $invoiceDate,
-                        'invoiceAmount' => $invoiceAmount,
-                        'invoiceUrl' => $invoiceLink
-                    ));
-                }
+                $invoiceName = $this->exts->extract('dtd:nth-child(3)', $row);
+                $invoiceDate = $this->exts->extract('td:nth-child(1)', $row);
+                $invoiceAmount = $this->exts->extract('td:nth-child(4)', $row);
+
+                array_push($invoices, array(
+                    'invoiceName' => $invoiceName,
+                    'invoiceDate' => $invoiceDate,
+                    'invoiceAmount' => $invoiceAmount,
+                    'invoiceUrl' => $invoiceLink
+                ));
             }
+        }
 
-            // Download all invoices
-            $this->exts->log('Invoices: ' . count($invoices));
-            $count = 1;
-            $totalFiles = count($invoices);
-            foreach ($invoices as $invoice) {
-                $invoiceFileName = !empty($invoice['invoiceName']) ? $invoice['invoiceName'] . '.pdf' : '';
+        // Download all invoices
+        $this->exts->log('Invoices: ' . count($invoices));
+        $count = 1;
+        $totalFiles = count($invoices);
+        foreach ($invoices as $invoice) {
+            $invoiceFileName = !empty($invoice['invoiceName']) ? $invoice['invoiceName'] . '.pdf' : '';
 
-                $this->exts->log('date before parse: ' . $invoice['invoiceDate']);
+            $this->exts->log('date before parse: ' . $invoice['invoiceDate']);
 
-                $invoice['invoiceDate'] = $this->exts->parse_date($invoice['invoiceDate'], 'M d, Y', 'Y-m-d');
-                $this->exts->log('invoiceName: ' . $invoice['invoiceName']);
-                $this->exts->log('invoiceDate: ' . $invoice['invoiceDate']);
-                $this->exts->log('invoiceAmount: ' . $invoice['invoiceAmount']);
-                $this->exts->log('invoiceUrl: ' . $invoice['invoiceUrl']);
+            $invoice['invoiceDate'] = $this->exts->parse_date($invoice['invoiceDate'], 'M d, Y', 'Y-m-d');
+            $this->exts->log('invoiceName: ' . $invoice['invoiceName']);
+            $this->exts->log('invoiceDate: ' . $invoice['invoiceDate']);
+            $this->exts->log('invoiceAmount: ' . $invoice['invoiceAmount']);
+            $this->exts->log('invoiceUrl: ' . $invoice['invoiceUrl']);
 
-                // Download invoice if it not exisited
-                if ($this->exts->invoice_exists($invoice['invoiceName'])) {
-                    $this->exts->log('Invoice existed ' . $invoiceFileName);
-                } else {
-                    $this->exts->openUrl($invoice['invoiceUrl']);
-                    sleep(5);
-                    $this->exts->waitTillPresent('a.button-download-pdf');
-
-                    $this->exts->log('Downloading invoice ' . $count . '/' . $totalFiles);
-
-                    $downloaded_file = $this->exts->click_and_download('a.button-download-pdf', 'pdf', $invoiceFileName);
-                    sleep(2);
-                    if (trim($downloaded_file) != '' && file_exists($downloaded_file)) {
-                        $this->exts->new_invoice($invoiceUrl,  $invoiceDate, $invoiceAmount, $downloaded_file);
-                        sleep(1);
-                    } else {
-                        $this->exts->log(__FUNCTION__ . '::No download ' . $invoiceFileName);
-                    }
-                    $this->exts->log('Timeout when download ' . $invoiceFileName);
-                }
-            }
-        } else {
-            if ($count < 5) {
-                $count = $count + 1;
-                $this->processInvoices($count);
+            // Download invoice if it not exisited
+            if ($this->exts->invoice_exists($invoice['invoiceName'])) {
+                $this->exts->log('Invoice existed ' . $invoiceFileName);
             } else {
-                $this->exts->log('Timeout processInvoices');
-                $this->exts->capture('4-no-invoices');
-                $this->exts->no_invoice();
+                $this->exts->openUrl($invoice['invoiceUrl']);
+                sleep(5);
+                $this->exts->waitTillPresent('a.button-download-pdf');
+
+                $this->exts->log('Downloading invoice ' . $count . '/' . $totalFiles);
+
+                $downloaded_file = $this->exts->click_and_download('a.button-download-pdf', 'pdf', $invoiceFileName);
+                sleep(2);
+                if (trim($downloaded_file) != '' && file_exists($downloaded_file)) {
+                    $this->exts->new_invoice($invoiceUrl,  $invoiceDate, $invoiceAmount, $downloaded_file);
+                    sleep(1);
+                } else {
+                    $this->exts->log(__FUNCTION__ . '::No download ' . $invoiceFileName);
+                }
+                $this->exts->log('Timeout when download ' . $invoiceFileName);
             }
         }
     }
