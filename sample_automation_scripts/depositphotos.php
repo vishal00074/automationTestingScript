@@ -70,6 +70,7 @@ class PortalScriptCDP
 
     public $checkLoginFailedSelector = 'form[novalidate] label[for="email"] > span:last-child,span.field-box__error';
     public $checkLoggedinSelector = 'img[src*="avatars"], a[href*="/logout"], a[href="/subscribe.html"], li[data-qa-group-name="logout"]';
+    public $isNoInvoice = true;
 
     /**
      * Entry Method thats called for a portal
@@ -234,6 +235,11 @@ class PortalScriptCDP
             $this->exts->openUrl($this->invoicePageUrl);
             $this->processInvoices();
 
+            // Final, check no invoice
+            if ($this->isNoInvoice) {
+                $this->exts->no_invoice();
+            }
+
             $this->exts->success();
         } else {
             if ($count < 5) {
@@ -256,9 +262,9 @@ class PortalScriptCDP
     private function processInvoices($count = 1)
     {
         sleep(5);
-
+        $this->exts->waitTillPresent('div.buyer-menu-invoices table tbody tr');
         $this->exts->log('Invoices found');
-        $this->exts->capture("4-page-opened");
+        $this->exts->capture("4-invoices-classic");
         $invoices = [];
 
         $rows = $this->exts->getElements('div.buyer-menu-invoices table tbody tr');
@@ -278,6 +284,8 @@ class PortalScriptCDP
                     'invoiceUrl' => $invoiceLink
                 ));
             }
+
+            $this->isNoInvoice = false;
         }
 
         // Download all invoices
@@ -313,7 +321,6 @@ class PortalScriptCDP
                 } else {
                     $this->exts->log(__FUNCTION__ . '::No download ' . $invoiceFileName);
                 }
-                $this->exts->log('Timeout when download ' . $invoiceFileName);
             }
         }
     }
