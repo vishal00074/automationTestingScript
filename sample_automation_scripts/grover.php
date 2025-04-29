@@ -1,4 +1,4 @@
-<?php 
+<?php
 
 /**
  * Chrome Remote via Chrome devtool protocol script, for specific process/portal
@@ -62,7 +62,8 @@ class PortalScriptCDP
     /*Define constants used in script*/
     public $baseUrl = 'https://www.grover.com/business-de/for-business';
     public $loginUrl = 'https://www.grover.com/de-de/auth';
-    public $paymentPageUrl = 'https://www.grover.com/business-de/your-payments?status=PAID';
+    public $paymentPageUrl = 'https://www.grover.com/business-de/your-payments';
+    public $paymentPageUrlPaid = 'https://www.grover.com/business-de/your-payments?status=PAID';
 
     public $username_selector = 'input[name="email"]';
     public $password_selector = 'input[name="password"]';
@@ -72,6 +73,8 @@ class PortalScriptCDP
     public $check_login_success_selector = 'div[data-testid="header-dashboard-links"] a:nth-child(3), div[data-testid="account-menu-button"], a[href*="your-profile"]';
 
     public $isNoInvoice = true;
+    public $download_all_invoice = 0;
+
     /**
      * Entry Method thats called for a portal
      * @param Integer $count Number of times portal is retried.
@@ -79,6 +82,9 @@ class PortalScriptCDP
     private function initPortal($count)
     {
         $this->exts->log('Begin initPortal ' . $count);
+        $this->download_all_invoice = isset($this->exts->config_array["download_all_invoice"]) ? (int)@$this->exts->config_array["download_all_invoice"] : $this->download_all_invoice;
+
+        $this->exts->log('download_all_invoice ' . $this->download_all_invoice);
         // Load cookies
         $this->exts->loadCookiesFromFile();
         $this->exts->openUrl($this->baseUrl);
@@ -162,9 +168,19 @@ class PortalScriptCDP
                 sleep(1);
             }
 
-            // Open and download payment
-            $this->exts->openUrl($this->paymentPageUrl);
-            $this->processPayments();
+
+
+            // Download All Invoices
+            if ($this->download_all_invoice) {
+                $this->exts->log(__FUNCTION__ . 'Download All Invoices');
+                $this->exts->openUrl($this->paymentPageUrl);
+                $this->processPayments();
+            } else {
+                // Download Paid Invoices
+                $this->exts->log(__FUNCTION__ . 'Download Paid Invoices');
+                $this->exts->openUrl($this->paymentPageUrlPaid);
+                $this->processPayments();
+            }
 
             // Final, check no invoice
             if ($this->isNoInvoice) {
@@ -298,7 +314,7 @@ class PortalScriptCDP
         sleep(7);
         $rows = $this->exts->getElements('div > div[data-testid="your-payments-payment-card"]');
         foreach ($rows as $key => $row) {
-            $downloadBtn = $this->exts->getElement('button', $row);
+            $downloadBtn = $this->exts->getElement('button[data-testid="your-payments-download-invoice-button"]', $row);
             if ($downloadBtn != null) {
                 $invoiceUrl = '';
                 $invoiceName = $this->exts->extract('div.flex:nth-child(1) span:nth-child(2)', $row);
@@ -338,115 +354,8 @@ class PortalScriptCDP
                         sleep(1);
                     }
                 } else {
-                    $this->exts->log(__FUNCTION__ . '::No download ');
+                    $this->exts->log(__FUNCTION__ . '::No download');
                 }
-            }
-        }
-    }
-
-    private function processPaymentsOld()
-    {
-        $this->exts->waitTillPresent('div[data-testid="your-payments-payment-card"]', 30);
-        //error500-page-light
-        if ($this->exts->getElement('div[data-testid="error500-page-light"] button[type="button"]') != null) {
-            $this->exts->click_by_xdotool('div[data-testid="error500-page-light"] button[type="button"]');
-            $this->exts->waitTillPresent('div[data-testid="your-payments-payment-card"]', 30);
-        }
-        $this->exts->capture("4-invoices-page");
-        $invoices = [];
-        $currentPageHeight = 0;
-        $this->exts->log('Trying to scroll to bottom');
-        $restrictPages = isset($this->exts->config_array["restrictPages"]) ? (int)@$this->exts->config_array["restrictPages"] : 3;
-        $max_scroll_count = $restrictPages == 0 ? 30 : $restrictPages;
-        $scroll_count = 1;
-        $this->exts->update_process_lock();
-        while ($currentPageHeight != $this->exts->getElement('body')->getAttribute("scrollHeight") && $scroll_count <= $max_scroll_count) {
-            $currentPageHeight = $this->exts->getElement('body')->getAttribute("scrollHeight");
-            $this->exts->execute_javascript('window.scrollTo(0,document.body.scrollHeight);');
-            sleep(10);
-            $scroll_count++;
-        }
-        $this->exts->update_process_lock();
-        $this->exts->capture("4.1-invoices-page");
-
-        $rows = $this->exts->getElements('div[data-testid="your-payments-payment-card"]');
-        $this->exts->log('count row-' . $rows);
-        foreach ($rows as $row) {
-            // $row->getLocationOnScreenOnceScrolledIntoView();
-            sleep(2);
-            try {
-                if ($this->exts->getElementByText('div', ['Bezahlt', 'Paid'], $row, false) !== null) {
-                    $invoiceDate = '';
-                    $invoiceAmount = '';
-                    try {
-
-                        // $this->exts->log('Row outerHTML: ' . $row->getAttribute('outerHTML'));
-                        sleep(8);
-                        $this->exts->execute_javascript("arguments[0].click();", [$row]);
-
-                        // $isClickable = $this->exts->execute_javascript('return arguments[0].offsetParent !== null && getComputedStyle(arguments[0]).getPropertyValue("pointer-events") === "auto";',  [$row]);
-
-                        // if ($isClickable) {
-                        //     $this->exts->log('click row inside');
-                        //     $row->click();
-                        // }
-
-
-
-
-                    } catch (\Exception  $exception) {
-                        $this->exts->execute_javascript("arguments[0].click()", [$row]);
-                    }
-
-                    sleep(2);
-                    if ($this->exts->exists('.modalOverlay a[href*="pdf"]')) {
-                        $invoiceLink = $this->exts->getElement('.modalOverlay a[href*="pdf"]');
-                        if ($invoiceLink != null) {
-                            $invoiceUrl = $invoiceLink->getAttribute("href");
-                            $this->exts->log('invoiceUrl: ' . $invoiceUrl);
-                            $urlParts = explode('invoices/', $invoiceUrl);
-                            $invoiceName = explode('/pdf', array_pop($urlParts))[0];
-                            array_push($invoices, array(
-                                'invoiceName' => $invoiceName,
-                                'invoiceDate' => $invoiceDate,
-                                'invoiceAmount' => $invoiceAmount,
-                                'invoiceUrl' => $invoiceUrl
-                            ));
-                            $this->isNoInvoice = false;
-                        }
-                    }
-
-                    $this->exts->log('Invoice Name: ' . $invoiceName);
-                    $this->exts->execute_javascript('document.elementFromPoint(0,0).click();');
-                    sleep(2);
-                    $this->exts->update_process_lock();
-                }
-            } catch (\StaleElementReferenceException $e) {
-                echo "An error occurred: " . $e->getMessage();
-            }
-        }
-
-        $this->exts->update_process_lock();
-
-        // Download all invoices
-        $this->exts->log('Invoices found: ' . count($invoices));
-        foreach ($invoices as $invoice) {
-            $this->exts->log('--------------------------');
-            $this->exts->log('invoiceName: ' . $invoice['invoiceName']);
-            $this->exts->log('invoiceDate: ' . $invoice['invoiceDate']);
-            $this->exts->log('invoiceAmount: ' . $invoice['invoiceAmount']);
-            $this->exts->log('invoiceUrl: ' . $invoice['invoiceUrl']);
-
-            $invoiceFileName = !empty($invoice['invoiceName']) ? $invoice['invoiceName'] . '.pdf' : '';
-            $invoice['invoiceDate'] = $this->exts->parse_date($invoice['invoiceDate'], 'd. F Y', 'Y-m-d');
-            $this->exts->log('Date parsed: ' . $invoice['invoiceDate']);
-
-            $downloaded_file = $this->exts->direct_download($invoice['invoiceUrl'], 'pdf', $invoiceFileName);
-            if (trim($downloaded_file) != '' && file_exists($downloaded_file)) {
-                $this->exts->new_invoice($invoice['invoiceName'], $invoice['invoiceDate'], $invoice['invoiceAmount'], $invoiceFileName);
-                sleep(1);
-            } else {
-                $this->exts->log(__FUNCTION__ . '::No download ' . $invoiceFileName);
             }
         }
     }

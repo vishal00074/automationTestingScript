@@ -543,8 +543,6 @@ class PortalScriptCDP
                 }
                 $this->exts->log('Date parsed: ' . $parse_date);
                 $invoiceAmount = '';
-
-
                 try {
                     $downloadBtn->click();
                 } catch (\Exception $exception) {
