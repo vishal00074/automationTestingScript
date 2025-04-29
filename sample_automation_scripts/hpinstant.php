@@ -503,7 +503,7 @@ class PortalScriptCDP
             $this->exts->click_element('[role="listbox"]#' . $cycle_dropdown_id . '-listbox li[data-value="' . $bill_value . '"]');
             sleep(5);
             if ($this->isExists('[class*="printHistory__columnB"] a[data-testid="download_invoice_pdf"]')) {
-                $invoiceFileName = !empty($invoiceName) ? $invoiceName . '.pdf': '';
+                $invoiceFileName = !empty($invoiceName) ? $invoiceName . '.pdf' : '';
                 $this->exts->log('--------------------------');
                 $this->exts->log('invoiceName: ' . $invoiceName);
                 $this->exts->log('invoiceDate: ');
@@ -534,46 +534,56 @@ class PortalScriptCDP
         sleep(10);
         $rows = $this->exts->getElements('table[data-testid*="-print-hitory-table"] tbody tr');
         foreach ($rows as $row) {
-            $tags = $this->exts->getElements('td', $row);
-            if (count($tags) >= 3 && $this->exts->getElement('div[class*="invoiceDownloadLink"] a', $row) != null) {
-                $invoiceUrl = $this->exts->getElement('div[class*="invoiceDownloadLink"] a', $row);
-                $invoiceDate = trim($tags[0]->getAttribute('innerText'));
+            $downloadBtn = $this->exts->getElement('div[class*="invoiceDownloadLink"] a', $row);
+            if ($downloadBtn != null) {
+                $invoiceDate = $this->exts->extract('td:nth-child(1)', $row);
                 $parse_date = $this->exts->parse_date($invoiceDate, 'd/m/Y', 'Y-m-d');
                 if ($parse_date == '') {
                     $parse_date = $this->exts->parse_date($invoiceDate, 'm/d/Y', 'Y-m-d');
                 }
                 $this->exts->log('Date parsed: ' . $parse_date);
-                $invoiceName = $parse_date;
-                $this->exts->log('Invoice name: ' . $invoiceName);
                 $invoiceAmount = '';
-                $invoiceFileName = !empty($invoiceName) ? $invoiceName . '.pdf': '';
-                $this->exts->log('Invoice file name: ' . $invoiceFileName);
-                $this->isNoInvoice = false;
 
-                if ($this->exts->invoice_exists($invoiceName)) {
-                    $this->exts->log('Invoice already exists : ' . $invoiceName);
-                } else {
 
-                    $downloaded_file = $this->exts->click_and_download($invoiceUrl, 'pdf', $invoiceFileName);
+                try {
+                    $downloadBtn->click();
+                } catch (\Exception $exception) {
+                    $this->exts->executeSafeScript('arguments[0].click();', [$downloadBtn]);
+                }
 
-                    $this->exts->wait_and_check_download('pdf');
+                $this->exts->wait_and_check_download('pdf');
+                // $filename = $invoiceName.'.pdf';
+                $downloaded_file = $this->exts->find_saved_file('pdf');
+                if (trim($downloaded_file) != '' && file_exists($downloaded_file)) {
+                    $invoiceFileName = basename($downloaded_file);
+                    $invoiceName = trim(array_pop(explode('#', explode('.pdf', $invoiceFileName)[0])));
+                    $invoiceName = trim(array_pop(explode('(', explode(')', $invoiceName)[0])));
+                    // $invoiceName = trim(explode('_', end(explode('obile_', $invoiceName)))[0]);
+                    $this->exts->log('Final invoice name: ' . $invoiceName);
+                    $invoiceFileName = !empty($invoiceName) ? $invoiceName . '.pdf' : '';
+                    @rename($downloaded_file, $this->exts->config_array['download_folder'] . $invoiceFileName);
 
-                    if (trim($downloaded_file) != '' && file_exists($downloaded_file)) {
-                        $this->exts->new_invoice($invoiceName, $parse_date, $invoiceAmount, $invoiceFileName);
-                        sleep(1);
+                    if ($this->exts->invoice_exists($invoiceName)) {
+                        $this->exts->log('Invoice existed ' . $invoiceFileName);
                     } else {
-                        $this->exts->log(__FUNCTION__ . '::No download ' . $invoiceFileName);
+                        $this->isNoInvoice = false;
+                        $this->exts->new_invoice($invoiceName, $invoiceDate, $invoiceAmount, $invoiceFileName);
+                        sleep(1);
                     }
+                } else {
+                    $this->exts->log(__FUNCTION__ . '::No download ');
+                }
+            }
 
-                    $this->waitFor('div[data-testid="critical-scopes-modal"] button:last-child');
-                    if ($this->isExists('div[data-testid="critical-scopes-modal"] button:last-child')) {
-                        $this->exts->click_element('div[data-testid="critical-scopes-modal"] button:last-child');
-                        $this->fillForm();
-                        $this->exts->openUrl('https://portal.hpsmart.com/de/de/print_plans/account_history');
-                        if ($this->checkLogin()) {
-                            $this->processPaymentHistory();
-                        }
-                    }
+
+
+            $this->waitFor('div[data-testid="critical-scopes-modal"] button:last-child');
+            if ($this->isExists('div[data-testid="critical-scopes-modal"] button:last-child')) {
+                $this->exts->click_element('div[data-testid="critical-scopes-modal"] button:last-child');
+                $this->fillForm();
+                $this->exts->openUrl('https://portal.hpsmart.com/de/de/print_plans/account_history');
+                if ($this->checkLogin()) {
+                    $this->processPaymentHistory();
                 }
             }
         }
