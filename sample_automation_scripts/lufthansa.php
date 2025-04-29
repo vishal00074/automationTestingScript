@@ -116,6 +116,7 @@ class PortalScriptCDP
 
         if (!$this->checkLogin()) {
             $this->exts->log('Not Logged in : : ');
+            $this->exts->clearCookies();
 
             $this->exts->openUrl($this->baseUrl);
 
@@ -231,6 +232,18 @@ class PortalScriptCDP
                     $this->exts->click_by_xdotool($this->submit_btn);
                 }
                 sleep(10);
+
+                $error_text = strtolower($this->exts->extract('p.travelid-form__errorBoxContentItemText'));
+                if (
+                    stripos($error_text, 'A technical error has occurred.') !== false
+                ) {
+                    $this->exts->moveToElementAndType($this->password_selector, $this->password);
+                    sleep(2);
+
+                    if ($this->isExists($this->continue_btn)) {
+                        $this->exts->click_by_xdotool($this->submit_btn);
+                    }
+                }
             } else {
                 $this->exts->log(__FUNCTION__ . '::Login page not found');
                 $this->exts->capture("2-login-page-not-found");

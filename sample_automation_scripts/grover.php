@@ -298,7 +298,11 @@ class PortalScriptCDP
     {
         $this->exts->waitTillPresent('div > div[data-testid="your-payments-payment-card"]');
         $this->exts->capture("4-invoices-classic");
-
+        // Load Default upto 5 pages 
+        for ($i = 0; $i < 7; $i++) {
+            $this->exts->executeSafeScript('window.scrollBy(0, 1000);');
+            sleep(5);
+        }
         // Scroll According to restrictPages count 
         $restrictPages = isset($this->exts->config_array["restrictPages"]) ? (int)@$this->exts->config_array["restrictPages"] : 3;
 
@@ -314,7 +318,7 @@ class PortalScriptCDP
         sleep(7);
         $rows = $this->exts->getElements('div > div[data-testid="your-payments-payment-card"]');
         foreach ($rows as $key => $row) {
-            $downloadBtn = $this->exts->getElement('button[data-testid="your-payments-download-invoice-button"]', $row);
+            $downloadBtn = $this->exts->getElement('button:not(:disabled)', $row);
             if ($downloadBtn != null) {
                 $invoiceUrl = '';
                 $invoiceName = $this->exts->extract('div.flex:nth-child(1) span:nth-child(2)', $row);
@@ -329,10 +333,9 @@ class PortalScriptCDP
                 $this->exts->log('invoiceUrl: ' . $invoiceUrl);
 
                 try {
-                    $downloadBtn->click();
+                    $this->exts->execute_javascript('arguments[0].click();', [$downloadBtn]);
                 } catch (\Exception $exception) {
                     $this->exts->log(__FUNCTION__ . ' by javascript' . $exception);
-                    $this->exts->execute_javascript('arguments[0].click();', [$downloadBtn]);
                 }
                 sleep(10);
 

@@ -244,6 +244,8 @@ class PortalScriptCDP
             $this->check_solve_cloudflare_page();
         }
 
+        $this->waitFor($this->password_selector, 15);
+
         if ($this->exts->querySelector($this->password_selector) != null) {
             $this->exts->log("Enter Password");
             $this->exts->moveToElementAndType($this->password_selector, $this->password);
