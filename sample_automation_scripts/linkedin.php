@@ -1,6 +1,14 @@
 <?php
 
 /**
+ * I have updated the login code to retry logging in if the user 
+ * is redirected back to the login page after submitting the form. 
+ * I have also replaced the exists and waitTillPresent functions 
+ * with custom JavaScript functions. The script has been successfully
+ *  tested on the test engine.
+ */
+
+/**
  * Chrome Remote via Chrome devtool protocol script, for specific process/portal
  *
  * @package uwa
