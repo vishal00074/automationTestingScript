@@ -4,7 +4,7 @@ public $homePageUrl = "https://www.figma.com";
 public $username_selector = "input[name='email']";
 public $password_selector = "input[name='password']";
 public $login_button_selector = "form#auth-view-page > button[type='submit']";
-public $login_confirm_selector = 'a[data-tooltip-text*="notifications"], div[class*="notifications"], div[class*="workspace_icon"] div[class*="avatar--avatar"] img, div[class*="profileAction"] div[class*="workspace_icon"] span[class*="avatar--avatar"], button[class*="profileAction"] div[class*="workspace_icon"] span[class*="avatar--avatar"]';
+public $login_confirm_selector = "div[data-testid='ProfileButton']";
 public $login_tryout = 0;
 
 public $login_with_google = '0';
@@ -12,14 +12,14 @@ public $isNoInvoice = true;
 
 
 /**
- * Entry Method thats called for a portal
- * @param Integer $count Number of times portal is retried.
- */
+    * Entry Method thats called for a portal
+    * @param Integer $count Number of times portal is retried.
+    */
 private function initPortal($count)
 {
     $this->exts->log('Begin initPortal ' . $count);
 
-    $this->login_with_google = isset($this->exts->config_array["login_with_google"]) ? (int)@$this->exts->config_array["login_with_google"] : 0;
+    $this->login_with_google = isset($this->exts->config_array["login_with_google"]) ? (int) @$this->exts->config_array["login_with_google"] : 0;
 
     $this->exts->openUrl($this->baseUrl);
 
@@ -29,9 +29,6 @@ private function initPortal($count)
     $isCookieLoginSuccess = false;
     if ($this->exts->loadCookiesFromFile()) {
         $this->exts->openUrl($this->homePageUrl);
-
-        $this->exts->waitTillPresent($this->login_confirm_selector, 20);
-
         if ($this->checkLogin()) {
             $isCookieLoginSuccess = true;
         }
@@ -43,7 +40,7 @@ private function initPortal($count)
         $this->exts->openUrl($this->loginUrl);
         sleep(15);
 
-        if ((int)@$this->login_with_google == 1) {
+        if ((int) @$this->login_with_google == 1) {
             $this->exts->moveToElementAndClick('button[class*="landing_form--googleButton"], button div[class*="googleButtonInner"]');
             sleep(10);
             $google_tab = $this->exts->findTabMatchedUrl(['google']);
@@ -62,11 +59,10 @@ private function initPortal($count)
         } else {
             $this->exts->capture("after-login-clicked");
             $this->fillForm(0);
-            sleep(15);
-            $this->check_and_solve_challenge();
-
-            $this->exts->moveToElementAndClick('div[class*="onboarding_components"] div[class*="close_button--closeX"]');
-            sleep(7);
+            sleep(10);
+            if ($this->isExists('div[class*="onboarding_components"] div[class*="close_button--closeX"]')) {
+                $this->exts->moveToElementAndClick('div[class*="onboarding_components"] div[class*="close_button--closeX"]');
+            }
             $this->checkFillTwoFactor();
         }
         if ($this->checkLogin()) {
@@ -76,6 +72,7 @@ private function initPortal($count)
             if (!empty($this->exts->config_array['allow_login_success_request'])) {
                 $this->exts->triggerLoginSuccess();
             }
+            $this->exts->success();
 
         } else {
             if ($this->exts->extract('#auth-view-page div[class*="auth_form--error"]') != '') {
@@ -99,9 +96,10 @@ private function initPortal($count)
         $this->exts->capture("LoginSuccess");
 
         if (!empty($this->exts->config_array['allow_login_success_request'])) {
-
-            $this->exts->triggerLoginSuccess();
+                $this->exts->triggerLoginSuccess();
         }
+        $this->exts->success();
+
     }
 }
 public function switchToFrame($query_string)
@@ -128,38 +126,41 @@ private function fillForm($count)
 {
     $this->exts->log("Begin fillForm " . $count);
     try {
-        if ($this->exts->getElement($this->username_selector) != null && $this->exts->getElement($this->password_selector) != null) {
+        $this->waitForSelectors($this->username_selector, 5, 3);
+        if ($this->exts->getElement($this->username_selector) != null) {
             sleep(2);
 
             $this->exts->log("Enter Username");
             $this->exts->moveToElementAndType($this->username_selector, $this->username);
             sleep(5);
-            if ($this->exts->exists($this->login_button_selector) &&  !$this->exts->exists($this->password_selector)) {
+            if ($this->isExists($this->login_button_selector) && !$this->isExists($this->password_selector)) {
                 $this->exts->moveToElementAndClick($this->login_button_selector);
                 sleep(5);
             }
-            
-            if ($this->exts->exists($this->password_selector)) {
+
+            if ($this->isExists($this->password_selector)) {
                 $this->exts->log("Enter Password");
                 $this->exts->moveToElementAndType($this->password_selector, $this->password);
                 sleep(5);
                 $this->exts->capture("2-login-page-filled");
                 $this->exts->moveToElementAndClick($this->login_button_selector);
             } else {
-                if ($this->exts->exists($this->login_button_selector)) {
+                if ($this->isExists($this->login_button_selector)) {
                     $this->exts->moveToElementAndClick($this->login_button_selector);
                     sleep(5);
                 }
             }
+            sleep(5);
             if ($this->exts->urlContains("login.microsoftonline")) {
                 $this->loginMicrosoftIfRequired();
             }
+            sleep(5);
         }
     } catch (\Exception $exception) {
         $this->exts->log("Exception filling loginform " . $exception->getMessage());
     }
 }
-private function fillFormOnelogin()
+private function fillFormOnelogin($count = 0)
 {
     $this->exts->log("Begin fillForm " . $count);
     try {
@@ -175,7 +176,8 @@ private function fillFormOnelogin()
             $this->exts->moveToElementAndType('input#password', $this->password);
             sleep(5);
             $this->exts->moveToElementAndClick('button[type="submit"]');
-            if ($this->exts->waitTillVisible('[type="error"]', 10)) {
+            $this->waitForSelectors("[type='error']", 3, 3);
+            if ($this->isExists('[type="error"]')) {
                 $this->exts->log("Login Failure : " . $this->exts->extract('[type="error"]'));
                 if (strpos(strtolower($this->exts->extract('[type="error"]')), 'passwor') !== false) {
                     $this->exts->loginFailure(1);
@@ -187,25 +189,26 @@ private function fillFormOnelogin()
         $this->exts->log("Exception filling loginform " . $exception->getMessage());
     }
 }
-private function checkLogin()
+
+private function waitForSelectors($selector, $max_attempt, $sec)
 {
-    $this->exts->log("Begin checkLogin ");
-    $isLoggedIn = false;
-    try {
-        if ($this->exts->getElement($this->login_confirm_selector) != null && !$this->exts->exists($this->username_selector)) {
-            $this->exts->log(">>>>>>>>>>>>>>>Login successful!!!!");
-            $isLoggedIn = true;
-        }
-    } catch (\Exception $exception) {
-        $this->exts->log("Exception checking loggedin " . $exception);
+    for (
+        $wait = 0;
+        $wait < $max_attempt && $this->exts->executeSafeScript("return !!document.querySelector(\"" . $selector . "\");") != 1;
+        $wait++
+    ) {
+        $this->exts->log('Waiting for Selectors!!!!!!');
+        sleep($sec);
     }
-    return $isLoggedIn;
 }
+
 private function checkFillTwoFactor()
 {
     $two_factor_selector = 'input[name="totp_key"]';
     $two_factor_message_selector = 'form#auth-view-page div[class*="auth_form--header"], div[data-component-name="auth-view"] p';
     $two_factor_submit_selector = 'form#auth-view-page button';
+
+    sleep(10);
 
     if (($this->exts->getElement($two_factor_selector) != null || strpos($this->exts->extract('h1[class*="validate_email--header"]'), 'Check your inbox') !== false) && $this->exts->two_factor_attempts < 3) {
         $this->exts->log("Two factor page found.");
@@ -237,7 +240,7 @@ private function checkFillTwoFactor()
             }
         } elseif (!empty($two_factor_code) && trim($two_factor_code) != '') {
             $this->exts->log("checkFillTwoFactor: Entering two_factor_code." . $two_factor_code);
-            $this->exts->getElement($two_factor_selector)->sendKeys($two_factor_code);
+            $this->exts->moveToElementAndType($two_factor_selector, $two_factor_code);
 
             $this->exts->log("checkFillTwoFactor: Clicking submit button.");
             sleep(3);
@@ -259,82 +262,9 @@ private function checkFillTwoFactor()
         }
     }
 }
-private function check_and_solve_challenge()
-{
-    // Check and solve Funcaptcha, It can require 1 pics, 2 or 5 pics. So check 5 times.
-    $funcaptcha_displayed = $this->process_funcaptcha_by_clicking();
-    if ($funcaptcha_displayed) {
-        $this->process_funcaptcha_by_clicking();
-        $this->process_funcaptcha_by_clicking();
-        $this->process_funcaptcha_by_clicking();
-        $this->process_funcaptcha_by_clicking();
-        $funcaptcha_displayed = $this->process_funcaptcha_by_clicking();
-    }
 
-    // if Step above failed, try again
-    if ($funcaptcha_displayed) {
-        $this->process_funcaptcha_by_clicking();
-        $this->process_funcaptcha_by_clicking();
-        $this->process_funcaptcha_by_clicking();
-        $this->process_funcaptcha_by_clicking();
-        $this->process_funcaptcha_by_clicking();
-        $this->process_funcaptcha_by_clicking();
-    }
-}
-private function process_funcaptcha_by_clicking()
-{
-    $this->exts->log("Checking Funcaptcha");
-    $language_code = $this->exts->extract('[lang]', null, "lang");
-    if ($this->exts->exists('iframe#arkoseFrame')) {
-        $this->exts->switchToFrame('iframe#arkoseFrame');
-    }
 
-    if ($this->exts->exists('[data-e2e="enforcement-frame"].show')) {
-        $this->exts->capture("funcaptcha");
-        $this->exts->switchToFrame('[data-e2e="enforcement-frame"].show');
-
-        if ($this->exts->exists('#fc-iframe-wrap')) {
-            $this->exts->switchToFrame('#fc-iframe-wrap');
-        }
-        if ($this->exts->exists('.front [id*="CaptchaFrame"]')) {
-            $this->exts->switchToFrame('.front [id*="CaptchaFrame"]');
-            // Click button to show images challenge
-            if ($this->exts->exists('#home_children_button')) {
-                $this->exts->moveToElementAndClick('#home_children_button');
-                sleep(2);
-            } else if ($this->exts->exists('#wrong_children_button, a#wrongTimeout_children_button')) {
-                $this->exts->moveToElementAndClick('#wrong_children_button, a#wrongTimeout_children_button');
-                sleep(2);
-            }
-            $captcha_instruction = $this->exts->extract('#game #game_children_text');
-            $this->exts->log('language_code: ' . $language_code . ' Instruction: ' . $captcha_instruction);
-            $this->exts->switchToDefault();
-            // if($this->exts->exists('iframe#arkoseFrame')){
-            // 	$this->exts->switchToFrame('iframe#arkoseFrame');
-            // }
-            // $this->exts->switchToFrame('[data-e2e="enforcement-frame"].show');
-
-            $captcha_wraper_selector = 'iframe#arkoseFrame';
-            $coordinates = $this->exts->processClickCaptcha($captcha_wraper_selector, $captcha_instruction, $language_code, $json_result = true);
-            if ($coordinates == '') {
-                $coordinates = $this->exts->processClickCaptcha($captcha_wraper_selector, $captcha_instruction, $language_code, $json_result = true);
-            }
-            if ($coordinates != '') {
-                $wraper = $this->exts->getElement($captcha_wraper_selector);
-                $actions = $this->exts->webdriver->action();
-                $this->exts->log('Clicking X/Y: ' . $coordinates[0]['x'] . '/' . $coordinates[0]['y']);
-                $actions->moveToElement($wraper, intval($coordinates[0]['x']), intval($coordinates[0]['y']))->click()->perform();
-                sleep(5);
-            }
-        }
-        $this->exts->switchToDefault();
-        return true;
-    }
-    $this->exts->switchToDefault();
-    return false;
-}
-
-    // -------------------- GOOGLE login
+// -------------------- GOOGLE login
 public $google_username_selector = 'input[name="identifier"]';
 public $google_submit_username_selector = '#identifierNext';
 public $google_password_selector = 'input[name="password"], input[name="Passwd"]';
@@ -353,7 +283,7 @@ private function loginGoogleIfRequired()
             $this->exts->loginFailure(1);
         }
 
-        if ($this->exts->exists('form #approve_button[name="submit_true"]')) {
+        if ($this->isExists('form #approve_button[name="submit_true"]')) {
             // An application is requesting permission to access your Google Account.
             // Click allow
             $this->exts->click_by_xdotool('form #approve_button[name="submit_true"]');
@@ -363,36 +293,36 @@ private function loginGoogleIfRequired()
         $this->exts->click_by_xdotool('div[data-ownership-changed-phone-number] div:nth-child(2) > [role="button"]');
         $this->checkGoogleTwoFactorMethod();
         sleep(10);
-        if ($this->exts->exists('#smsauth-interstitial-remindbutton')) {
+        if ($this->isExists('#smsauth-interstitial-remindbutton')) {
             $this->exts->click_by_xdotool('#smsauth-interstitial-remindbutton');
             sleep(10);
         }
-        if ($this->exts->exists('#tos_form input#accept')) {
+        if ($this->isExists('#tos_form input#accept')) {
             $this->exts->click_by_xdotool('#tos_form input#accept');
             sleep(10);
         }
-        if ($this->exts->exists('[wizard-step-uid="RecoveryOptionsCollectionWizard:starter"] div:last-child > [role="button"]')) {
+        if ($this->isExists('[wizard-step-uid="RecoveryOptionsCollectionWizard:starter"] div:last-child > [role="button"]')) {
             $this->exts->click_by_xdotool('[wizard-step-uid="RecoveryOptionsCollectionWizard:starter"] div:last-child > [role="button"]');
             sleep(10);
         }
-        if ($this->exts->exists('.action-button.signin-button + a.setup-button[href*="/two-step-verification/"]')) {
+        if ($this->isExists('.action-button.signin-button + a.setup-button[href*="/two-step-verification/"]')) {
             // SKIP setup 2FA
             $this->exts->click_by_xdotool('.action-button.signin-button');
             sleep(10);
         }
-        if ($this->exts->exists('[action="/signin/newfeatures/save"] #optionsButton ~ [role="button"]')) {
+        if ($this->isExists('[action="/signin/newfeatures/save"] #optionsButton ~ [role="button"]')) {
             $this->exts->click_by_xdotool('[action="/signin/newfeatures/save"] #optionsButton ~ [role="button"]');
             sleep(10);
         }
-        if ($this->exts->exists('input[name="later"]') && $this->exts->urlContains('/AddressNoLongerAvailable')) {
+        if ($this->isExists('input[name="later"]') && $this->exts->urlContains('/AddressNoLongerAvailable')) {
             $this->exts->click_by_xdotool('input[name="later"]');
             sleep(7);
         }
-        if ($this->exts->exists('#editLanguageAndContactForm a[href*="/adsense/app"]')) {
+        if ($this->isExists('#editLanguageAndContactForm a[href*="/adsense/app"]')) {
             $this->exts->click_by_xdotool('#editLanguageAndContactForm a[href*="/adsense/app"]');
             sleep(7);
         }
-        if ($this->exts->exists('[data-view-instance-id="/web/chip-V0"] [role="button"]:first-child [jsslot]')) {
+        if ($this->isExists('[data-view-instance-id="/web/chip-V0"] [role="button"]:first-child [jsslot]')) {
             $this->exts->click_by_xdotool('[data-view-instance-id="/web/chip-V0"] [role="button"]:first-child [jsslot]');
             sleep(10);
         }
@@ -401,7 +331,7 @@ private function loginGoogleIfRequired()
             sleep(10);
         }
 
-        if ($this->exts->exists('form #approve_button[name="submit_true"]')) {
+        if ($this->isExists('form #approve_button[name="submit_true"]')) {
             // An application is requesting permission to access your Google Account.
             // Click allow
             $this->exts->click_by_xdotool('form #approve_button[name="submit_true"]');
@@ -423,14 +353,14 @@ private function loginGoogleIfRequired()
 }
 private function checkFillGoogleLogin()
 {
-    if ($this->exts->exists('[data-view-id*="signInChooserView"] li [data-identifier]')) {
+    if ($this->isExists('[data-view-id*="signInChooserView"] li [data-identifier]')) {
         $this->exts->click_by_xdotool('[data-view-id*="signInChooserView"] li [data-identifier]');
         sleep(10);
-    } else if ($this->exts->exists('form li [role="link"][data-identifier]')) {
+    } else if ($this->isExists('form li [role="link"][data-identifier]')) {
         $this->exts->click_by_xdotool('form li [role="link"][data-identifier]');
         sleep(10);
     }
-    if ($this->exts->exists('form [data-profileindex]')) {
+    if ($this->isExists('form [data-profileindex]')) {
         $this->exts->click_by_xdotool('form [data-profileindex]');
         sleep(5);
     }
@@ -445,7 +375,7 @@ private function checkFillGoogleLogin()
         sleep(1);
         $this->exts->click_by_xdotool($this->google_submit_username_selector);
         sleep(7);
-        if ($this->exts->exists('#captchaimg[src]') && !$this->exts->exists($this->google_password_selector) && $this->exts->exists($this->google_username_selector)) {
+        if ($this->isExists('#captchaimg[src]') && !$this->isExists($this->google_password_selector) && $this->isExists($this->google_username_selector)) {
             $this->exts->moveToElementAndType($this->google_username_selector, $this->username);
             sleep(1);
             $this->exts->processCaptcha('#captchaimg[src]', '#captchaimg[src] ~ * input[type="text"]');
@@ -454,11 +384,11 @@ private function checkFillGoogleLogin()
         }
 
         // Which account do you want to use?
-        if ($this->exts->exists('form[action*="/lookup"] button.account-chooser-button')) {
+        if ($this->isExists('form[action*="/lookup"] button.account-chooser-button')) {
             $this->exts->click_by_xdotool('form[action*="/lookup"] button.account-chooser-button');
             sleep(5);
         }
-        if ($this->exts->exists('[data-view-id="prbTle"] form [role="link"][data-profileindex]')) {
+        if ($this->isExists('[data-view-id="prbTle"] form [role="link"][data-profileindex]')) {
             $this->exts->click_by_xdotool('[data-view-id="prbTle"] form [role="link"][data-profileindex]');
             sleep(5);
         }
@@ -469,21 +399,21 @@ private function checkFillGoogleLogin()
         $this->exts->moveToElementAndType($this->google_password_selector, $this->password);
         sleep(1);
 
-        if ($this->exts->exists('#captchaimg[src]')) {
+        if ($this->isExists('#captchaimg[src]')) {
             $this->exts->processCaptcha('#captchaimg[src]', '#captchaimg[src] ~ * input[type="text"]');
         }
 
         $this->exts->capture("2-google-password-filled");
         $this->exts->click_by_xdotool($this->google_submit_password_selector);
         sleep(5);
-        if ($this->exts->exists('#captchaimg[src]') && $this->exts->exists($this->google_password_selector)) {
+        if ($this->isExists('#captchaimg[src]') && $this->isExists($this->google_password_selector)) {
             $this->exts->moveToElementAndType($this->google_password_selector, $this->password);
             sleep(1);
             $this->exts->processCaptcha('#captchaimg[src]', '#captchaimg[src] ~ * input[type="text"]');
             $this->exts->capture("2-login-google-pageandcaptcha-filled");
             $this->exts->click_by_xdotool($this->google_submit_password_selector);
             sleep(10);
-            if ($this->exts->exists('#captchaimg[src]') && $this->exts->exists($this->google_password_selector)) {
+            if ($this->isExists('#captchaimg[src]') && $this->isExists($this->google_password_selector)) {
                 $this->exts->moveToElementAndType($this->google_password_selector, $this->password);
                 sleep(1);
                 $this->exts->processCaptcha('#captchaimg[src]', '#captchaimg[src] ~ * input[type="text"]');
@@ -629,31 +559,31 @@ private function check_solve_rejected_browser()
 private function overwrite_user_agent($user_agent_string = 'DN')
 {
     $userAgentScript = "
-    (function() {
-        if ('userAgentData' in navigator) {
-            navigator.userAgentData.getHighEntropyValues({}).then(() => {
-                Object.defineProperty(navigator, 'userAgent', { 
-                    value: '{$user_agent_string}', 
-                    configurable: true 
-                });
-            });
-        } else {
+(function() {
+    if ('userAgentData' in navigator) {
+        navigator.userAgentData.getHighEntropyValues({}).then(() => {
             Object.defineProperty(navigator, 'userAgent', { 
                 value: '{$user_agent_string}', 
                 configurable: true 
             });
-        }
-    })();
+        });
+    } else {
+        Object.defineProperty(navigator, 'userAgent', { 
+            value: '{$user_agent_string}', 
+            configurable: true 
+        });
+    }
+})();
 ";
     $this->exts->execute_javascript($userAgentScript);
 }
 
 private function checkFillLogin_undetected_mode($root_user_agent = '')
 {
-    if ($this->exts->exists('form [data-profileindex]')) {
+    if ($this->isExists('form [data-profileindex]')) {
         $this->exts->click_by_xdotool('form [data-profileindex]');
         sleep(5);
-    } else if ($this->exts->urlContainsAny(['/ServiceLogin/identifier', '/ServiceLogin/webreauth']) && $this->exts->exists($this->google_submit_username_selector) && !$this->exts->exists($this->google_username_selector)) {
+    } else if ($this->exts->urlContainsAny(['/ServiceLogin/identifier', '/ServiceLogin/webreauth']) && $this->isExists($this->google_submit_username_selector) && !$this->isExists($this->google_username_selector)) {
         $this->exts->capture("2-google-verify-it-you");
         // To help keep your account secure, Google needs to verify it’s you. Please sign in again to continue to Google Ads
         $this->exts->click_by_xdotool($this->google_submit_username_selector);
@@ -724,7 +654,7 @@ private function checkFillLogin_undetected_mode($root_user_agent = '')
         $this->exts->log("Enter Password");
         $this->exts->moveToElementAndType($this->google_password_selector, $this->password);
         sleep(1);
-        if ($this->exts->exists('#captchaimg[src]')) {
+        if ($this->isExists('#captchaimg[src]')) {
             $this->exts->processCaptcha('#captchaimg[src]', '#captchaimg[src] ~ * input[type="text"]');
         }
 
@@ -734,7 +664,7 @@ private function checkFillLogin_undetected_mode($root_user_agent = '')
 
         $continueButton = $this->exts->getElements('button[type="button"]');
 
-        if(count($continueButton) > 0){
+        if (count($continueButton) > 0) {
             $this->exts->click_by_xdotool($continueButton[0]);
             sleep(5);
             $this->exts->type_key_by_xdotool('Return');
@@ -742,15 +672,15 @@ private function checkFillLogin_undetected_mode($root_user_agent = '')
         }
 
 
-        if ($this->exts->exists('#captchaimg[src]') && !$this->exts->exists('input[name="password"][aria-invalid="true"]') && $this->exts->exists($this->google_password_selector)) {
+        if ($this->isExists('#captchaimg[src]') && !$this->isExists('input[name="password"][aria-invalid="true"]') && $this->isExists($this->google_password_selector)) {
             $this->exts->moveToElementAndType($this->google_password_selector, $this->password);
             sleep(1);
-            if ($this->exts->exists('#captchaimg[src]')) {
+            if ($this->isExists('#captchaimg[src]')) {
                 $this->exts->processCaptcha('#captchaimg[src]', 'input[name="ca"]');
             }
             $this->exts->click_by_xdotool($this->google_submit_password_selector);
             sleep(5);
-            if ($this->exts->exists('#captchaimg[src]') && $this->exts->exists($this->google_password_selector)) {
+            if ($this->isExists('#captchaimg[src]') && $this->isExists($this->google_password_selector)) {
                 $this->exts->moveToElementAndType($this->google_password_selector, $this->password);
                 sleep(1);
                 $this->exts->processCaptcha('#captchaimg[src]', 'input[name="ca"]');
@@ -777,7 +707,7 @@ private function checkGoogleTwoFactorMethod()
     sleep(5);
     $this->exts->capture("2.0-before-check-two-factor");
     // STEP 0 (updated special case 28-Mar-2020): If we meet a unsolvable, click to back to method choosen list
-    if ($this->exts->exists('#assistActionId') && $this->exts->exists('[data-illustration="securityKeyLaptopAnim"]')) {
+    if ($this->isExists('#assistActionId') && $this->isExists('[data-illustration="securityKeyLaptopAnim"]')) {
         $this->exts->click_by_xdotool('#assistActionId');
         sleep(5);
     } else if ($this->exts->urlContains('/challenge/wa') && strpos($this->exts->extract('form header h2'), 'QR-Code') !== false) {
@@ -801,12 +731,12 @@ private function checkGoogleTwoFactorMethod()
         $this->exts->click_by_xdotool('[data-view-id] [data-secondary-action-label] > div > div:nth-child(2) [role="button"], [data-view-id] [data-secondary-action-label] > div > div:nth-child(2) button');
         sleep(5);
         $this->exts->capture("2.0-backed-methods-list");
-    } else if ($this->exts->exists('[data-view-id*="authzenView"] form, form [data-illustration*="authzen"]') || $this->exts->urlContains('/challenge/dp?')) {
+    } else if ($this->isExists('[data-view-id*="authzenView"] form, form [data-illustration*="authzen"]') || $this->exts->urlContains('/challenge/dp?')) {
         // (updated special case 09-May-2020): If Notification method showed immediately, This method often make user confused
         // So, We try to click 'Choose another option' in order to select easier method
         $this->exts->click_by_xdotool('[data-view-id] > div > div:nth-child(2)  div:nth-child(2) > [role="button"], [data-view-id] [data-secondary-action-label] > div > div:nth-child(2) [role="button"], [data-view-id] [data-secondary-action-label] > div > div:nth-child(2) button, button#assistiveActionOutOfQuota');
         sleep(7);
-    } else if ($this->exts->exists('input[name="ootpPin"]')) {
+    } else if ($this->isExists('input[name="ootpPin"]')) {
         // (updated special case 11-Jun-2020): If "Verify by offline device" immediately, This method often make user confused and maybe they don't have device on hand
         // So, We try to click 'Choose another option' in order to select easier method
         $this->exts->click_by_xdotool('[data-view-id] [data-secondary-action-label] > div > div:nth-child(2) [role="button"], [data-view-id] [data-secondary-action-label] > div > div:nth-child(2) button');
@@ -838,60 +768,60 @@ private function checkGoogleTwoFactorMethod()
     }
 
     // STEP 1: Check if list of two factor methods showed, select first
-    if ($this->exts->exists('li [data-challengetype]:not([data-challengeunavailable="true"])')) {
+    if ($this->isExists('li [data-challengetype]:not([data-challengeunavailable="true"])')) {
         $this->exts->capture("2.1-2FA-method-list");
 
         // Updated 03-2023 since we setup sub-system to get authenticator code without request to end-user. So from now, We priority for code from Authenticator app top 1, sms code or email code 2st, then other methods
-        if ($this->exts->exists('li [data-challengetype="6"]:not([data-challengeunavailable="true"])')) {
+        if ($this->isExists('li [data-challengetype="6"]:not([data-challengeunavailable="true"])')) {
             // We RECOMMEND TOP 1 method type = 6 is get code from Google Authenticator
             $this->exts->click_by_xdotool('li [data-challengetype="6"]:not([data-challengeunavailable="true"])');
-        } else if ($this->exts->exists('li [data-challengetype="13"]:not([data-challengeunavailable="true"])') && isset($this->security_phone_number) && $this->security_phone_number != '') {
+        } else if ($this->isExists('li [data-challengetype="13"]:not([data-challengeunavailable="true"])') && isset($this->security_phone_number) && $this->security_phone_number != '') {
             $this->exts->click_by_xdotool('li [data-challengetype="13"]:not([data-challengeunavailable="true"])');
-        } else if ($this->exts->exists('li [data-challengetype="12"]:not([data-challengeunavailable="true"])') && isset($this->recovery_email) && $this->recovery_email != '') {
+        } else if ($this->isExists('li [data-challengetype="12"]:not([data-challengeunavailable="true"])') && isset($this->recovery_email) && $this->recovery_email != '') {
             $this->exts->click_by_xdotool('li [data-challengetype="12"]:not([data-challengeunavailable="true"])');
-        } else if ($this->exts->exists('li [data-challengetype="1"]:not([data-challengeunavailable="true"])')) {
+        } else if ($this->isExists('li [data-challengetype="1"]:not([data-challengeunavailable="true"])')) {
             // Select enter your passowrd, if only option is passkey
             $this->exts->click_by_xdotool('li [data-challengetype="1"]:not([data-challengeunavailable="true"])');
             sleep(3);
             $this->checkFillGoogleLogin();
             sleep(3);
             $this->checkGoogleTwoFactorMethod();
-        } else if ($this->exts->exists('li [data-challengetype="6"]:not([data-challengeunavailable="true"])')) {
+        } else if ($this->isExists('li [data-challengetype="6"]:not([data-challengeunavailable="true"])')) {
             // We RECOMMEND method type = 6 is get code from Google Authenticator
             $this->exts->click_by_xdotool('li [data-challengetype="6"]:not([data-challengeunavailable="true"])');
-        } else if ($this->exts->exists('li [data-challengetype][data-sendmethod="SMS"]:not([data-challengeunavailable="true"])') && (isset($this->security_phone_number) && $this->security_phone_number != '')) {
+        } else if ($this->isExists('li [data-challengetype][data-sendmethod="SMS"]:not([data-challengeunavailable="true"])') && (isset($this->security_phone_number) && $this->security_phone_number != '')) {
             // We second RECOMMEND method type = 9 is get code from SMS
             $this->exts->click_by_xdotool('li [data-challengetype][data-sendmethod="SMS"]:not([data-challengeunavailable="true"])');
-        } else if ($this->exts->exists('li [data-challengetype="4"][data-sendauthzenprompt="true"]:not([data-challengeunavailable="true"]), li [data-challengetype="39"][data-challengeid="10"]:not([data-challengeunavailable="true"])')) {
+        } else if ($this->isExists('li [data-challengetype="4"][data-sendauthzenprompt="true"]:not([data-challengeunavailable="true"]), li [data-challengetype="39"][data-challengeid="10"]:not([data-challengeunavailable="true"])')) {
             // We recommend method type = 4 and [data-sendauthzenprompt="true"] is  Tap YES on your smartphone or tablet
             $this->exts->click_by_xdotool('li [data-challengetype="4"][data-sendauthzenprompt="true"]:not([data-challengeunavailable="true"]), li [data-challengetype="39"]:not([data-challengeunavailable="true"])');
-        } else if ($this->exts->exists('li [data-challengetype="4"][data-sendauthzenprompt="true"]:not([data-challengeunavailable="true"]), li [data-challengetype="39"][data-challengeid="12"]:not([data-challengeunavailable="true"])')) {
+        } else if ($this->isExists('li [data-challengetype="4"][data-sendauthzenprompt="true"]:not([data-challengeunavailable="true"]), li [data-challengetype="39"][data-challengeid="12"]:not([data-challengeunavailable="true"])')) {
             // We recommend method type = 4 and [data-sendauthzenprompt="true"] is  Tap YES on your smartphone or tablet
             $this->exts->click_by_xdotool('li [data-challengetype="4"][data-sendauthzenprompt="true"]:not([data-challengeunavailable="true"]), li [data-challengetype="39"]:not([data-challengeunavailable="true"])');
-        } else if ($this->exts->exists('li [data-challengetype="5"]:not([data-challengeunavailable="true"])')) {
+        } else if ($this->isExists('li [data-challengetype="5"]:not([data-challengeunavailable="true"])')) {
             // Use a smartphone or tablet to receive a security code (even when offline)
             $this->exts->click_by_xdotool('li [data-challengetype="5"]:not([data-challengeunavailable="true"])');
-        } else if ($this->exts->exists('li [data-challengetype]:not([data-challengetype="4"]):not([data-challengetype="2"]):not([data-challengeunavailable="true"])')) {
+        } else if ($this->isExists('li [data-challengetype]:not([data-challengetype="4"]):not([data-challengetype="2"]):not([data-challengeunavailable="true"])')) {
             // We DONT recommend method is QR code OR is Security USB, we can not solve this type of 2FA
             $this->exts->click_by_xdotool('li [data-challengetype]:not([data-challengetype="4"]):not([data-challengetype="2"]):not([data-challengeunavailable="true"])');
         } else {
             $this->exts->click_by_xdotool('li [data-challengetype]:not([data-challengeunavailable="true"])');
         }
         sleep(10);
-    } else if ($this->exts->exists('#smsButton, [data-illustration="accountRecoverySmsPin"]')) {
+    } else if ($this->isExists('#smsButton, [data-illustration="accountRecoverySmsPin"]')) {
         // Sometime user must confirm before google send sms
         $this->exts->click_by_xdotool('#smsButton, div:first-child > [role="button"], [data-secondary-action-label] > div > div:nth-child(1) button');
         sleep(10);
-    } else if ($this->exts->exists('#authzenNext') && $this->exts->exists('[data-view-id*="authzenView"], [data-illustration*="authzen"]')) {
+    } else if ($this->isExists('#authzenNext') && $this->isExists('[data-view-id*="authzenView"], [data-illustration*="authzen"]')) {
         $this->exts->click_by_xdotool('[data-view-id] #authzenNext');
         sleep(10);
-    } else if ($this->exts->exists('#idvpreregisteredemailNext') && !$this->exts->exists('form input:not([type="hidden"])')) {
+    } else if ($this->isExists('#idvpreregisteredemailNext') && !$this->isExists('form input:not([type="hidden"])')) {
         $this->exts->click_by_xdotool('#idvpreregisteredemailNext');
         sleep(10);
     }
 
     // STEP 2: (Optional)
-    if ($this->exts->exists('input#knowledge-preregistered-email-response, input[name="knowledgePreregisteredEmailResponse"]')) {
+    if ($this->isExists('input#knowledge-preregistered-email-response, input[name="knowledgePreregisteredEmailResponse"]')) {
         // If methos is recovery email, send 2FA to ask for email
         $this->exts->two_factor_attempts = 2;
         $input_selector = 'input#knowledge-preregistered-email-response, input[name="knowledgePreregisteredEmailResponse"]';
@@ -902,11 +832,11 @@ private function checkGoogleTwoFactorMethod()
             $this->exts->type_key_by_xdotool('Return');
             sleep(7);
         }
-        if ($this->exts->exists($input_selector)) {
+        if ($this->isExists($input_selector)) {
             $this->fillGoogleTwoFactor($input_selector, $message_selector, $submit_selector, true);
             sleep(5);
         }
-    } else if ($this->exts->exists('[data-view-id*="knowledgePreregisteredPhoneView"] input[type="tel"]')) {
+    } else if ($this->isExists('[data-view-id*="knowledgePreregisteredPhoneView"] input[type="tel"]')) {
         // If methos confirm recovery phone number, send 2FA to ask
         $this->exts->two_factor_attempts = 3;
         $input_selector = '[data-view-id*="knowledgePreregisteredPhoneView"] input[type="tel"]';
@@ -917,11 +847,11 @@ private function checkGoogleTwoFactorMethod()
             $this->exts->type_key_by_xdotool('Return');
             sleep(5);
         }
-        if ($this->exts->exists($input_selector)) {
+        if ($this->isExists($input_selector)) {
             $this->fillGoogleTwoFactor($input_selector, $message_selector, $submit_selector, true);
             sleep(5);
         }
-    } else if ($this->exts->exists('input#phoneNumberId')) {
+    } else if ($this->isExists('input#phoneNumberId')) {
         // Enter a phone number to receive an SMS with a confirmation code.
         $this->exts->two_factor_attempts = 3;
         $input_selector = 'input#phoneNumberId';
@@ -932,10 +862,10 @@ private function checkGoogleTwoFactorMethod()
             $this->exts->type_key_by_xdotool('Return');
             sleep(7);
         }
-        if ($this->exts->exists($input_selector)) {
+        if ($this->isExists($input_selector)) {
             $this->fillGoogleTwoFactor($input_selector, $message_selector, $submit_selector, true);
         }
-    } else if ($this->exts->exists('[data-view-id*="authzenView"] form, form [data-illustration*="authzen"]') || $this->exts->urlContains('/challenge/dp?')) {
+    } else if ($this->isExists('[data-view-id*="authzenView"] form, form [data-illustration*="authzen"]') || $this->exts->urlContains('/challenge/dp?')) {
         // Check your smartphone. Google has sent a notification to your smartphone. Tap Yes in the notification, then tap 91 on your smartphone to continue
         $this->exts->two_factor_attempts = 3;
         $message_selector = '[data-view-id*="authzenView"] form, [data-view-id] form[method="post"]';
@@ -943,7 +873,7 @@ private function checkGoogleTwoFactorMethod()
         $this->exts->two_factor_notif_msg_de = trim($this->exts->extract($message_selector, null, 'text')) . "\n>>>Geben Sie danach hier unten \"OK\" ein.";
         $this->fillGoogleTwoFactor(null, null, '');
         sleep(5);
-    } else if ($this->exts->exists('[data-view-id*="securityKeyWebAuthnView"], [data-view-id*="securityKeyView"]')) {
+    } else if ($this->isExists('[data-view-id*="securityKeyWebAuthnView"], [data-view-id*="securityKeyView"]')) {
         // Method: insert your security key and touch it
         $this->exts->two_factor_attempts = 3;
         $this->exts->two_factor_notif_msg_en = 'Use chrome, login then insert your security key and touch it' . "\n>>>Enter \"OK\" after confirmation on device";
@@ -954,14 +884,14 @@ private function checkGoogleTwoFactorMethod()
     }
 
     // STEP 3: (Optional)  After choose method and confirm email or phone or.., google may asked confirm one more time before send code
-    if ($this->exts->exists('#smsButton, [data-illustration="accountRecoverySmsPin"]')) {
+    if ($this->isExists('#smsButton, [data-illustration="accountRecoverySmsPin"]')) {
         // Sometime user must confirm before google send sms
         $this->exts->click_by_xdotool('#smsButton, div:first-child > [role="button"], [data-secondary-action-label] > div > div:nth-child(1) button');
         sleep(10);
-    } else if ($this->exts->exists('#authzenNext') && $this->exts->exists('[data-view-id*="authzenView"], [data-illustration*="authzen"]')) {
+    } else if ($this->isExists('#authzenNext') && $this->isExists('[data-view-id*="authzenView"], [data-illustration*="authzen"]')) {
         $this->exts->click_by_xdotool('[data-view-id] #authzenNext');
         sleep(10);
-    } else if ($this->exts->exists('#idvpreregisteredemailNext') && !$this->exts->exists('form input:not([type="hidden"])')) {
+    } else if ($this->isExists('#idvpreregisteredemailNext') && !$this->isExists('form input:not([type="hidden"])')) {
         $this->exts->click_by_xdotool('#idvpreregisteredemailNext');
         sleep(10);
     } else if (count($this->exts->querySelectorAll('li [data-challengetype]:not([data-challengeunavailable="true"]):not([data-challengetype="undefined"])')) > 0) {
@@ -971,19 +901,19 @@ private function checkGoogleTwoFactorMethod()
 
 
     // STEP 4: input code
-    if ($this->exts->exists('form input[name="idvPin"], form input[name="totpPin"], input[name="code"], input#backupCodePin, input#idvPin, input#idvPinId')) {
+    if ($this->isExists('form input[name="idvPin"], form input[name="totpPin"], input[name="code"], input#backupCodePin, input#idvPin, input#idvPinId')) {
         $input_selector = 'form input[name="idvPin"], form input[name="totpPin"], input[name="code"], input#backupCodePin, input#idvPin, input#idvPinId';
         $message_selector = 'form > span > section > div > div > div:first-child';
         $submit_selector = '#idvPreregisteredPhoneNext, #idvpreregisteredemailNext, #totpNext, #idvanyphoneverifyNext, #backupCodeNext';
         $this->exts->two_factor_attempts = 3;
         $this->fillGoogleTwoFactor($input_selector, $message_selector, $submit_selector, true);
-    } else if ($this->exts->exists('input[name="ootpPin"], input#securityKeyOtpInputId')) {
+    } else if ($this->isExists('input[name="ootpPin"], input#securityKeyOtpInputId')) {
         $input_selector = 'input[name="ootpPin"], input#securityKeyOtpInputId';
         $message_selector = 'form > span > section > div > div > div:first-child';
         $submit_selector = '';
         $this->exts->two_factor_attempts = 0;
         $this->fillGoogleTwoFactor($input_selector, $message_selector, $submit_selector, true);
-    } else if ($this->exts->exists('[data-view-id*="authzenView"] form, form [data-illustration*="authzen"]') || $this->exts->urlContains('/challenge/dp?')) {
+    } else if ($this->isExists('[data-view-id*="authzenView"] form, form [data-illustration*="authzen"]') || $this->exts->urlContains('/challenge/dp?')) {
         // Check your smartphone. Google has sent a notification to your smartphone. Tap Yes in the notification, then tap 91 on your smartphone to continue
         $this->exts->two_factor_attempts = 3;
         $message_selector = '[data-view-id*="authzenView"] form, [data-view-id] form[method="post"]';
@@ -991,7 +921,7 @@ private function checkGoogleTwoFactorMethod()
         $this->exts->two_factor_notif_msg_de = trim($this->exts->extract($message_selector, null, 'text')) . "\n>>>Geben Sie danach hier unten \"OK\" ein.";
         $this->fillGoogleTwoFactor(null, null, '');
         sleep(5);
-    } else if ($this->exts->exists('[data-view-id*="securityKeyWebAuthnView"], [data-view-id*="securityKeyView"]')) {
+    } else if ($this->isExists('[data-view-id*="securityKeyWebAuthnView"], [data-view-id*="securityKeyView"]')) {
         // Method: insert your security key and touch it
         $this->exts->two_factor_attempts = 3;
         $this->exts->two_factor_notif_msg_en = 'Use chrome, login then insert your security key and touch it' . "\n>>>Enter \"OK\" after confirmation on device";
@@ -999,7 +929,7 @@ private function checkGoogleTwoFactorMethod()
         $this->fillGoogleTwoFactor(null, null, '');
         sleep(5);
         // choose another option: #assistActionIdk
-    } else if ($this->exts->exists('input[name="secretQuestionResponse"]')) {
+    } else if ($this->isExists('input[name="secretQuestionResponse"]')) {
         $input_selector = 'input[name="secretQuestionResponse"]';
         $message_selector = 'form > span > section > div > div > div:first-child';
         $submit_selector = '[data-secondary-action-label] > div > div:nth-child(1) button';
@@ -1039,7 +969,7 @@ private function fillGoogleTwoFactor($input_selector, $message_selector, $submit
             sleep(2);
             $this->exts->capture("2.2-two-factor-filled-" . $this->exts->two_factor_attempts);
 
-            if ($this->exts->exists($submit_selector)) {
+            if ($this->isExists($submit_selector)) {
                 $this->exts->log("fillTwoFactor: Clicking submit button.");
                 $this->exts->click_by_xdotool($submit_selector);
             } else if ($submit_by_enter) {
@@ -1053,7 +983,7 @@ private function fillGoogleTwoFactor($input_selector, $message_selector, $submit
                 if ($this->exts->two_factor_attempts < 3) {
                     $this->exts->notification_uid = '';
                     $this->exts->two_factor_attempts++;
-                    if ($this->exts->exists('form input[name="idvPin"], form input[name="totpPin"], input[name="code"], input#backupCodePin')) {
+                    if ($this->isExists('form input[name="idvPin"], form input[name="totpPin"], input[name="code"], input#backupCodePin')) {
                         // if(strpos(strtoupper($this->exts->extract('div:last-child[style*="visibility: visible;"] [role="button"]')), 'CODE') !== false){
                         $this->exts->click_by_xdotool('[aria-relevant="additions"] + [style*="visibility: visible;"] [role="button"]');
                         sleep(2);
@@ -1086,21 +1016,21 @@ public $microsoft_account_type = 0;
 public $microsoft_phone_number = '';
 public $microsoft_recovery_email = '';
 /**
- * Entry Method thats called for a portal
- * @param Integer $count Number of times portal is retried.
- */
+    * Entry Method thats called for a portal
+    * @param Integer $count Number of times portal is retried.
+    */
 private function loginMicrosoftIfRequired($count = 0)
 {
     $this->microsoft_phone_number = isset($this->exts->config_array["phone_number"]) ? $this->exts->config_array["phone_number"] : '';
     $this->microsoft_recovery_email = isset($this->exts->config_array["recovery_email"]) ? $this->exts->config_array["recovery_email"] : '';
-    $this->microsoft_account_type = isset($this->exts->config_array["account_type"]) ? (int)@$this->exts->config_array["account_type"] : 0;
+    $this->microsoft_account_type = isset($this->exts->config_array["account_type"]) ? (int) @$this->exts->config_array["account_type"] : 0;
 
     if ($this->exts->urlContains('microsoft') || $this->exts->urlContains('live.')) {
         $this->checkFillMicrosoftLogin();
         sleep(10);
         $this->checkMicrosoftTwoFactorMethod();
 
-        if ($this->exts->exists('input#newPassword')) {
+        if ($this->isExists('input#newPassword')) {
             $this->exts->account_not_ready();
         } else if ($this->exts->getElement('#passwordError a[href*="ResetPassword"], #passwordError a[href*="passwordreset"]') != null) {
             $this->exts->loginFailure(1);
@@ -1115,7 +1045,7 @@ private function checkFillMicrosoftLogin()
 {
     $this->exts->log(__FUNCTION__);
     // When open login page, sometime it show previous logged user, select login with other user.
-    if ($this->exts->isVisible('[role="listbox"] .row #otherTile[role="option"], div#otherTile')) {
+    if ($this->isExists('[role="listbox"] .row #otherTile[role="option"], div#otherTile')) {
         $this->exts->moveToElementAndClick('[role="listbox"] .row #otherTile[role="option"], div#otherTile');
         sleep(10);
     }
@@ -1131,7 +1061,7 @@ private function checkFillMicrosoftLogin()
     }
 
     //Some user need to approve login after entering username on the app
-    if ($this->exts->exists('div#idDiv_RemoteNGC_PollingDescription')) {
+    if ($this->isExists('div#idDiv_RemoteNGC_PollingDescription')) {
         $this->exts->two_factor_timeout = 5;
         $polling_message_selector = '#idDiv_RemoteNGC_PollingDescription, #idRemoteNGC_DisplaySign, .confirmIdentityPageControl #iPollSessionDesc';
         $this->exts->two_factor_notif_msg_en = trim(join("\n", $this->exts->getElementsAttribute($polling_message_selector, 'innerText')));
@@ -1140,13 +1070,13 @@ private function checkFillMicrosoftLogin()
 
         $two_factor_code = trim($this->exts->fetchTwoFactorCode());
         if (!empty($two_factor_code) && trim($two_factor_code) != '') {
-            if ($this->exts->isVisible($this->remember_me_selector)) {
+            if ($this->isExists($this->remember_me_selector)) {
                 $this->exts->moveToElementAndClick($this->remember_me_selector);
             }
             $this->exts->capture("2.2-two-factor-filled-" . $this->exts->two_factor_attempts);
             $this->exts->two_factor_timeout = 15;
         } else {
-            if ($this->exts->exists('a#idA_PWD_SwitchToPassword')) {
+            if ($this->isExists('a#idA_PWD_SwitchToPassword')) {
                 $this->exts->moveToElementAndClick('a#idA_PWD_SwitchToPassword');
                 sleep(5);
             } else {
@@ -1154,12 +1084,12 @@ private function checkFillMicrosoftLogin()
             }
         }
     }
-    if ($this->exts->exists('a[data-bind*="href: svr.urlSwitch"][href*="/logout"]')) {
+    if ($this->isExists('a[data-bind*="href: svr.urlSwitch"][href*="/logout"]')) {
         // if site show: Already login with .. account, click logout and login with other account
         $this->exts->moveToElementAndClick('a[data-bind*="href: svr.urlSwitch"][href*="/logout"]');
         sleep(10);
     }
-    if ($this->exts->exists('a#mso_account_tile_link, #aadTile, #msaTile')) {
+    if ($this->isExists('a#mso_account_tile_link, #aadTile, #msaTile')) {
         // if site show: This Email is being used with multiple Microsoft accounts, Select depending on account_type variable
         //if account type is 1 then only personal account will be selected otherwise business account.
         if ($this->microsoft_account_type == 1) {
@@ -1169,7 +1099,7 @@ private function checkFillMicrosoftLogin()
         }
         sleep(10);
     }
-    if ($this->exts->exists('form #idA_PWD_SwitchToPassword')) {
+    if ($this->isExists('form #idA_PWD_SwitchToPassword')) {
         $this->exts->moveToElementAndClick('form #idA_PWD_SwitchToPassword');
         sleep(5);
     }
@@ -1214,26 +1144,26 @@ private function checkFillMicrosoftLogin()
 private function checkConfirmMicrosoftButton()
 {
     // After submit password, It have many button can be showed, check and click it
-    if ($this->exts->isVisible('form[action*="/kmsi"] input[name="DontShowAgain"], input#idSIButton9[aria-describedby="KmsiDescription"]')) {
+    if ($this->isExists('form[action*="/kmsi"] input[name="DontShowAgain"], input#idSIButton9[aria-describedby="KmsiDescription"]')) {
         // if site show: Do this to reduce the number of times you are asked to sign in. Click yes
         $this->exts->moveToElementAndClick('form input[name="DontShowAgain"] + span');
         sleep(3);
         $this->exts->moveToElementAndClick('form[action*="/kmsi"] input#idSIButton9, input#idSIButton9[aria-describedby="KmsiDescription"]');
         sleep(10);
     }
-    if ($this->exts->exists('input#btnAskLater')) {
+    if ($this->isExists('input#btnAskLater')) {
         $this->exts->moveToElementAndClick('input#btnAskLater');
         sleep(10);
     }
-    if ($this->exts->exists('a[data-bind*=SkipMfaRegistration]')) {
+    if ($this->isExists('a[data-bind*=SkipMfaRegistration]')) {
         $this->exts->moveToElementAndClick('a[data-bind*=SkipMfaRegistration]');
         sleep(10);
     }
-    if ($this->exts->exists('input#idSIButton9[aria-describedby="KmsiDescription"]')) {
+    if ($this->isExists('input#idSIButton9[aria-describedby="KmsiDescription"]')) {
         $this->exts->moveToElementAndClick('input#idSIButton9[aria-describedby="KmsiDescription"]');
         sleep(10);
     }
-    if ($this->exts->isVisible('input#idSIButton9[aria-describedby*="landingDescription"]')) {
+    if ($this->isExists('input#idSIButton9[aria-describedby*="landingDescription"]')) {
         $this->exts->moveToElementAndClick('input#idSIButton9[aria-describedby*="landingDescription"]');
         sleep(3);
     }
@@ -1249,7 +1179,7 @@ private function checkConfirmMicrosoftButton()
         $this->exts->moveToElementAndClick("input#iLooksGood");
         sleep(10);
     }
-    if ($this->exts->exists("input#StartAction") && !$this->exts->urlContains('/Abuse?')) {
+    if ($this->isExists("input#StartAction") && !$this->exts->urlContains('/Abuse?')) {
         $this->exts->moveToElementAndClick("input#StartAction");
         sleep(10);
     }
@@ -1261,7 +1191,7 @@ private function checkConfirmMicrosoftButton()
         $this->exts->moveToElementAndClick("input#idSubmit_ProofUp_Redirect");
         sleep(10);
     }
-    if ($this->exts->urlContains('mysignins.microsoft.com/register') && $this->exts->exists('#id__11')) {
+    if ($this->exts->urlContains('mysignins.microsoft.com/register') && $this->isExists('#id__11')) {
         // Great job! Your security information has been successfully set up. Click "Done" to continue login.
         $this->exts->moveToElementAndClick(' #id__11');
         sleep(10);
@@ -1282,17 +1212,17 @@ private function checkConfirmMicrosoftButton()
         $this->exts->moveToElementAndClick('a#CancelLinkButton');
         sleep(10);
     }
-    if ($this->exts->urlContains('mysignins.microsoft.com/register') && $this->exts->exists('#id__7')) {
+    if ($this->exts->urlContains('mysignins.microsoft.com/register') && $this->isExists('#id__7')) {
         // Confirm your info.
         $this->exts->moveToElementAndClick(' #id__7');
         sleep(10);
     }
-    if ($this->exts->urlContains('mysignins.microsoft.com/register') && $this->exts->exists('#id__11')) {
+    if ($this->exts->urlContains('mysignins.microsoft.com/register') && $this->isExists('#id__11')) {
         // Great job! Your security information has been successfully set up. Click "Done" to continue login.
         $this->exts->moveToElementAndClick(' #id__11');
         sleep(10);
     }
-    if ($this->exts->isVisible('form[action*="/kmsi"] input[name="DontShowAgain"]')) {
+    if ($this->isExists('form[action*="/kmsi"] input[name="DontShowAgain"]')) {
         // if site show: Do this to reduce the number of times you are asked to sign in. Click yes
         $this->exts->moveToElementAndClick('form[action*="/kmsi"] input[name="DontShowAgain"] + span');
         sleep(3);
@@ -1312,23 +1242,23 @@ private function checkMicrosoftTwoFactorMethod()
     sleep(5);
     $this->exts->capture("2.0-microsoft-two-factor-checking");
     // STEP 1: Check if list of two factor methods showed, select first
-    if ($this->exts->exists('#idDiv_SAOTCS_Proofs_Section #idDiv_SAOTCS_Proofs [role="option"]')) {
+    if ($this->isExists('#idDiv_SAOTCS_Proofs_Section #idDiv_SAOTCS_Proofs [role="option"]')) {
         $this->exts->moveToElementAndClick('#idDiv_SAOTCS_Proofs_Section #idDiv_SAOTCS_Proofs [role="option"]');
         sleep(10);
-    } else if ($this->exts->exists('#iProofList input[name="proof"]')) {
+    } else if ($this->isExists('#iProofList input[name="proof"]')) {
         $this->exts->moveToElementAndClick('#iProofList input[name="proof"]');
         sleep(10);
-    } else if ($this->exts->exists('#idDiv_SAOTCS_Proofs [role="listitem"]')) {
+    } else if ($this->isExists('#idDiv_SAOTCS_Proofs [role="listitem"]')) {
         // Updated 11-2020
-        if ($this->exts->exists('#idDiv_SAOTCS_Proofs [role="listitem"] [data-value="OneWaySMS"]')) { // phone SMS
+        if ($this->isExists('#idDiv_SAOTCS_Proofs [role="listitem"] [data-value="OneWaySMS"]')) { // phone SMS
             $this->exts->moveToElementAndClick('#idDiv_SAOTCS_Proofs [role="listitem"] [data-value="OneWaySMS"]');
-        } else if ($this->exts->exists('#idDiv_SAOTCS_Proofs [role="listitem"] [data-value^="3:"]')) { // phone SMS
+        } else if ($this->isExists('#idDiv_SAOTCS_Proofs [role="listitem"] [data-value^="3:"]')) { // phone SMS
             $this->exts->moveToElementAndClick('#idDiv_SAOTCS_Proofs [role="listitem"] [data-value^="3:"]');
-        } else if ($this->exts->exists('#idDiv_SAOTCS_Proofs [role="listitem"] [data-value^="1:"]')) { // Email 
+        } else if ($this->isExists('#idDiv_SAOTCS_Proofs [role="listitem"] [data-value^="1:"]')) { // Email 
             $this->exts->moveToElementAndClick('#idDiv_SAOTCS_Proofs [role="listitem"] [data-value^="1:"]');
-        } else if ($this->exts->exists('#idDiv_SAOTCS_Proofs [role="listitem"] [data-value="PhoneAppOTP"]')) {
+        } else if ($this->isExists('#idDiv_SAOTCS_Proofs [role="listitem"] [data-value="PhoneAppOTP"]')) {
             $this->exts->moveToElementAndClick('#idDiv_SAOTCS_Proofs [role="listitem"] [data-value="PhoneAppOTP"]');
-        } else if ($this->exts->exists('#idDiv_SAOTCS_Proofs [role="listitem"] [data-value="PhoneAppNotification"]')) {
+        } else if ($this->isExists('#idDiv_SAOTCS_Proofs [role="listitem"] [data-value="PhoneAppNotification"]')) {
             $this->exts->moveToElementAndClick('#idDiv_SAOTCS_Proofs [role="listitem"] [data-value="PhoneAppNotification"]');
         } else {
             $this->exts->moveToElementAndClick('#idDiv_SAOTCS_Proofs [role="listitem"]');
@@ -1337,7 +1267,7 @@ private function checkMicrosoftTwoFactorMethod()
     }
 
     // STEP 2: (Optional)
-    if ($this->exts->exists('#idDiv_RemoteNGC_PollingDescription, #idRemoteNGC_DisplaySign, .confirmIdentityPageControl #iPollSessionDesc')) {
+    if ($this->isExists('#idDiv_RemoteNGC_PollingDescription, #idRemoteNGC_DisplaySign, .confirmIdentityPageControl #iPollSessionDesc')) {
         // If method is click some number on Microsoft Authenticator app, send 2FA to ask user to do click it
         $message_selector = '#idDiv_RemoteNGC_PollingDescription, #idRemoteNGC_DisplaySign, .confirmIdentityPageControl #iPollSessionDesc';
         $this->exts->two_factor_notif_msg_en = trim(join("\n", $this->exts->getElementsAttribute($message_selector, 'innerText')));
@@ -1346,7 +1276,7 @@ private function checkMicrosoftTwoFactorMethod()
 
         $this->exts->two_factor_attempts = 2;
         $this->fillMicrosoftTwoFactor('', '', '', '');
-    } else if ($this->exts->exists('[data-bind*="Type.TOTPAuthenticatorV2"]')) {
+    } else if ($this->isExists('[data-bind*="Type.TOTPAuthenticatorV2"]')) {
         // If method is Microsoft Authenticator app: send 2FA to ask user approve on Microsoft app.
         // Then wait. If not success, click to select two factor by code from mobile app
         $input_selector = '';
@@ -1361,11 +1291,11 @@ private function checkMicrosoftTwoFactorMethod()
         $this->fillMicrosoftTwoFactor('', '', $remember_selector, $submit_selector);
         // sleep(30);
 
-        if ($this->exts->exists('a#idA_SAASTO_TOTP')) {
+        if ($this->isExists('a#idA_SAASTO_TOTP')) {
             $this->exts->moveToElementAndClick('a#idA_SAASTO_TOTP');
             sleep(5);
         }
-    } else if ($this->exts->exists('input[value="TwoWayVoiceOffice"]') && $this->exts->exists('div#idDiv_SAOTCC_Description')) {
+    } else if ($this->isExists('input[value="TwoWayVoiceOffice"]') && $this->isExists('div#idDiv_SAOTCC_Description')) {
         // If method is Microsoft Authenticator app: send 2FA to ask user approve on Microsoft app.
         // Then wait. If not success, click to select two factor by code from mobile app
         $input_selector = '';
@@ -1376,7 +1306,7 @@ private function checkMicrosoftTwoFactorMethod()
         $this->exts->two_factor_attempts = 2;
         $this->exts->two_factor_timeout = 5;
         $this->fillMicrosoftTwoFactor('', '', '', '');
-    } else if ($this->exts->exists('input[name="ProofConfirmation"]:not([type="hidden"]), .confirmIdentityPageControl [id^="iProof"][style*="display: block"] >  input[type="email"][name^="iProof"], .confirmIdentityPageControl [id^="iProof"][style*="display: table"] >  input[name^="iProof"][type="email"]:not([type="hidden"])')) {
+    } else if ($this->isExists('input[name="ProofConfirmation"]:not([type="hidden"]), .confirmIdentityPageControl [id^="iProof"][style*="display: block"] >  input[type="email"][name^="iProof"], .confirmIdentityPageControl [id^="iProof"][style*="display: table"] >  input[name^="iProof"][type="email"]:not([type="hidden"])')) {
         // If method is email code or phone code, This site may be ask for confirm phone/email first, So send 2FA to ask user phone/email
         $input_selector = 'input[name="ProofConfirmation"]:not([type="hidden"]), .confirmIdentityPageControl [id^="iProof"][style*="display: block"] >  input[type="email"][name^="iProof"], .confirmIdentityPageControl [id^="iProof"][style*="display: table"] >  input[name^="iProof"][type="email"]:not([type="hidden"])';
         $message_selector = '#idDiv_SAOTCS_ProofConfirmationDesc, #iAdditionalProofInfo #iEnterProofDesc, #iAdditionalProofInfo #iEnterProofDesc ~ * #iConfirmProofEmailDomain';
@@ -1392,15 +1322,15 @@ private function checkMicrosoftTwoFactorMethod()
             $this->exts->two_factor_attempts = 1;
             $this->fillMicrosoftTwoFactor($input_selector, $message_selector, $remember_selector, $submit_selector);
         }
-    } else if ($this->exts->exists('input[name="ProofConfirmation"]:not([type="hidden"]), .confirmIdentityPageControl [id^="iProof"][style*="display: block"] >  input[type="tel"][name^="iProof"], .confirmIdentityPageControl [id^="iProof"][style*="display: table"] >  input[name^="iProof"][type="tel"]:not([type="hidden"]), #iProofPhoneEntry:not([aria-hidden="true"]) input[name^="iProof"][type="tel"]:not([type="hidden"])')) {
+    } else if ($this->isExists('input[name="ProofConfirmation"]:not([type="hidden"]), .confirmIdentityPageControl [id^="iProof"][style*="display: block"] >  input[type="tel"][name^="iProof"], .confirmIdentityPageControl [id^="iProof"][style*="display: table"] >  input[name^="iProof"][type="tel"]:not([type="hidden"]), #iProofPhoneEntry:not([aria-hidden="true"]) input[name^="iProof"][type="tel"]:not([type="hidden"])')) {
         // If method is phone code, This site may be ask for confirm phone first, So send 2FA to ask user phone
         $input_selector = 'input[name="ProofConfirmation"]:not([type="hidden"]), .confirmIdentityPageControl [id^="iProof"][style*="display: block"] >  input[type="tel"][name^="iProof"], .confirmIdentityPageControl [id^="iProof"][style*="display: table"] >  input[name^="iProof"][type="tel"]:not([type="hidden"]), #iProofPhoneEntry:not([aria-hidden="true"]) input[name^="iProof"][type="tel"]:not([type="hidden"])';
         $message_selector = '#idDiv_SAOTCS_ProofConfirmationDesc, #iAdditionalProofInfo #iEnterProofDesc, #iAdditionalProofInfo #iEnterProofDesc ~ * #iConfirmProofEmailDomain';
         $remember_selector = '';
         $submit_selector = 'input#idSubmit_SAOTCS_SendCode, input#iSelectProofAction[type="submit"], input[type="submit"]';
         $this->exts->two_factor_attempts = 1;
-        if ($this->phone_number != '' && is_numeric(trim(substr($this->phone_number,   - 1,  4)))) {
-            $last4digit = substr($this->phone_number,   - 1,  4);
+        if ($this->phone_number != '' && is_numeric(trim(substr($this->phone_number, -1, 4)))) {
+            $last4digit = substr($this->phone_number, -1, 4);
             $this->exts->moveToElementAndType($input_selector, $last4digit);
             sleep(3);
             $this->exts->moveToElementAndClick($submit_selector);
@@ -1412,7 +1342,7 @@ private function checkMicrosoftTwoFactorMethod()
     }
 
     // STEP 3: input code
-    if ($this->exts->exists('input[name="otc"], input[name="iOttText"]')) {
+    if ($this->isExists('input[name="otc"], input[name="iOttText"]')) {
         $input_selector = 'input[name="otc"], input[name="iOttText"]';
         $message_selector = 'div#idDiv_SAOTCC_Description, .OTTLabel, #idDiv_SAOTCC_Description, span#otcDesc';
         $remember_selector = 'label#idLbl_SAOTCC_TD_Cb';
@@ -1439,14 +1369,14 @@ private function fillMicrosoftTwoFactor($input_selector, $message_selector, $rem
     if (!empty($two_factor_code) && trim($two_factor_code) != '') {
         if ($this->exts->getElement($input_selector) != null) {
             $this->exts->log("microsoftfillTwoFactor: Entering two_factor_code." . $two_factor_code);
-            $this->exts->getElement($input_selector)->sendKeys($two_factor_code);
+            $this->exts->moveToElementAndType($input_selector, $two_factor_code);
             sleep(2);
-            if ($this->exts->exists($remember_selector)) {
+            if ($this->isExists($remember_selector)) {
                 $this->exts->moveToElementAndClick($remember_selector);
             }
             $this->exts->capture("2.2-microsoft-two-factor-filled-" . $this->exts->two_factor_attempts);
 
-            if ($this->exts->exists($submit_selector)) {
+            if ($this->isExists($submit_selector)) {
                 $this->exts->log("microsoftfillTwoFactor: Clicking submit button.");
                 $this->exts->moveToElementAndClick($submit_selector);
             }
@@ -1468,3 +1398,34 @@ private function fillMicrosoftTwoFactor($input_selector, $message_selector, $rem
     }
 }
 //*********** END Microsoft Login
+
+// Custom Exists function to check element found or not
+private function isExists($selector = '')
+{
+    $safeSelector = addslashes($selector);
+    $this->exts->log('Element:: ' . $safeSelector);
+    $isElement = $this->exts->execute_javascript('!!document.querySelector("' . $safeSelector . '")');
+    if ($isElement) {
+        $this->exts->log('Element Found');
+        return true;
+    } else {
+        $this->exts->log('Element not Found');
+        return false;
+    }
+}
+
+private function checkLogin()
+{
+    $this->exts->log("Begin checkLogin ");
+    $isLoggedIn = false;
+    try {
+        $this->waitForSelectors("div[data-testid='ProfileButton'], input[name='email']", 10, 5);
+        if ($this->exts->getElement($this->login_confirm_selector) != null && !$this->isExists($this->username_selector)) {
+            $this->exts->log(">>>>>>>>>>>>>>>Login successful!!!!");
+            $isLoggedIn = true;
+        }
+    } catch (\Exception $exception) {
+        $this->exts->log("Exception checking loggedin " . $exception);
+    }
+    return $isLoggedIn;
+}
