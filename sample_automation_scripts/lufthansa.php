@@ -118,27 +118,6 @@ class PortalScriptCDP
             $this->exts->log('Not Logged in : : ');
             $this->exts->clearCookies();
 
-            $this->exts->openUrl($this->baseUrl);
-
-            $this->waitForSelectors("maui-link-button[variant='close']", 10, 2);
-
-            if ($this->isExists('maui-link-button[variant="close"]')) {
-                $this->exts->click_by_xdotool('maui-link-button[variant="close"]');
-                sleep(5);
-            }
-
-            if ($this->isExists('button#cm-acceptAll')) {
-                $this->exts->click_by_xdotool('button#cm-acceptAll');
-                sleep(5);
-            }
-            if ($this->isExists('.consent-manager-inner button#cm-selectSpecific')) {
-                $this->exts->click_by_xdotool('.consent-manager-inner button#cm-selectSpecific');
-                sleep(5);
-            }
-            if ($this->isExists('button[data-identifier-track="login-flag-modal_click_login-flag-modal-close"]')) {
-                $this->exts->click_by_xdotool('button[data-identifier-track="login-flag-modal_click_login-flag-modal-close"]');
-                sleep(5);
-            }
             if ($this->isExists('div.one-id-login a')) {
                 $this->exts->click_by_xdotool('div.one-id-login a');
             }
@@ -169,7 +148,7 @@ class PortalScriptCDP
             }
         } else {
             $this->exts->log($this->exts->getUrl());
-            if ($this->exts->getElementByText($this->login_failed_selector, ['password', 'Passwort', 'passwort', 'card number', 'email address'], null, false) != null) {
+            if ($this->exts->getElementByText($this->login_failed_selector, ['password', 'Passwort', 'passwort', 'card number', 'email address', 'error has occurred'], null, false) != null) {
                 $this->exts->loginFailure(1);
             } else {
                 $this->exts->loginFailure();
@@ -206,7 +185,7 @@ class PortalScriptCDP
             $this->exts->type_key_by_xdotool("ctrl+l");
             $this->exts->type_key_by_xdotool("Return");
             sleep(15);
-            if ($this->isExists($this->username_selector)) {
+            if ($this->exts->exists($this->username_selector)) {
                 sleep(2);
 
                 $this->exts->log("Enter Username");
@@ -216,7 +195,7 @@ class PortalScriptCDP
                 $this->exts->type_text_by_xdotool($this->username);
                 sleep(2);
 
-                if ($this->isExists($this->continue_btn)) {
+                if ($this->exts->exists($this->continue_btn)) {
                     $this->exts->click_by_xdotool($this->continue_btn);
                     sleep(7);
                 }
@@ -228,22 +207,10 @@ class PortalScriptCDP
                 $this->exts->type_text_by_xdotool($this->password);
                 sleep(2);
 
-                if ($this->isExists($this->continue_btn)) {
+                if ($this->exts->exists($this->continue_btn)) {
                     $this->exts->click_by_xdotool($this->submit_btn);
                 }
                 sleep(10);
-
-                $error_text = strtolower($this->exts->extract('p.travelid-form__errorBoxContentItemText'));
-                if (
-                    stripos($error_text, 'A technical error has occurred.') !== false
-                ) {
-                    $this->exts->moveToElementAndType($this->password_selector, $this->password);
-                    sleep(2);
-
-                    if ($this->isExists($this->continue_btn)) {
-                        $this->exts->click_by_xdotool($this->submit_btn);
-                    }
-                }
             } else {
                 $this->exts->log(__FUNCTION__ . '::Login page not found');
                 $this->exts->capture("2-login-page-not-found");
