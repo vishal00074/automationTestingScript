@@ -60,10 +60,10 @@ class PortalScriptCDP
 	// Server-Portal-ID: 52779 - Last modified: 30.01.2025 13:52:53 UTC - User: 1
 
 	public $baseUrl = 'https://www.flaschenpost.de/';
-	public $loginUrl = 'https://www.flaschenpost.de/account/login/';
+	public $loginUrl = 'https://www.flaschenpost.de/login';
 
-	public $username_selector = 'ion-input input[type="email"],input#emailLogin';
-	public $password_selector = 'ion-input input[type="password"],input#passwordLogin';
+	public $username_selector = 'ion-input input[autocomplete="email"],input#emailLogin';
+	public $password_selector = 'input[name="password"]';
 	public $submit_login_selector = '.main_content_wrapper button[type="button"],form[data-validate="login"] button[type="submit"], button>ion-ripple-effect';
 
 	public $check_login_failed_selector = 'div[class*="secondary-red"],div.alert-danger';
@@ -102,7 +102,8 @@ class PortalScriptCDP
 			$this->exts->log('NOT logged via cookie');
 			$this->exts->openUrl($this->loginUrl);
 			sleep(10);
-			$this->check_solve_blocked_page();
+			// $this->check_solve_blocked_page();
+			$this->check_solve_cloudflare_login();
 
 			if ($this->exts->exists('div.main_consent_modal button.fp_button_primary')) {
 				$this->exts->moveToElementAndClick('div.main_consent_modal button.fp_button_primary');
@@ -113,32 +114,25 @@ class PortalScriptCDP
 				sleep(1);
 			}
 			$this->enteZipCode();
-			sleep(3);
-			$this->check_solve_blocked_page();
+			sleep(7);
+			$this->check_solve_cloudflare_login();
 			sleep(8);
 			for ($i = 0; $i < 8; $i++) {
-				// Extract the error message from the page
-				$this->exts->capture('site-notworking-page' . $i);
+				$this->exts->capture('site-notworking-page-' . $i);
 				$err_msg1 = $this->exts->extract('div#main-frame-error h1 span');
-				$lowercase_err_msg = strtolower($err_msg1);
-				// Define the substring to search for
-				$substring = "this page isn't working";
+				if ($this->exts->exists('div#main-frame-error h1 span')) {
 
-				// Check if the error message contains the specified substring
-				if (strpos($lowercase_err_msg, $substring) !== false || stripos($lowercase_err_msg, 'Diese Seite funktioniert nicht') !== false) {
-					// Retry opening the URL
 					$this->exts->openUrl($this->loginUrl);
-					sleep(30); // Wait for the page to load
-					$this->check_solve_blocked_page();
-					sleep(10);
+					sleep(20);
+					$this->check_solve_cloudflare_login();
 				} else {
-					// If the substring is not found, break the loop
 					break;
 				}
 			}
 
-			$this->checkFillLogin();
-			sleep(15);
+			$this->checkFillLogin(1);
+			sleep(10);
+			$this->check_solve_cloudflare_login();
 			if (
 				strpos(strtolower($this->exts->extract($this->check_login_failed_selector)), 'eingaben noch einmal') !== false ||
 				strpos(strtolower($this->exts->extract($this->check_login_failed_selector)), 'und versuche es nochmal') !== false
@@ -147,66 +141,77 @@ class PortalScriptCDP
 			}
 			$this->exts->capture('2-after-login-submitted');
 			if ($this->exts->getElement($this->username_selector) != null) {
-				$this->checkFillLogin();
+				$this->checkFillLogin(2);
 				sleep(15);
 			}
-			$this->check_solve_blocked_page();
+			$this->check_solve_cloudflare_login();
 			if ($this->exts->getElement($this->username_selector) != null) {
-				$this->checkFillLogin();
+				$this->checkFillLogin(3);
 				sleep(15);
 			}
-			sleep(10);
-		}
-		//click solve to login check
-		if (
-			strpos(strtolower($this->exts->extract($this->check_login_failed_selector)), 'eingaben noch einmal') !== false ||
-			strpos(strtolower($this->exts->extract($this->check_login_failed_selector)), 'und versuche es nochmal') !== false
-		) {
-			$this->exts->loginFailure(1);
-		}
-		if ($this->exts->exists('a[href*="account_overview"]')) {
-			$this->exts->capture("after-login-submit");
-			$this->exts->moveToElementAndClick('a[href*="account_overview"]');
-			sleep(15);
-		}
 
-		// then check user logged in or not
-		if ($this->exts->getElement($this->check_login_success_selector) != null) {
-			sleep(3);
-			$this->exts->log(__FUNCTION__ . '::User logged in');
-			$this->exts->capture("3-login-success");
-			// Final, check no invoice
-
-			if ($this->exts->exists('div[data-testid*="Liefer"]')) {
-				$this->exts->moveToElementAndClick('div[data-testid*="Liefer"]');
-			}
-			sleep(10);
-
-			$this->downloadInvoice();
-
-			if ($this->isNoInvoice) {
-				$this->exts->no_invoice();
-			}
-			$this->exts->success();
-		} else {
-			$this->exts->log(__FUNCTION__ . '::Use login failed');
+			//click solve to login check
 			if (
 				strpos(strtolower($this->exts->extract($this->check_login_failed_selector)), 'eingaben noch einmal') !== false ||
 				strpos(strtolower($this->exts->extract($this->check_login_failed_selector)), 'und versuche es nochmal') !== false
 			) {
 				$this->exts->loginFailure(1);
-			} else if ($this->zipCode == null || $this->zipCode == '') {
-				$this->exts->log('zip_code is empty');
-				$this->exts->loginFailure(1);
+			}
+			if ($this->exts->exists('a[href*="account_overview"]')) {
+				$this->exts->capture("after-login-submit");
+				$this->exts->moveToElementAndClick('a[href*="account_overview"]');
+				sleep(15);
+			}
+
+			// then check user logged in or not
+			if ($this->exts->getElement($this->check_login_success_selector) != null) {
+				sleep(3);
+				$this->exts->log(__FUNCTION__ . '::User logged in');
+				$this->exts->capture("3-login-success");
+				// Final, check no invoice
+
+				if ($this->exts->exists('div[data-testid*="Liefer"]')) {
+					$this->exts->moveToElementAndClick('div[data-testid*="Liefer"]');
+				}
+				sleep(10);
+
+				$this->downloadInvoice();
+
+				if ($this->isNoInvoice) {
+					$this->exts->no_invoice();
+				}
+				$this->exts->success();
 			} else {
-				$this->exts->loginFailure();
+				$this->exts->log(__FUNCTION__ . '::Use login failed');
+				if (
+					strpos(strtolower($this->exts->extract($this->check_login_failed_selector)), 'eingaben noch einmal') !== false ||
+					strpos(strtolower($this->exts->extract($this->check_login_failed_selector)), 'und versuche es nochmal') !== false
+				) {
+					$this->exts->loginFailure(1);
+				} else if ($this->zipCode == null || $this->zipCode == '') {
+					$this->exts->log('zip_code is empty');
+					$this->exts->loginFailure(1);
+				} else {
+					$this->exts->loginFailure();
+				}
 			}
 		}
 	}
 
-	private function checkFillLogin()
+	public function waitFor($selector, $seconds = 10)
 	{
-		if ($this->exts->getElement($this->password_selector) != null) {
+		for ($wait = 0; $wait < 2 && $this->exts->executeSafeScript("return !!document.querySelector('" . $selector . "');") != 1; $wait++) {
+			$this->exts->log('Waiting for Selectors.....');
+			sleep($seconds);
+		}
+	}
+
+	private function checkFillLogin($count = 0)
+	{
+		$this->exts->log("Fill Form " . $count);
+		$this->waitFor($this->username_selector);
+
+		if ($this->exts->getElement($this->username_selector) != null) {
 			$this->exts->capture("2-login-page");
 
 			$this->exts->log("Enter Username");
@@ -219,6 +224,14 @@ class PortalScriptCDP
 
 			$this->exts->capture("2-login-page-filled");
 			$this->exts->moveToElementAndClick($this->submit_login_selector);
+			sleep(7);
+
+			$isLoginError = $this->exts->extract('div#password-error');
+			$this->exts->log("isLoginError:: " . $isLoginError);
+
+			if (strpos(strtolower($isLoginError), strtolower('Passwort sind nicht korrekt')) !== false) {
+				$this->exts->loginFailure(1);
+			}
 
 			if ($this->exts->getElement($this->password_selector)) {
 				sleep(4);
@@ -252,6 +265,44 @@ class PortalScriptCDP
 				}
 			} else {
 				break;
+			}
+		}
+	}
+
+	private function check_solve_cloudflare_login($refresh_page = false)
+	{
+		$unsolved_cloudflare_input_xpath = '//input[starts-with(@name, "cf") and contains(@name, "response") and string-length(@value) <= 0]';
+		$solved_cloudflare_input_xpath = '//input[starts-with(@name, "cf") and contains(@name, "response") and string-length(@value) > 0]';
+		$this->exts->capture("cloudflare-checking");
+		if (
+			!$this->exts->oneExists([$solved_cloudflare_input_xpath, $unsolved_cloudflare_input_xpath]) &&
+			$this->exts->exists('#cf-please-wait > p:not([style*="display: none"]):not([style*="display:none"])')
+		) {
+			for ($waiting = 0; $waiting < 10; $waiting++) {
+				sleep(2);
+				if ($this->exts->oneExists([$solved_cloudflare_input_xpath, $unsolved_cloudflare_input_xpath])) {
+					sleep(3);
+					break;
+				}
+			}
+		}
+
+		if ($this->exts->exists($unsolved_cloudflare_input_xpath)) {
+			$this->exts->click_by_xdotool('div:has(>input[name^="cf"][name$="response"])', 30, 28);
+			sleep(5);
+			$this->exts->capture("cloudflare-clicked-1", true);
+			sleep(3);
+			if ($this->exts->exists($unsolved_cloudflare_input_xpath)) {
+				$this->exts->click_by_xdotool('div:has(>input[name^="cf"][name$="response"])', 30, 28);
+				sleep(5);
+				$this->exts->capture("cloudflare-clicked-2", true);
+				sleep(15);
+			}
+			if ($this->exts->exists($unsolved_cloudflare_input_xpath)) {
+				$this->exts->click_by_xdotool('div:has(>input[name^="cf"][name$="response"])', 30, 28);
+				sleep(5);
+				$this->exts->capture("cloudflare-clicked-3", true);
+				sleep(15);
 			}
 		}
 	}

@@ -53,7 +53,6 @@ private function initPortal($count)
         $this->exts->capture("LoginSuccess");
 
         if (!empty($this->exts->config_array['allow_login_success_request'])) {
- 
             $this->exts->triggerLoginSuccess();
         }
 
