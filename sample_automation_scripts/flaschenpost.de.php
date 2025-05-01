@@ -409,7 +409,7 @@ class PortalScriptCDP
 							}
 
 							// Handle file download
-							$invoiceFileName = $orderNumber . '.pdf';
+							$invoiceFileName = !empty($orderNumber) ? $orderNumber . '.pdf': '';
 							$downloaded_file = $this->exts->download_current($invoiceFileName, 3);
 							if (trim($downloaded_file) != '' && file_exists($downloaded_file)) {
 								$this->exts->new_invoice($orderNumber, "", "", $invoiceFileName);
