@@ -103,7 +103,7 @@ class PortalScriptCDP
 
 
         // If user hase not logged in from cookie, clear cookie, open the login url and do login
-        if ($this->exts->getElement($this->check_login_success_selector) == null) {
+        if (!$this->checkLogin()) {
             $this->exts->log('NOT logged via cookie');
             // $this->exts->clearCookies();
             if ($this->login_with_google == 1) {
@@ -266,6 +266,7 @@ class PortalScriptCDP
 
     private function checkAndSolveFunCaptcha($count = 0)
     {
+        $this->exts->log(__FUNCTION__);
         $this->exts->log("Begin solving fun captcha" . $count);
         $input = "input[name='fc-token']";
         $formInput = 'input[name="captchaUserResponseToken"]';
@@ -1488,6 +1489,7 @@ class PortalScriptCDP
     // -------------------- GOOGLE login END
     private function checkLogin()
     {
+        $this->waitFor($this->check_login_success_selector, 7);
         $this->exts->capture('check-login');
         return $this->exts->exists($this->check_login_success_selector);
     }
