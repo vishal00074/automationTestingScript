@@ -132,6 +132,13 @@ class PortalScriptCDP
                 }
                 $this->checkFillLogin();
                 sleep(10);
+
+                if ($this->exts->exists($this->username_selector)) {
+                    $this->checkFillLogin();
+                    sleep(10);
+                }
+
+
                 $this->checkTwoFactorAuth(1);
 
                 // Some time this site showed a form to confirm email and phone number, just simple click DONE
@@ -294,19 +301,24 @@ class PortalScriptCDP
             $this->exts->switchToDefault();
             sleep(1);
         }
-        if ($this->exts->exists('iframe.iframe--authentication')) {
-            $this->switchToFrame('iframe.iframe--authentication');
-        }
-        if ($this->exts->exists('iframe#captcha-internal')) {
+        
+        if ($this->exts->querySelector('iframe#captcha-internal') != null) {
             $this->switchToFrame('iframe#captcha-internal');
             sleep(3);
-            if ($this->exts->exists('iframe#arkoseframe')) {
+            if ($this->exts->querySelector('iframe#arkoseframe') != null) {
                 $this->switchToFrame('iframe#arkoseframe');
+                sleep(2);
             }
-            if ($this->exts->exists('iframe[data-e2e="enforcement-frame"]')) {
+            if ($this->exts->querySelector('iframe[data-e2e="enforcement-frame"]') != null) {
                 $this->switchToFrame('iframe[data-e2e="enforcement-frame"]');
                 sleep(1);
             }
+
+            if ($this->exts->querySelector('iframe[id="game-core-frame"]') != null) {
+                $this->switchToFrame('iframe[id="game-core-frame"]');
+                sleep(1);
+            }
+
             sleep(3);
             if ($this->exts->exists($input)) {
                 $value = $this->exts->getElement($input)->getAttribute("value");
