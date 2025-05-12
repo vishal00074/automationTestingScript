@@ -1,4 +1,4 @@
-<?php
+<?php // updated two factor code handle empty invoice name  updated login code skip after submitting loigin form
 
 /**
  * Chrome Remote via Chrome devtool protocol script, for specific process/portal
@@ -104,6 +104,7 @@ class PortalScriptCDP
                 $this->fillForm(0);
                 sleep(10);
             }
+
             $this->checkFillRecaptcha(1);
             sleep(10);
             // $this->solve_captcha_by_clicking(1);
@@ -116,8 +117,8 @@ class PortalScriptCDP
                     $is_captcha = $this->solve_captcha_by_clicking($i);
                 }
             }
-            sleep(10);
-            $this->exts->waitTillPresent('div[data-nemo="twofactorPage"] button');
+            sleep(5);
+            $this->exts->waitTillPresent('div[data-nemo="twofactorPage"] button', 10);
             if ($this->exts->exists('div[data-nemo="twofactorPage"] button')) {
                 $this->exts->click_by_xdotool('div[data-nemo="twofactorPage"] button');
             }
@@ -230,6 +231,14 @@ class PortalScriptCDP
                     sleep(10);
                 }
 
+
+                if ($this->exts->urlContains('email-confirmation')) {
+                    $this->exts->type_key_by_xdotool('Return');
+                    sleep(5);
+                    $this->exts->moveToElementAndClick('a[class="skip-button"]');
+                    sleep(10);
+                }
+
                 $error_text = strtolower($this->exts->extract('p#inputError'));
                 $this->exts->log("Error text:: " . $error_text);
                 if (
@@ -291,12 +300,12 @@ class PortalScriptCDP
         // $unsolved_hcaptcha_submit_selector = 'div[id="hcaptcha-d"] iframe, iframe[title="reCAPTCHA"]';
         // $hcaptcha_challenger_wraper_selector = 'div[style*="visible"] iframe[src*="hcaptcha"][title*="hallenge"], div[style*="visibility: visible;"] > div > iframe[title*="in zwei Minuten ab"]';
 
-        $this->exts->waitTillPresent('iframe[name="recaptcha"]', 40);
+        $this->exts->waitTillPresent('iframe[name="recaptcha"]', 20);
         if ($this->exts->exists('iframe[name="recaptcha"]')) {
             $this->switchToFrame('iframe[name="recaptcha"]');
             sleep(5);
         }
-        $this->exts->waitTillAnyPresent(['div[id="hcaptcha-d"] iframe', 'iframe[title="reCAPTCHA"]'], 30);
+        $this->exts->waitTillAnyPresent(['div[id="hcaptcha-d"] iframe', 'iframe[title="reCAPTCHA"]'], 15);
 
 
         // $this->exts->waitTillAnyPresent([$unsolved_hcaptcha_submit_selector, $hcaptcha_challenger_wraper_selector], 20);
@@ -431,7 +440,7 @@ class PortalScriptCDP
         $this->exts->log(__FUNCTION__);
         $recaptcha_iframe_selector = 'iframe[src*="/recaptcha/enterprise"], iframe[src*="/recaptcha/api2/anchor?"]';
         $recaptcha_textarea_selector = 'textarea[name="g-recaptcha-response"]';
-        $this->exts->waitTillPresent($recaptcha_iframe_selector, 20);
+        $this->exts->waitTillPresent($recaptcha_iframe_selector);
         sleep(5);
         if ($this->exts->exists($recaptcha_iframe_selector)) {
             $iframeUrl = $this->exts->extract($recaptcha_iframe_selector, null, 'src');
@@ -518,9 +527,9 @@ class PortalScriptCDP
 
     private function checkFillTwoFactor()
     {
-        $two_factor_selector = 'input[name="answer"], div[data-nemo="twofactorPage"] input, input[name*="otpCode"]';
+        $two_factor_selector = 'input.otp-box.otp-input';
         $two_factor_message_selector = 'div.smsChallenge h1, div.smsChallenge p, div[data-nemo="twofactorPage"] p:nth-child(1)';
-        $two_factor_submit_selector = 'button#securityCodeSubmit, button[data-nemo="twofactorSubmit"]';
+        $two_factor_submit_selector = 'button#submitBtn:not(:disabled), button#securityCodeSubmit, button[data-nemo="twofactorSubmit"]';
 
         if ($this->exts->querySelector($two_factor_selector) != null && $this->exts->two_factor_attempts < 3) {
             $this->exts->log("Two factor page found.");
@@ -549,9 +558,8 @@ class PortalScriptCDP
                 $code_inputs = $this->exts->querySelectorAll($two_factor_selector);
                 foreach ($code_inputs as $key => $code_input) {
                     if (array_key_exists($key, $resultCodes)) {
-                        $this->exts->log('"checkFillTwoFactor: Entering key ' . $resultCodes[$key] . 'to input #');
-                        $this->exts->moveToElementAndType('input[name*="otpCode"]:nth-child(' . ($key + 1) . ')', $resultCodes[$key]);
-                        // $code_input->sendKeys($resultCodes[$key]);
+                        $this->exts->log('"checkFillTwoFactor: Entering key ' . $resultCodes[$key] . ' to input #');
+                        $this->exts->moveToElementAndType('input.otp-box.otp-input:nth-child(' . ($key + 1) . ')', $resultCodes[$key]);
                     } else {
                         $this->exts->log('"checkFillTwoFactor: Have no char for input #');
                     }
@@ -615,7 +623,7 @@ class PortalScriptCDP
             $this->exts->log('invoiceAmount: ' . $invoice['invoiceAmount']);
             $this->exts->log('invoiceUrl: ' . $invoice['invoiceUrl']);
 
-            $invoiceFileName = !empty($invoice['invoiceName']) ? $invoice['invoiceName'] . '.pdf': '';
+            $invoiceFileName = !empty($invoice['invoiceName']) ? $invoice['invoiceName'] . '.pdf' : '';
             $invoice['invoiceDate'] = $this->exts->parse_date($invoice['invoiceDate'], 'M d, Y', 'Y-m-d');
             $this->exts->log('Date parsed: ' . $invoice['invoiceDate']);
             $this->exts->openUrl($invoice['invoiceUrl']);
