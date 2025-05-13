@@ -1,4 +1,4 @@
-<?php //add accecpt cookies after login and removed invoicePageProUrl(not in use) added waitTillPresent on download button and successfully tested with mutiple connection
+<?php
 
 /**
  * Chrome Remote via Chrome devtool protocol script, for specific process/portal
@@ -57,8 +57,6 @@ class PortalScriptCDP
         }
     }
 
-    // Server-Portal-ID: 6095 - Last modified: 20.03.2025 14:13:16 UTC - User: 1
-
     public $baseUrl = 'https://my.izettle.com';
     public $loginUrl = 'https://my.izettle.com';
     public $invoicePageUrl = 'https://my.zettle.com/invoices/orders?status=PAID';
@@ -66,10 +64,8 @@ class PortalScriptCDP
     public $password_selector = 'form input[name="password"], input[name="login_password"]';
     public $remember_me_selector = '';
     public $submit_login_selector = 'form button[type="submit"], button[id="btnLogin"]';
-
     public $check_login_failed_selector = '.flash.error .message, .error-message, p[id="inputError"], p[role="alert"]';
     public $check_login_success_selector = 'iz-bo-header, iz-bo-header[user-name], .dropdown-user a[ng-click*="logout"], iz-bo-vertical-navigation';
-
     public $isNoInvoice = true;
     public $download_monthly_report = 0;
     public $download_daily_report = 0;
@@ -89,6 +85,11 @@ class PortalScriptCDP
         $this->restrictPages = isset($this->exts->config_array["restrictPages"]) ? (int) @$this->exts->config_array["restrictPages"] : 3;
         $this->download_monthly_report = isset($this->exts->config_array["download_monthly_report"]) ? (int) @$this->exts->config_array["download_monthly_report"] : 0;
         $this->download_daily_report = isset($this->exts->config_array["download_daily_report"]) ? (int) @$this->exts->config_array["download_daily_report"] : 0;
+
+        $this->exts->log('download_monthly_report ' . $this->download_monthly_report);
+        $this->exts->log('download_daily_report ' . $this->download_daily_report);
+
+
         $this->exts->log('Begin initPortal ' . $count);
         $this->exts->loadCookiesFromFile();
         $this->exts->openUrl($this->loginUrl);
@@ -98,6 +99,15 @@ class PortalScriptCDP
             $this->exts->openUrl($this->loginUrl);
             $this->fillForm(0);
             sleep(10);
+            if (stripos(strtolower($this->exts->extract('p.message')), 'suspicious behaviour') !== false) {
+                $this->exts->capture('suspicious-behaviour-detected');
+                $this->exts->log('Try to login in again!');
+                $this->clearChrome();
+                $this->exts->openUrl($this->loginUrl);
+                $this->fillForm(0);
+                sleep(10);
+            }
+
             $this->checkFillRecaptcha(1);
             sleep(10);
             // $this->solve_captcha_by_clicking(1);
@@ -110,8 +120,8 @@ class PortalScriptCDP
                     $is_captcha = $this->solve_captcha_by_clicking($i);
                 }
             }
-            sleep(10);
-            $this->exts->waitTillPresent('div[data-nemo="twofactorPage"] button');
+            sleep(5);
+            $this->exts->waitTillPresent('div[data-nemo="twofactorPage"] button', 10);
             if ($this->exts->exists('div[data-nemo="twofactorPage"] button')) {
                 $this->exts->click_by_xdotool('div[data-nemo="twofactorPage"] button');
             }
@@ -120,7 +130,7 @@ class PortalScriptCDP
 
 
         if ($this->checkLogin()) {
-            $this->exts->log(">>>>>>>>>>>>>>>Login successful!!!!");
+            $this->exts->log(">>>>>>>>>>>>>>>Login successfufl!!!!");
             $this->exts->capture("LoginSuccess");
 
             // accecpt cookies
@@ -136,6 +146,17 @@ class PortalScriptCDP
                 sleep(10);
             }
             $this->processInvoices();
+
+
+            if ($this->download_monthly_report == 1) {
+                $this->exts->openUrl('https://my.zettle.com/reports/v2');
+                $this->processMonthlyReport();
+            }
+
+            if ($this->download_daily_report == 1) {
+                $this->exts->openUrl('https://my.zettle.com/reports/v2');
+                $this->processDailyReport();
+            }
 
             if ($this->isNoInvoice) {
                 $this->exts->no_invoice();
@@ -184,7 +205,10 @@ class PortalScriptCDP
 
                 $this->exts->capture("1-pre-login");
                 $this->exts->log("Enter Username");
-                $this->exts->moveToElementAndType($this->username_selector, $this->username);
+                // $this->exts->moveToElementAndType($this->username_selector, $this->username);
+                $this->exts->click_by_xdotool($this->username_selector);
+                sleep(2);
+                $this->exts->type_text_by_xdotool($this->username);
                 sleep(3);
 
                 if (!$this->isValidEmail($this->username)) {
@@ -193,7 +217,10 @@ class PortalScriptCDP
 
                 if ($this->exts->exists($this->password_selector)) {
                     $this->exts->log("Enter Password");
-                    $this->exts->moveToElementAndType($this->password_selector, $this->password);
+                    // $this->exts->moveToElementAndType($this->password_selector, $this->password);
+                    $this->exts->click_by_xdotool($this->password_selector);
+                    sleep(2);
+                    $this->exts->type_text_by_xdotool($this->password);
                 } else {
                     if ($this->exts->exists($this->submit_login_selector)) {
                         $this->exts->click_by_xdotool($this->submit_login_selector);
@@ -218,12 +245,19 @@ class PortalScriptCDP
                     sleep(10);
                 }
 
+
+                if ($this->exts->urlContains('email-confirmation')) {
+                    $this->exts->type_key_by_xdotool('Return');
+                    sleep(5);
+                    $this->exts->moveToElementAndClick('a[class="skip-button"]');
+                    sleep(10);
+                }
+
                 $error_text = strtolower($this->exts->extract('p#inputError'));
                 $this->exts->log("Error text:: " . $error_text);
                 if (
                     stripos(strtolower($error_text), strtolower('Check your email and password and try again.')) !== false ||
                     stripos(strtolower($error_text), strtolower('Please type a valid email address.')) !== false
-
                 ) {
                     $this->exts->log(__FUNCTION__ . '::Use login failed');
                     $this->exts->log(__FUNCTION__ . '::Last URL: ' . $this->exts->getUrl());
@@ -239,11 +273,8 @@ class PortalScriptCDP
 
 
     /**
-
      * Method to Check where user is logged in or not
-
      * return boolean true/false
-
      */
     private function checkLogin()
     {
@@ -283,12 +314,12 @@ class PortalScriptCDP
         // $unsolved_hcaptcha_submit_selector = 'div[id="hcaptcha-d"] iframe, iframe[title="reCAPTCHA"]';
         // $hcaptcha_challenger_wraper_selector = 'div[style*="visible"] iframe[src*="hcaptcha"][title*="hallenge"], div[style*="visibility: visible;"] > div > iframe[title*="in zwei Minuten ab"]';
 
-        $this->exts->waitTillPresent('iframe[name="recaptcha"]', 40);
+        $this->exts->waitTillPresent('iframe[name="recaptcha"]', 20);
         if ($this->exts->exists('iframe[name="recaptcha"]')) {
             $this->switchToFrame('iframe[name="recaptcha"]');
             sleep(5);
         }
-        $this->exts->waitTillAnyPresent(['div[id="hcaptcha-d"] iframe', 'iframe[title="reCAPTCHA"]'], 30);
+        $this->exts->waitTillAnyPresent(['div[id="hcaptcha-d"] iframe', 'iframe[title="reCAPTCHA"]'], 15);
 
 
         // $this->exts->waitTillAnyPresent([$unsolved_hcaptcha_submit_selector, $hcaptcha_challenger_wraper_selector], 20);
@@ -327,7 +358,7 @@ class PortalScriptCDP
                     // $challenge_wraper = $this->exts->querySelector($captcha_wraper_selector);
 
                     foreach ($coordinates as $coordinate) {
-                        $this->click_point($captcha_wraper_selector, (int) $coordinate['x'], (int) $coordinate['y']);
+                        $this->exts->click_by_xdotool($captcha_wraper_selector, (int) $coordinate['x'], (int) $coordinate['y']);
                     }
                     $this->switchToFrame('iframe[name="recaptcha"]');
                     $this->exts->capture("paypal-captcha-selected " . $count);
@@ -344,44 +375,6 @@ class PortalScriptCDP
             $this->exts->switchToDefault();
             return false;
         }
-    }
-
-    private function click_point($selector = '', $x_on_element = 0, $y_on_element = 0)
-    {
-        $this->exts->log(__FUNCTION__ . " $selector $x_on_element $y_on_element");
-        $selector = base64_encode($selector);
-        $element_coo = $this->exts->execute_javascript('var x_on_element = ' . $x_on_element . '; 
-            var y_on_element = ' . $y_on_element . ';
-            var coo = document.querySelector(atob("' . $selector . '")).getBoundingClientRect();
-            // Default get center point in element, if offset inputted, out put them
-            if(x_on_element > 0 || y_on_element > 0) {
-                Math.round(coo.x + x_on_element) + "|" + Math.round(coo.y + y_on_element);
-            } else {
-                Math.round(coo.x + coo.width/2) + "|" + Math.round(coo.y + coo.height/2);
-            }
-            
-        ');
-        // sleep(1);
-        $this->exts->log("Browser clicking position: $element_coo");
-        $element_coo = explode('|', $element_coo);
-
-        $root_position = $this->exts->get_brower_root_position();
-        $this->exts->log("Browser root position");
-        $this->exts->log(print_r($root_position, true));
-
-        $clicking_x = (int) $element_coo[0] + (int) $root_position['root_x'];
-        $clicking_y = (int) $element_coo[1] + (int) $root_position['root_y'];
-        $this->exts->log("Screen clicking position: $clicking_x $clicking_y");
-        $node_name = !empty($this->exts->config_array['node_name']) ? $this->exts->config_array['node_name'] : "selenium-node-" . $this->exts->process_uid;
-        // move randomly
-        exec("sudo docker exec " . $node_name . " bash -c 'xdotool mousemove " . rand($clicking_x - 60, $clicking_x + 60) . " " . rand($clicking_y - 50, $clicking_y + 50) . "'");
-        exec("sudo docker exec " . $node_name . " bash -c 'xdotool mousemove " . rand($clicking_x - 50, $clicking_x + 50) . " " . rand($clicking_y - 50, $clicking_y + 50) . "'");
-        exec("sudo docker exec " . $node_name . " bash -c 'xdotool mousemove " . rand($clicking_x - 40, $clicking_x + 40) . " " . rand($clicking_y - 41, $clicking_y + 40) . "'");
-        exec("sudo docker exec " . $node_name . " bash -c 'xdotool mousemove " . rand($clicking_x - 30, $clicking_x + 30) . " " . rand($clicking_y - 35, $clicking_y + 30) . "'");
-        exec("sudo docker exec " . $node_name . " bash -c 'xdotool mousemove " . rand($clicking_x - 20, $clicking_x + 20) . " " . rand($clicking_y - 25, $clicking_y + 25) . "'");
-        exec("sudo docker exec " . $node_name . " bash -c 'xdotool mousemove " . rand($clicking_x - 10, $clicking_x + 10) . " " . rand($clicking_y - 10, $clicking_y + 10) . "'");
-
-        exec("sudo docker exec " . $node_name . " bash -c 'xdotool mousemove " . $clicking_x . " " . $clicking_y . " click 1;'");
     }
 
     private function getCoordinates(
@@ -461,7 +454,7 @@ class PortalScriptCDP
         $this->exts->log(__FUNCTION__);
         $recaptcha_iframe_selector = 'iframe[src*="/recaptcha/enterprise"], iframe[src*="/recaptcha/api2/anchor?"]';
         $recaptcha_textarea_selector = 'textarea[name="g-recaptcha-response"]';
-        $this->exts->waitTillPresent($recaptcha_iframe_selector, 20);
+        $this->exts->waitTillPresent($recaptcha_iframe_selector);
         sleep(5);
         if ($this->exts->exists($recaptcha_iframe_selector)) {
             $iframeUrl = $this->exts->extract($recaptcha_iframe_selector, null, 'src');
@@ -483,26 +476,26 @@ class PortalScriptCDP
                 $this->exts->capture('recaptcha-filled');
 
                 $gcallbackFunction = $this->exts->execute_javascript('(function() { 
-                if(document.querySelector("[data-callback]") != null){
-                    return document.querySelector("[data-callback]").getAttribute("data-callback");
-                }
+                    if(document.querySelector("[data-callback]") != null){
+                        return document.querySelector("[data-callback]").getAttribute("data-callback");
+                    }
 
-                var result = ""; var found = false;
-                function recurse (cur, prop, deep) {
-                    if(deep > 5 || found){ return;}console.log(prop);
-                    try {
-                        if(cur == undefined || cur == null || cur instanceof Element || Object(cur) !== cur || Array.isArray(cur)){ return;}
-                        if(prop.indexOf(".callback") > -1){result = prop; found = true; return;
-                        } else { deep++;
-                            for (var p in cur) { recurse(cur[p], prop ? prop + "." + p : p, deep);}
-                        }
-                    } catch(ex) { console.log("ERROR in function: " + ex); return; }
-                }
+                    var result = ""; var found = false;
+                    function recurse (cur, prop, deep) {
+                        if(deep > 5 || found){ return;}console.log(prop);
+                        try {
+                            if(cur == undefined || cur == null || cur instanceof Element || Object(cur) !== cur || Array.isArray(cur)){ return;}
+                            if(prop.indexOf(".callback") > -1){result = prop; found = true; return;
+                            } else { deep++;
+                                for (var p in cur) { recurse(cur[p], prop ? prop + "." + p : p, deep);}
+                            }
+                        } catch(ex) { console.log("ERROR in function: " + ex); return; }
+                    }
 
-                recurse(___grecaptcha_cfg.clients[0], "", 0);
-                return found ? "___grecaptcha_cfg.clients[0]." + result : null;
-            })();
-		');
+                    recurse(___grecaptcha_cfg.clients[0], "", 0);
+                    return found ? "___grecaptcha_cfg.clients[0]." + result : null;
+                })();
+                ');
                 $this->exts->log('Callback function: ' . $gcallbackFunction);
                 $this->exts->log('Callback function: ' . $this->exts->recaptcha_answer);
                 if ($gcallbackFunction != null) {
@@ -538,7 +531,7 @@ class PortalScriptCDP
         $this->exts->type_key_by_xdotool('Return');
         sleep(3);
         $this->exts->capture("clear-page");
-        for ($i = 0; $i < 5; $i++) {
+        for ($i = 0; $i < 6; $i++) {
             $this->exts->type_key_by_xdotool('Tab');
         }
         $this->exts->type_key_by_xdotool('Return');
@@ -548,9 +541,9 @@ class PortalScriptCDP
 
     private function checkFillTwoFactor()
     {
-        $two_factor_selector = 'input[name="answer"], div[data-nemo="twofactorPage"] input, input[name*="otpCode"]';
+        $two_factor_selector = 'input.otp-box.otp-input';
         $two_factor_message_selector = 'div.smsChallenge h1, div.smsChallenge p, div[data-nemo="twofactorPage"] p:nth-child(1)';
-        $two_factor_submit_selector = 'button#securityCodeSubmit, button[data-nemo="twofactorSubmit"]';
+        $two_factor_submit_selector = 'button#submitBtn:not(:disabled), button#securityCodeSubmit, button[data-nemo="twofactorSubmit"]';
 
         if ($this->exts->querySelector($two_factor_selector) != null && $this->exts->two_factor_attempts < 3) {
             $this->exts->log("Two factor page found.");
@@ -579,9 +572,8 @@ class PortalScriptCDP
                 $code_inputs = $this->exts->querySelectorAll($two_factor_selector);
                 foreach ($code_inputs as $key => $code_input) {
                     if (array_key_exists($key, $resultCodes)) {
-                        $this->exts->log('"checkFillTwoFactor: Entering key ' . $resultCodes[$key] . 'to input #');
-                        $this->exts->moveToElementAndType('input[name*="otpCode"]:nth-child(' . ($key + 1) . ')', $resultCodes[$key]);
-                        // $code_input->sendKeys($resultCodes[$key]);
+                        $this->exts->log('"checkFillTwoFactor: Entering key ' . $resultCodes[$key] . ' to input #');
+                        $this->exts->moveToElementAndType('input.otp-box.otp-input:nth-child(' . ($key + 1) . ')', $resultCodes[$key]);
                     } else {
                         $this->exts->log('"checkFillTwoFactor: Have no char for input #');
                     }
@@ -605,6 +597,146 @@ class PortalScriptCDP
                 }
             } else {
                 $this->exts->log("Not received two factor code");
+            }
+        }
+    }
+
+
+    // download DailyReport
+    private function processDailyReport()
+    {
+        sleep(15);
+        if ($this->exts->querySelector('div[aria-describedby="general-datepicker-messages"]') != null) {
+            $this->exts->click_by_xdotool('div[aria-describedby="general-datepicker-messages"]');
+            sleep(10);
+        }
+
+        if ($this->exts->querySelector('div[class*="range-select-double-page-calendar"] > div > button:nth-child(1)') != null) {
+            $this->exts->click_by_xdotool('div[class*="range-select-double-page-calendar"] > div > button:nth-child(1)');
+            sleep(10);
+            $this->exts->type_key_by_xdotool('Escape');
+            sleep(2);
+        }
+
+        $this->exts->waitTillPresent('div[role="table"] a[href*="/invoices"]', 10);
+        $this->exts->capture("4-invoices-page");
+        $invoices = [];
+
+        $rows = $this->exts->getElements('div[role="table"] a[href*="/invoices"]');
+        foreach ($rows as $row) {
+            if ($row != null) {
+                $invoiceUrl = $row->getAttribute('href');
+                $invoiceName = $this->exts->extract('div[role="cell"]:nth-child(3)', $row);
+                $invoiceAmount = $this->exts->extract('div[role="cell"]:nth-child(4)', $row);
+                $invoiceDate = $this->exts->extract('div[role="cell"]:nth-child(1)', $row);
+
+                $downloadBtn = '';
+
+                array_push($invoices, array(
+                    'invoiceName' => $invoiceName,
+                    'invoiceDate' => $invoiceDate,
+                    'invoiceAmount' => $invoiceAmount,
+                    'invoiceUrl' => $invoiceUrl,
+                    'downloadBtn' => $downloadBtn
+                ));
+                $this->isNoInvoice = false;
+            }
+        }
+
+        // Download all invoices
+        $this->exts->log('Invoices found: ' . count($invoices));
+        foreach ($invoices as $invoice) {
+            $this->exts->log('--------------------------');
+            $this->exts->log('invoiceName: ' . $invoice['invoiceName']);
+            $this->exts->log('invoiceDate: ' . $invoice['invoiceDate']);
+            $this->exts->log('invoiceAmount: ' . $invoice['invoiceAmount']);
+            $this->exts->log('invoiceUrl: ' . $invoice['invoiceUrl']);
+
+            $invoiceFileName = !empty($invoice['invoiceName']) ? $invoice['invoiceName'] . '.pdf' : '';
+            $invoice['invoiceDate'] = $this->exts->parse_date($invoice['invoiceDate'], 'M d, Y', 'Y-m-d');
+            $this->exts->log('Date parsed: ' . $invoice['invoiceDate']);
+            $this->exts->openUrl($invoice['invoiceUrl']);
+            sleep(2);
+            $this->exts->waitTillPresent('div[class*="layout__Container-zettle"] button[type="button"]:nth-child(3)', 20);
+
+            $downloadBtn = $this->exts->querySelector('div[class*="layout__Container-zettle"] button[type="button"]:nth-child(3)');
+            $downloaded_file = $this->exts->click_and_download($downloadBtn, 'pdf', $invoiceFileName);
+
+            if (trim($downloaded_file) != '' && file_exists($downloaded_file)) {
+                $this->exts->new_invoice($invoice['invoiceName'], $invoice['invoiceDate'], $invoice['invoiceAmount'], $downloaded_file);
+                sleep(1);
+            } else {
+                $this->exts->log(__FUNCTION__ . '::No download ' . $invoiceFileName);
+            }
+        }
+    }
+
+
+    // download this month report
+    private function processMonthlyReport()
+    {
+        sleep(15);
+        if ($this->exts->querySelector('div[aria-describedby="general-datepicker-messages"]') != null) {
+            $this->exts->click_by_xdotool('div[aria-describedby="general-datepicker-messages"]');
+            sleep(10);
+        }
+
+        if ($this->exts->querySelector('div[class*="range-select-double-page-calendar"] > div > button:nth-child(3)') != null) {
+            $this->exts->click_by_xdotool('div[class*="range-select-double-page-calendar"] > div > button:nth-child(3)');
+            sleep(10);
+            $this->exts->type_key_by_xdotool('Escape');
+            sleep(2);
+        }
+
+        $this->exts->waitTillPresent('div[role="table"] a[href*="/invoices"]', 10);
+        $this->exts->capture("4-invoices-page");
+        $invoices = [];
+
+        $rows = $this->exts->getElements('div[role="table"] a[href*="/invoices"]');
+        foreach ($rows as $row) {
+            if ($row != null) {
+                $invoiceUrl = $row->getAttribute('href');
+                $invoiceName = $this->exts->extract('div[role="cell"]:nth-child(3)', $row);
+                $invoiceAmount = $this->exts->extract('div[role="cell"]:nth-child(4)', $row);
+                $invoiceDate = $this->exts->extract('div[role="cell"]:nth-child(1)', $row);
+
+                $downloadBtn = '';
+
+                array_push($invoices, array(
+                    'invoiceName' => $invoiceName,
+                    'invoiceDate' => $invoiceDate,
+                    'invoiceAmount' => $invoiceAmount,
+                    'invoiceUrl' => $invoiceUrl,
+                    'downloadBtn' => $downloadBtn
+                ));
+                $this->isNoInvoice = false;
+            }
+        }
+
+        // Download all invoices
+        $this->exts->log('Invoices found: ' . count($invoices));
+        foreach ($invoices as $invoice) {
+            $this->exts->log('--------------------------');
+            $this->exts->log('invoiceName: ' . $invoice['invoiceName']);
+            $this->exts->log('invoiceDate: ' . $invoice['invoiceDate']);
+            $this->exts->log('invoiceAmount: ' . $invoice['invoiceAmount']);
+            $this->exts->log('invoiceUrl: ' . $invoice['invoiceUrl']);
+
+            $invoiceFileName = !empty($invoice['invoiceName']) ? $invoice['invoiceName'] . '.pdf' : '';
+            $invoice['invoiceDate'] = $this->exts->parse_date($invoice['invoiceDate'], 'M d, Y', 'Y-m-d');
+            $this->exts->log('Date parsed: ' . $invoice['invoiceDate']);
+            $this->exts->openUrl($invoice['invoiceUrl']);
+            sleep(2);
+            $this->exts->waitTillPresent('div[class*="layout__Container-zettle"] button[type="button"]:nth-child(3)', 20);
+
+            $downloadBtn = $this->exts->querySelector('div[class*="layout__Container-zettle"] button[type="button"]:nth-child(3)');
+            $downloaded_file = $this->exts->click_and_download($downloadBtn, 'pdf', $invoiceFileName);
+
+            if (trim($downloaded_file) != '' && file_exists($downloaded_file)) {
+                $this->exts->new_invoice($invoice['invoiceName'], $invoice['invoiceDate'], $invoice['invoiceAmount'], $downloaded_file);
+                sleep(1);
+            } else {
+                $this->exts->log(__FUNCTION__ . '::No download ' . $invoiceFileName);
             }
         }
     }
@@ -645,7 +777,7 @@ class PortalScriptCDP
             $this->exts->log('invoiceAmount: ' . $invoice['invoiceAmount']);
             $this->exts->log('invoiceUrl: ' . $invoice['invoiceUrl']);
 
-            $invoiceFileName = $invoice['invoiceName'] . '.pdf';
+            $invoiceFileName = !empty($invoice['invoiceName']) ? $invoice['invoiceName'] . '.pdf' : '';
             $invoice['invoiceDate'] = $this->exts->parse_date($invoice['invoiceDate'], 'M d, Y', 'Y-m-d');
             $this->exts->log('Date parsed: ' . $invoice['invoiceDate']);
             $this->exts->openUrl($invoice['invoiceUrl']);

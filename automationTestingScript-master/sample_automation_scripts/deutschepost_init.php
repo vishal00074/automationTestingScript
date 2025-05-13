@@ -16,10 +16,10 @@ public $confirm_code_btn = '#standardform a[onclick*="submitLoginRequestPageForm
 public $isNoInvoice = true;
 
 /**
-    * Entry Method thats called for a portal
-    *
-    * @param int $count Number of times portal is retried.
-    */
+ * Entry Method thats called for a portal
+ *
+ * @param int $count Number of times portal is retried.
+ */
 private function initPortal($count)
 {
     $this->exts->log('Begin initPortal ' . $count);
@@ -176,15 +176,15 @@ private function checkFillLogin($count = 1)
 
 
         $error_text = strtolower($this->exts->extract('div.clue__message'));
-        $this->exts->log('Error text:: '.$error_text);
+        $this->exts->log('Error text:: ' . $error_text);
 
         if (strpos($error_text, 'fehler bei der eingabe des logins oder passwortes.') !== false) {
             $this->exts->loginFailure(1);
-        } 
+        }
 
         if (strpos($error_text, 'ihr account ist gesperrt. bitte verwenden sie unsere "passwort-vergessen" funktionalität, um ihren account wieder freizuschalten.') !== false) {
             $this->exts->loginFailure(1);
-        } 
+        }
 
         $this->checkFillTwoFactor();
         sleep(7);

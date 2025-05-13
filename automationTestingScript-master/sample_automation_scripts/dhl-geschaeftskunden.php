@@ -1,4 +1,4 @@
-<?php
+<?php// updated download code
 
 /**
  * Chrome Remote via Chrome devtool protocol script, for specific process/portal
@@ -83,6 +83,12 @@ class PortalScriptCDP
         $this->download_report = isset($this->exts->config_array["download_report"]) ? (int) @$this->exts->config_array["download_report"] : $this->download_report;
         $this->shipment_tracking = isset($this->exts->config_array["shipment_tracking"]) ? (int) @$this->exts->config_array["shipment_tracking"] : $this->shipment_tracking;
         $this->only_download_report = isset($this->exts->config_array["only_download_report"]) ? (int) @$this->exts->config_array["only_download_report"] : $this->only_download_report;
+
+        $this->exts->log('restrictPages '. $this->restrictPages);
+        $this->exts->log('daily_closing_list '. $this->daily_closing_list);
+        $this->exts->log('download_report '. $this->download_report);
+        $this->exts->log('shipment_tracking '. $this->shipment_tracking);
+        $this->exts->log('only_download_report '. $this->only_download_report);
 
         // Load cookies
         $this->exts->loadCookiesFromFile();
@@ -192,7 +198,7 @@ class PortalScriptCDP
                     $this->exts->execute_javascript("arguments[0].click()", [$open_invoices_link]);
                 }
             }
-            sleep(20);
+            sleep(15);
             if (!$this->exts->exists('[id*="BillingPeriodForm"] select[name*="socPeriod"]')) {
                 $this->exts->update_process_lock();
                 $open_invoices_link = $this->exts->getElementByText('.horizontal-navigation-sub .af_panelList a, .af_panelGroupLayout  a[id*="subsubtop"]', ['Rechnungssuche', 'Bill'], null, true);
@@ -205,7 +211,7 @@ class PortalScriptCDP
                         $this->exts->execute_javascript("arguments[0].click()", [$open_invoices_link]);
                     }
                 }
-                sleep(30);
+                sleep(15);
             }
             if ($this->only_download_report == 0) {
                 if ((int) $this->restrictPages == 0) {
@@ -515,7 +521,7 @@ class PortalScriptCDP
         }
     }
 
-    public function processDailyClosingList($pageCount = 0)
+    public function processDailyClosingList($paging_counts = 0)
     {
         sleep(25);
         $this->exts->capture("4-daily-closing-page");
@@ -560,17 +566,18 @@ class PortalScriptCDP
                     }
                 }
                 // close new tab too avoid too much tabs
-                $handles = $this->exts->webdriver->getWindowHandles();
+                $handles = $this->exts->get_all_tabs();
                 if (count($handles) > 1) {
-                    $this->exts->webdriver->switchTo()->window(end($handles));
-                    $this->exts->webdriver->close();
-                    $handles = $this->exts->webdriver->getWindowHandles();
+                    $switchedtab = $this->exts->switchToTab(end($handles));
+                    $this->exts->closeTab($switchedtab);
+
+                    $handles = $this->exts->get_all_tabs();
                     if (count($handles) > 1) {
-                        $this->exts->webdriver->switchTo()->window(end($handles));
-                        $this->exts->webdriver->close();
-                        $handles = $this->exts->webdriver->getWindowHandles();
+                        $switchedtab1 = $this->exts->switchToTab(end($handles));
+                        $this->exts->closeTab($switchedtab1);
+                        $handles = $this->exts->get_all_tabs();
                     }
-                    $this->exts->webdriver->switchTo()->window($handles[0]);
+                    $this->exts->switchToTab($handles[0]);
                     $this->switchToFrame('iframe[src*="/ArchiveManifest?"]');
                     sleep(2);
                 }
@@ -626,20 +633,21 @@ class PortalScriptCDP
                     }
                 }
                 // close new tab too avoid too much tabs
-                $handles = $this->exts->webdriver->getWindowHandles();
-                if (count($handles) > 1) {
-                    $this->exts->webdriver->switchTo()->window(end($handles));
-                    $this->exts->webdriver->close();
-                    $handles = $this->exts->webdriver->getWindowHandles();
-                    if (count($handles) > 1) {
-                        $this->exts->webdriver->switchTo()->window(end($handles));
-                        $this->exts->webdriver->close();
-                        $handles = $this->exts->webdriver->getWindowHandles();
-                    }
-                    $this->exts->webdriver->switchTo()->window($handles[0]);
-                    $this->switchToFrame('iframe[src*="/ArchiveManifest?"]');
-                    sleep(2);
-                }
+                 $handles = $this->exts->get_all_tabs();
+                 if (count($handles) > 1) {
+                     $switchedtab = $this->exts->switchToTab(end($handles));
+                     $this->exts->closeTab($switchedtab);
+ 
+                     $handles = $this->exts->get_all_tabs();
+                     if (count($handles) > 1) {
+                         $switchedtab1 = $this->exts->switchToTab(end($handles));
+                         $this->exts->closeTab($switchedtab1);
+                         $handles = $this->exts->get_all_tabs();
+                     }
+                     $this->exts->switchToTab($handles[0]);
+                     $this->switchToFrame('iframe[src*="/ArchiveManifest?"]');
+                     sleep(2);
+                 }
             }
             if ($rows > 0 && (int) $this->restrictPages == 0 && $this->exts->exists('ul.pagination li.active + li a') && $this->exts->isVisible('ul.pagination li.active + li a')) {
                 $this->exts->click_by_xdotool('ul.pagination li.active + li a');

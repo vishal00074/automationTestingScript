@@ -146,6 +146,8 @@ class PortalScriptCDP
             if ($this->isNoInvoice) {
                 $this->exts->no_invoice();
             }
+
+            $this->exts->success();
         } else {
             $this->exts->log($this->exts->getUrl());
             if ($this->exts->getElementByText($this->login_failed_selector, ['password', 'Passwort', 'passwort', 'card number', 'email address', 'error has occurred'], null, false) != null) {
