@@ -1,4 +1,5 @@
-<?php // updated captcha code and added trigger loginFailedConfirmed after submitting the form updated download code
+<?php
+
 
 /**
  * Chrome Remote via Chrome devtool protocol script, for specific process/portal
@@ -57,9 +58,8 @@ class PortalScriptCDP
         }
     }
 
-    // Server-Portal-ID: 23461 - Last modified: 30.01.2025 14:04:57 UTC - User: 1
+    // Server-Portal-ID: 23461 - Last modified: 08.04.2025 14:22:32 UTC - User: 1
 
-    /*Define constants used in script*/
     public $baseUrl = 'https://customer-self-care.waipu.tv';
     public $loginUrl = 'https://auth.waipu.tv/ui/login';
     public $invoicePageUrl = 'https://customer-self-care.waipu.tv/ui/my_invoices';
@@ -84,7 +84,7 @@ class PortalScriptCDP
         $this->exts->loadCookiesFromFile();
         sleep(1);
         $this->exts->openUrl($this->baseUrl);
-        sleep(15);
+        sleep(10);
         $this->clearChrome();
         // after load cookies and open base url, check if user logged in
         // Wait for selector that make sure user logged in
@@ -92,6 +92,22 @@ class PortalScriptCDP
         $this->exts->log('NOT logged in from initPortal');
         $this->exts->capture('0-init-portal-not-loggedin');
 
+        $this->exts->openUrl('chrome://extensions/'); 
+        sleep(10);
+        $this->exts->execute_javascript("
+            let manager = document.querySelector('extensions-manager');
+            if (manager && manager.shadowRoot) {
+                let itemList = manager.shadowRoot.querySelector('extensions-item-list');
+                if (itemList && itemList.shadowRoot) {
+                    let items = itemList.shadowRoot.querySelectorAll('extensions-item');
+                    items.forEach(item => {
+                        let toggle = item.shadowRoot.querySelector('#enableToggle[checked]');
+                        if (toggle) toggle.click();
+                    });
+                }
+            }
+        ");
+        sleep(5);
         $this->exts->openUrl($this->loginUrl);
         $this->exts->waitTillPresent('iframe[id*="sp_message_iframe"]', 20);
         $this->switchToFrame('iframe[id*="sp_message_iframe"]');
@@ -101,7 +117,7 @@ class PortalScriptCDP
         }
         $this->exts->switchToDefault();
         sleep(10);
-        $this->checkFillLogin();
+        $this->checkFillLogin(0);
         sleep(5);
         if ($this->exts->allExists([$this->password_selector])) {
             $this->exts->clearCookies();
@@ -116,14 +132,14 @@ class PortalScriptCDP
             $this->exts->switchToDefault();
             sleep(2);
         }
-        $this->checkFillLogin();
+        $this->checkFillLogin(0);
         sleep(10);
         $this->exts->capture("2-post-login");
         if ($this->exts->allExists([$this->password_selector])) {
             $this->exts->clearCookies();
             $this->exts->openUrl($this->loginUrl);
             sleep(5);
-            $this->checkFillLogin();
+            $this->checkFillLogin(0);
             sleep(10);
             $this->exts->capture("2-post-login");
         }
@@ -210,7 +226,9 @@ class PortalScriptCDP
         return false;
     }
 
-    private function checkFillLogin()
+   
+
+    private function checkFillLogin($count = 0)
     {
         $this->exts->waitTillPresent($this->username_selector, 5);
         if ($this->exts->querySelector($this->username_selector) != null) {
@@ -267,25 +285,25 @@ class PortalScriptCDP
 
                 // Step 2, check if callback function need executed
                 $gcallbackFunction = $this->exts->execute_javascript('
-				if(document.querySelector("[data-callback]") != null){
-					return document.querySelector("[data-callback]").getAttribute("data-callback");
-				}
+			if(document.querySelector("[data-callback]") != null){
+				return document.querySelector("[data-callback]").getAttribute("data-callback");
+			}
 
-				var result = ""; var found = false;
-				function recurse (cur, prop, deep) {
-					if(deep > 5 || found){ return;}console.log(prop);
-					try {
-						if(cur == undefined || cur == null || cur instanceof Element || Object(cur) !== cur || Array.isArray(cur)){ return;}
-						if(prop.indexOf(".callback") > -1){result = prop; found = true; return;
-						} else { deep++;
-							for (var p in cur) { recurse(cur[p], prop ? prop + "." + p : p, deep);}
-						}
-					} catch(ex) { console.log("ERROR in function: " + ex); return; }
-				}
+			var result = ""; var found = false;
+			function recurse (cur, prop, deep) {
+				if(deep > 5 || found){ return;}console.log(prop);
+				try {
+					if(cur == undefined || cur == null || cur instanceof Element || Object(cur) !== cur || Array.isArray(cur)){ return;}
+					if(prop.indexOf(".callback") > -1){result = prop; found = true; return;
+					} else { deep++;
+						for (var p in cur) { recurse(cur[p], prop ? prop + "." + p : p, deep);}
+					}
+				} catch(ex) { console.log("ERROR in function: " + ex); return; }
+			}
 
-				recurse(___grecaptcha_cfg.clients[0], "", 0);
-				return found ? "___grecaptcha_cfg.clients[0]." + result : null;
-			');
+			recurse(___grecaptcha_cfg.clients[0], "", 0);
+			return found ? "___grecaptcha_cfg.clients[0]." + result : null;
+		');
                 $this->exts->log('Callback function: ' . $gcallbackFunction);
                 if ($gcallbackFunction != null) {
                     $this->exts->execute_javascript($gcallbackFunction . '("' . $this->exts->recaptcha_answer . '");');

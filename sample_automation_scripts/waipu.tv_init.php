@@ -22,7 +22,7 @@ private function initPortal($count)
     $this->exts->loadCookiesFromFile();
     sleep(1);
     $this->exts->openUrl($this->baseUrl);
-    sleep(15);
+    sleep(10);
     $this->clearChrome();
     // after load cookies and open base url, check if user logged in
     // Wait for selector that make sure user logged in
@@ -30,6 +30,8 @@ private function initPortal($count)
     $this->exts->log('NOT logged in from initPortal');
     $this->exts->capture('0-init-portal-not-loggedin');
 
+    $this->disableExtensions();
+    sleep(5);
     $this->exts->openUrl($this->loginUrl);
     $this->exts->waitTillPresent('iframe[id*="sp_message_iframe"]', 20);
     $this->switchToFrame('iframe[id*="sp_message_iframe"]');
@@ -39,7 +41,7 @@ private function initPortal($count)
     }
     $this->exts->switchToDefault();
     sleep(10);
-    $this->checkFillLogin();
+    $this->checkFillLogin(0);
     sleep(5);
     if ($this->exts->allExists([$this->password_selector])) {
         $this->exts->clearCookies();
@@ -54,14 +56,14 @@ private function initPortal($count)
         $this->exts->switchToDefault();
         sleep(2);
     }
-    $this->checkFillLogin();
+    $this->checkFillLogin(0);
     sleep(10);
     $this->exts->capture("2-post-login");
     if ($this->exts->allExists([$this->password_selector])) {
         $this->exts->clearCookies();
         $this->exts->openUrl($this->loginUrl);
         sleep(5);
-        $this->checkFillLogin();
+        $this->checkFillLogin(0);
         sleep(10);
         $this->exts->capture("2-post-login");
     }
@@ -74,7 +76,7 @@ private function initPortal($count)
         if (!empty($this->exts->config_array['allow_login_success_request'])) {
             $this->exts->triggerLoginSuccess();
         }
-        
+
         $this->exts->success();
     } else {
         $this->exts->log('Timeout waitForLogin: ' . $this->exts->getUrl());
@@ -137,7 +139,26 @@ public function switchToFrame($query_string)
     return false;
 }
 
-private function checkFillLogin()
+private function disableExtensions()
+{
+    $this->exts->openUrl('chrome://extensions/'); // disable Block origin extension
+    sleep(2);
+    $this->exts->execute_javascript("
+        let manager = document.querySelector('extensions-manager');
+        if (manager && manager.shadowRoot) {
+            let itemList = manager.shadowRoot.querySelector('extensions-item-list');
+            if (itemList && itemList.shadowRoot) {
+                let items = itemList.shadowRoot.querySelectorAll('extensions-item');
+                items.forEach(item => {
+                    let toggle = item.shadowRoot.querySelector('#enableToggle[checked]');
+                    if (toggle) toggle.click();
+                });
+            }
+        }
+    ");
+}
+
+private function checkFillLogin($count = 0)
 {
     $this->exts->waitTillPresent($this->username_selector, 5);
     if ($this->exts->querySelector($this->username_selector) != null) {
@@ -194,25 +215,25 @@ private function checkFillRecaptcha($count = 1)
 
             // Step 2, check if callback function need executed
             $gcallbackFunction = $this->exts->execute_javascript('
-            if(document.querySelector("[data-callback]") != null){
-                return document.querySelector("[data-callback]").getAttribute("data-callback");
-            }
+        if(document.querySelector("[data-callback]") != null){
+            return document.querySelector("[data-callback]").getAttribute("data-callback");
+        }
 
-            var result = ""; var found = false;
-            function recurse (cur, prop, deep) {
-                if(deep > 5 || found){ return;}console.log(prop);
-                try {
-                    if(cur == undefined || cur == null || cur instanceof Element || Object(cur) !== cur || Array.isArray(cur)){ return;}
-                    if(prop.indexOf(".callback") > -1){result = prop; found = true; return;
-                    } else { deep++;
-                        for (var p in cur) { recurse(cur[p], prop ? prop + "." + p : p, deep);}
-                    }
-                } catch(ex) { console.log("ERROR in function: " + ex); return; }
-            }
+        var result = ""; var found = false;
+        function recurse (cur, prop, deep) {
+            if(deep > 5 || found){ return;}console.log(prop);
+            try {
+                if(cur == undefined || cur == null || cur instanceof Element || Object(cur) !== cur || Array.isArray(cur)){ return;}
+                if(prop.indexOf(".callback") > -1){result = prop; found = true; return;
+                } else { deep++;
+                    for (var p in cur) { recurse(cur[p], prop ? prop + "." + p : p, deep);}
+                }
+            } catch(ex) { console.log("ERROR in function: " + ex); return; }
+        }
 
-            recurse(___grecaptcha_cfg.clients[0], "", 0);
-            return found ? "___grecaptcha_cfg.clients[0]." + result : null;
-        ');
+        recurse(___grecaptcha_cfg.clients[0], "", 0);
+        return found ? "___grecaptcha_cfg.clients[0]." + result : null;
+    ');
             $this->exts->log('Callback function: ' . $gcallbackFunction);
             if ($gcallbackFunction != null) {
                 $this->exts->execute_javascript($gcallbackFunction . '("' . $this->exts->recaptcha_answer . '");');

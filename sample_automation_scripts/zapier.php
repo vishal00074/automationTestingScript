@@ -1,4 +1,5 @@
-<?php// updated google login code
+<?php // added condition to handle empty cases
+
 
 /**
  * Chrome Remote via Chrome devtool protocol script, for specific process/portal
@@ -56,10 +57,7 @@ class PortalScriptCDP
             echo 'Script execution failed.. ' . "\n";
         }
     }
-
-    // Server-Portal-ID: 8726 - Last modified: 15.04.2025 13:59:27 UTC - User: 1
-
-    /*start script*/
+    // Server-Portal-ID: 8726 - Last modified: 25.04.2025 13:12:49 UTC - User: 1
 
     public $baseUrl = "https://zapier.com/";
     public $username_selector = '.login-form input[name="email"], input[name="email"]';
@@ -274,18 +272,18 @@ class PortalScriptCDP
         $this->exts->openUrl('chrome://extensions/'); // disable Block origin extension
         sleep(2);
         $this->exts->execute_javascript("
-        let manager = document.querySelector('extensions-manager');
-        if (manager && manager.shadowRoot) {
-            let itemList = manager.shadowRoot.querySelector('extensions-item-list');
-            if (itemList && itemList.shadowRoot) {
-                let items = itemList.shadowRoot.querySelectorAll('extensions-item');
-                items.forEach(item => {
-                    let toggle = item.shadowRoot.querySelector('#enableToggle[checked]');
-                    if (toggle) toggle.click();
-                });
-            }
+    let manager = document.querySelector('extensions-manager');
+    if (manager && manager.shadowRoot) {
+        let itemList = manager.shadowRoot.querySelector('extensions-item-list');
+        if (itemList && itemList.shadowRoot) {
+            let items = itemList.shadowRoot.querySelectorAll('extensions-item');
+            items.forEach(item => {
+                let toggle = item.shadowRoot.querySelector('#enableToggle[checked]');
+                if (toggle) toggle.click();
+            });
         }
-    ");
+    }
+");
     }
 
     private function checkFillLogin()
@@ -544,24 +542,24 @@ class PortalScriptCDP
 
                 // Step 2, check if callback function need executed
                 $gcallbackFunction = $this->exts->execute_javascript('
-                if(document.querySelector("[data-callback]") != null){
-                    document.querySelector("[data-callback]").getAttribute("data-callback");
-                } else {
-                    var result = ""; var found = false;
-                    function recurse (cur, prop, deep) {
-                        if(deep > 5 || found){ return;}console.log(prop);
-                        try {
-                            if(prop.indexOf(".callback") > -1){result = prop; found = true; return;
-                            } else { if(cur == undefined || cur == null || cur instanceof Element || Object(cur) !== cur || Array.isArray(cur)){ return;}deep++;
-                                for (var p in cur) { recurse(cur[p], prop ? prop + "." + p : p, deep);}
-                            }
-                        } catch(ex) { console.log("ERROR in function: " + ex); return; }
-                    }
-    
-                    recurse(___grecaptcha_cfg.clients[0], "", 0);
-                    found ? "___grecaptcha_cfg.clients[0]." + result : null;
+            if(document.querySelector("[data-callback]") != null){
+                document.querySelector("[data-callback]").getAttribute("data-callback");
+            } else {
+                var result = ""; var found = false;
+                function recurse (cur, prop, deep) {
+                    if(deep > 5 || found){ return;}console.log(prop);
+                    try {
+                        if(prop.indexOf(".callback") > -1){result = prop; found = true; return;
+                        } else { if(cur == undefined || cur == null || cur instanceof Element || Object(cur) !== cur || Array.isArray(cur)){ return;}deep++;
+                            for (var p in cur) { recurse(cur[p], prop ? prop + "." + p : p, deep);}
+                        }
+                    } catch(ex) { console.log("ERROR in function: " + ex); return; }
                 }
-            ');
+
+                recurse(___grecaptcha_cfg.clients[0], "", 0);
+                found ? "___grecaptcha_cfg.clients[0]." + result : null;
+            }
+        ');
                 $this->exts->log('Callback function: ' . $gcallbackFunction);
                 if ($gcallbackFunction != null) {
                     $this->exts->execute_javascript($gcallbackFunction . '("' . $this->exts->recaptcha_answer . '");');
@@ -873,22 +871,22 @@ class PortalScriptCDP
     private function overwrite_user_agent($user_agent_string = 'DN')
     {
         $userAgentScript = "
-            (function() {
-                if ('userAgentData' in navigator) {
-                    navigator.userAgentData.getHighEntropyValues({}).then(() => {
-                        Object.defineProperty(navigator, 'userAgent', { 
-                            value: '{$user_agent_string}', 
-                            configurable: true 
-                        });
-                    });
-                } else {
+        (function() {
+            if ('userAgentData' in navigator) {
+                navigator.userAgentData.getHighEntropyValues({}).then(() => {
                     Object.defineProperty(navigator, 'userAgent', { 
                         value: '{$user_agent_string}', 
                         configurable: true 
                     });
-                }
-            })();
-        ";
+                });
+            } else {
+                Object.defineProperty(navigator, 'userAgent', { 
+                    value: '{$user_agent_string}', 
+                    configurable: true 
+                });
+            }
+        })();
+    ";
         $this->exts->execute_javascript($userAgentScript);
     }
 

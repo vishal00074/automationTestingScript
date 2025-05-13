@@ -1,10 +1,8 @@
 <?php
+
 /**
- * I have migrated the script on remote chrome
- * i have updated login code selector.
- * I have added custom js isExists and waitFor function
- * I have updated captcha code
- * I have updated download code extract selector
+ * I have migrated the script on remote chrome 
+ * update captcha code and updated login code
  */
 
 /**
@@ -64,23 +62,23 @@ class PortalScriptCDP
         }
     }
 
-    // Server-Portal-ID: 8808 - Last modified: 08.07.2024 14:05:34 UTC - User: 1
+    // Server-Portal-ID: 113592 - Last modified: 11.07.2024 14:23:08 UTC - User: 1
 
-    public $baseUrl = "https://thenounproject.com/";
-    public $loginUrl = 'https://thenounproject.com/accounts/login/';
-    public $invoicePageUrl = 'https://thenounproject.com/ssullivan5/settings/invoices/';
+    /*Define constants used in script*/
+    public $baseUrl = 'https://www.velocityfleet.com';
+    public $loginUrl = 'https://www.velocityfleet.com/accounts/login/';
+    public $invoicePageUrl = 'https://www.velocityfleet.com/app/invoices/list/all-invoices';
+    public $UserUrl = 'https://www.velocityfleet.com/selectSessionCustomer/';
 
+    public $username_selector = 'form input#id_username, form[action*="/login"] input[name*="username"]';
+    public $password_selector = 'form input#id_password, form[action*="/login"] input[name*="password"]';
+    public $remember_me_selector = '';
+    public $submit_login_selector = 'form input[data-qa-id="button__login"], form[action*="/login"] button[type="submit"]';
 
-    public $username_selector = 'input[name="username"]';
-    public $password_selector = 'input[name="password"]';
-    public $submit_btn = 'div[class*="Login__Container"] button[type="submit"]';
-    public $logout_btn = '[href="/logout/"], img[class*="UserAvatar"]';
-
-    public $check_login_failed_selector = 'div[class*="FormError"]';
-    public $check_login_success_selector = 'div[class*="AuthMenu__AvatarStyled"] button[class*="LogoutButton"]';
+    public $check_login_failed_selector = '.messages-section .alert.message, form#login-panel__form ul.errorlist';
+    public $check_login_success_selector = 'div#logout-top-nav a[href*="/logout"], a[href="/accounts/logout/"]';
 
     public $isNoInvoice = true;
-
     /**
      * Entry Method thats called for a portal
      * @param Integer $count Number of times portal is retried.
@@ -88,44 +86,73 @@ class PortalScriptCDP
     private function initPortal($count)
     {
         $this->exts->log('Begin initPortal ' . $count);
+
+        // $this->fake_user_agent('Mozilla/5.0 (Windows NT 10.0; WOW64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/92.0.4515.131 Safari/537.36');   
+        $this->exts->openUrl($this->baseUrl);
+        sleep(1);
+
+        // Load cookies
+        $this->exts->loadCookiesFromFile();
+        sleep(1);
         $this->exts->openUrl($this->baseUrl);
         sleep(10);
-        $this->exts->loadCookiesFromFile();
+        $this->exts->capture('1-init-page');
 
-        if (!$this->checkLogin()) {
+        // If user hase not logged in from cookie, clear cookie, open the login url and do login
+        if ($this->exts->getElement($this->check_login_success_selector) == null) {
             $this->exts->log('NOT logged via cookie');
-
             $this->exts->clearCookies();
             $this->exts->openUrl($this->loginUrl);
-            $this->fillForm(0);
-            sleep(10);
-            $this->exts->capture("after-login-clicked");
-
-            $str = "var div = document.querySelector('div.two-million-modal-container'); if (div != null) {  div.style.display = \"none\"; }";
-            $this->exts->executeSafeScript($str);
-            sleep(2);
+            sleep(15);
+            $this->checkFillLogin();
+            sleep(5);
+            for ($i = 0; $i < 3 && !$this->exts->check_exist_by_chromedevtool('div[style*="visibility: visible"] > div  >  iframe[src*="frame=challenge"]'); $i++) {
+                sleep(5);
+            }
+            $this->check_solve_hcaptcha_challenge();
+            $this->check_solve_hcaptcha_challenge();
+            // if Step above failed, try again
+            for ($i = 0; $i < 3 && !$this->exts->exists($this->check_login_failed_selector) && $this->exts->getElement($this->check_login_success_selector) == null; $i++) {
+                $this->clearChrome();
+                $this->exts->openUrl($this->loginUrl);
+                sleep(15);
+                $this->checkFillLogin();
+                sleep(5);
+                for ($i = 0; $i < 3 && !$this->exts->check_exist_by_chromedevtool('div[style*="visibility: visible"] > div  >  iframe[src*="frame=challenge"]'); $i++) {
+                    sleep(5);
+                }
+                $this->check_solve_hcaptcha_challenge();
+                $this->check_solve_hcaptcha_challenge();
+            }
+            if (stripos($this->exts->extract('form#login-panel__form ul.errorlist li'), 'You could not be logged in at this time') !== false) {
+                $this->exts->openUrl($this->loginUrl);
+                sleep(15);
+                $this->checkFillLogin();
+                sleep(5);
+                for ($i = 0; $i < 3 && !$this->exts->check_exist_by_chromedevtool('div[style*="visibility: visible"] > div  >  iframe[src*="frame=challenge"]'); $i++) {
+                    sleep(5);
+                }
+                $this->check_solve_hcaptcha_challenge();
+                $this->check_solve_hcaptcha_challenge();
+            }
         }
 
-        if ($this->checkLogin()) {
-            $this->exts->log(">>>>>>>>>>>>>>>Login successful!!!!");
-            $this->exts->capture("LoginSuccess");
-            $this->exts->openUrl($this->invoicePageUrl);
 
-            $this->downloadInvoice(0);
+        if ($this->exts->getElement($this->check_login_success_selector) != null) {
+            sleep(3);
+            $this->exts->log(__FUNCTION__ . '::User logged in');
+            $this->exts->capture("3-login-success");
+
+            $this->LoopAccount();
+
             // Final, check no invoice
             if ($this->isNoInvoice) {
                 $this->exts->no_invoice();
             }
-
             $this->exts->success();
         } else {
             $this->exts->log(__FUNCTION__ . '::Use login failed');
-            $this->exts->log(__FUNCTION__ . '::Last URL: ' . $this->exts->getUrl());
-
-            $error_text = strtolower($this->exts->extract($this->check_login_failed_selector));
-
-            $this->exts->log(__FUNCTION__ . '::Error text: ' . $error_text);
-            if (stripos($error_text, strtolower('The username and/or password you specified are not correct.')) !== false) {
+            if (stripos($this->exts->extract($this->check_login_failed_selector, null, 'innerText'), 'passwor') !== false) {
                 $this->exts->loginFailure(1);
             } else {
                 $this->exts->loginFailure();
@@ -133,101 +160,29 @@ class PortalScriptCDP
         }
     }
 
-    /**
-     * Method to fill login form
-     * @param Integer $count Number of times portal is retried.
-     */
-    function fillForm($count)
+    private function checkFillLogin()
     {
-        $this->exts->log("Begin fillForm " . $count);
-
-        $this->waitFor($this->username_selector);
-
-        if ($this->isExists($this->username_selector)) {
+        if ($this->exts->exists('button#CybotCookiebotDialogBodyLevelButtonLevelOptinAllowAll')) {
+            $this->exts->moveToElementAndClick('button#CybotCookiebotDialogBodyLevelButtonLevelOptinAllowAll');
             sleep(2);
-            $this->exts->capture("1-pre-login");
-
-            $this->exts->log("Enter Username");
-            $this->exts->moveToElementAndType($this->username_selector, $this->username);
-
-            if ($this->isExists($this->submit_btn)) {
-                $this->exts->moveToElementAndClick($this->submit_btn);
-            }
-
-            $this->exts->log("Enter Password");
-            $this->exts->moveToElementAndType($this->password_selector, $this->password);
-
-            $this->exts->capture("1-pre-login-1");
-
-            $this->check_solve_hcaptcha_challenge();
-            $this->check_solve_hcaptcha_challenge();
-            $this->check_solve_hcaptcha_challenge();
-            sleep(5);
-
-            if ($this->isExists($this->submit_btn)) {
-                $this->exts->moveToElementAndClick($this->submit_btn);
-                sleep(5);
-            }
-
-            $this->exts->capture("logged-in");
-        } else {
-            $this->exts->log(__FUNCTION__ . '::Login page not found');
-            $this->exts->capture("2-login-page-not-found");
         }
+        $this->exts->type_key_by_xdotool("F5");
+        sleep(7);
+
+        $this->exts->type_text_by_xdotool($this->username);
+        sleep(1);
+        $this->exts->type_key_by_xdotool("Tab");
+        $this->exts->type_text_by_xdotool($this->password);
+        sleep(1);
+        $this->exts->type_key_by_xdotool("Return");
+        sleep(10);
     }
 
-    public function waitFor($selector, $seconds = 10)
-    {
-        for ($wait = 0; $wait < 2 && $this->exts->executeSafeScript("return !!document.querySelector('" . $selector . "');") != 1; $wait++) {
-            $this->exts->log('Waiting for Selectors.....');
-            sleep($seconds);
-        }
-    }
 
-    private function isExists($selector = '')
-    {
-        $safeSelector = addslashes($selector);
-        $this->exts->log('Element:: ' . $safeSelector);
-        $isElement = $this->exts->execute_javascript('!!document.querySelector("' . $safeSelector . '")');
-        if ($isElement) {
-            $this->exts->log('Element Found');
-            return true;
-        } else {
-            $this->exts->log('Element not Found');
-            return false;
-        }
-    }
-
-    /**
-     * Method to Check where user is logged in or not
-     * return boolean true/false
-     */
-    function checkLogin()
-    {
-        $this->exts->log("Begin checkLogin ");
-        $isLoggedIn = false;
-        try {
-
-            for ($wait = 0; $wait < 2 && $this->exts->executeSafeScript("return !!document.querySelector('" . $this->check_login_success_selector . "');") != 1; $wait++) {
-                $this->exts->log('Waiting for login.....');
-                sleep(7);
-            }
-            if ($this->isExists($this->check_login_success_selector)) {
-                $this->exts->log(">>>>>>>>>>>>>>>Login successful!!!!");
-                $isLoggedIn = true;
-            }
-        } catch (\Exception $exception) {
-            $this->exts->log("Exception checking loggedin " . $exception);
-        }
-
-        return $isLoggedIn;
-    }
-
-    // solve hcaptcha by clicking
     private function check_solve_hcaptcha_challenge()
     {
-        $this->exts->waitTillPresent('div[data-testid="captcha-container"] iframe[src*="hcaptcha.com/captcha/v1/"]');
-        $unsolved_hcaptcha_submit_selector = 'div[data-testid="captcha-container"] iframe[src*="hcaptcha.com/captcha/v1/"]';
+        $this->exts->waitTillPresent('iframe[src*="hcaptcha.com/captcha"][title*="checkbox"][data-hcaptcha-response=""]');
+        $unsolved_hcaptcha_submit_selector = 'iframe[src*="hcaptcha.com/captcha"][title*="checkbox"][data-hcaptcha-response=""]';
         $hcaptcha_challenger_wraper_selector = 'div[style*="visibility: visible"] > div  >  iframe[src*="frame=challenge"]';
         if ($this->isExists($unsolved_hcaptcha_submit_selector) || $this->isExists($hcaptcha_challenger_wraper_selector)) { // if exist hcaptcha and it isn't solved
             // Check if challenge images hasn't showed yet, Click checkbox to show images challenge
@@ -352,7 +307,6 @@ class PortalScriptCDP
         return false;
     }
 
-
     private function click_hcaptcha_point($selector = '', $x_on_element = 0, $y_on_element = 0)
     {
         $this->exts->log(__FUNCTION__ . " $selector $x_on_element $y_on_element");
@@ -431,54 +385,182 @@ class PortalScriptCDP
     }
     //END block
 
-    private function downloadInvoice($count)
+    private function clearChrome()
     {
-        $this->exts->log("Begin download invoice - " . $count);
+        $this->exts->log("Clearing browser history, cookie, cache");
+        $this->exts->openUrl('chrome://settings/clearBrowserData');
+        sleep(10);
+        $this->exts->capture("clear-page");
+        for ($i = 0; $i < 2; $i++) {
+            $this->exts->type_key_by_xdotool('Tab');
+            sleep(1);
+        }
+        $this->exts->type_key_by_xdotool('Tab');
+        sleep(1);
+        $this->exts->type_key_by_xdotool('Return');
+        sleep(1);
+        $this->exts->type_key_by_xdotool('a');
+        sleep(1);
+        $this->exts->type_key_by_xdotool('Return');
+        sleep(3);
+        $this->exts->capture("clear-page");
+        for ($i = 0; $i < 5; $i++) {
+            $this->exts->type_key_by_xdotool('Tab');
+            sleep(1);
+        }
+        $this->exts->type_key_by_xdotool('Return');
+        sleep(10);
+        $this->exts->capture("after-clear");
+    }
 
-        $this->waitFor('.billing-history-table > tbody > tr');
+    private function isExists($selector = '')
+    {
+        $safeSelector = addslashes($selector);
+        $this->exts->log('Element:: ' . $safeSelector);
+        $isElement = $this->exts->execute_javascript('!!document.querySelector("' . $safeSelector . '")');
+        if ($isElement) {
+            $this->exts->log('Element Found');
+            return true;
+        } else {
+            $this->exts->log('Element not Found');
+            return false;
+        }
+    }
 
-        $this->exts->capture("2-download-invoice");
-        $invoices = [];
+    private function LoopAccount()
+    {
+        $this->exts->log("Select User");
+        sleep(2);
+        $accounts = count($this->exts->getElements('tr[onclick*="setSessionCustomer"]'));
+        $this->exts->log('ACCOUNTS found: ' . $accounts);
 
-        $rows = $this->exts->getElements('.billing-history-table > tbody > tr');
-        foreach ($rows as $row) {
-            $invoiceLink = $this->exts->getElement('a:nth-child(1)', $row);
-            if ($invoiceLink != null) {
-                $invoiceUrl = $invoiceLink->getAttribute("href");
-                $invoiceName = $this->exts->extract('td:nth-child(3)', $row);
-                $invoiceDate = $this->exts->extract('td:nth-child(1)', $row);
-                $invoiceAmount = $this->exts->extract('td:nth-child(4)', $row);
+        if ($accounts > 1) {
+            for ($a = 0; $a < $accounts; $a++) {
+                if ($a > 0) {
 
-                array_push($invoices, array(
-                    'invoiceName' => $invoiceName,
-                    'invoiceDate' => $invoiceDate,
-                    'invoiceAmount' => $invoiceAmount,
-                    'invoiceUrl' => $invoiceUrl,
-                ));
-                $this->isNoInvoice = false;
+                    $this->exts->moveToElementAndClick('a[href="/selectSessionCustomer/"]');
+                    sleep(5);
+                }
+                //redirected you too many times.
+                if ($this->exts->exists('#reload-button')) {
+                    $this->exts->moveToElementAndClick('#reload-button');
+                    sleep(10);
+                }
+                if ($this->exts->exists('#reload-button')) {
+                    $this->exts->openUrl($this->UserUrl);
+                    sleep(10);
+                }
+                $this->exts->log('SWITCH account');
+                $this->exts->capture("SWITCH-account-" . $a);
+                $account_button = $this->exts->getElements('tr[onclick*="setSessionCustomer"]')[$a];
+                try {
+                    $account_button->click();
+                } catch (\Exception $exception) {
+                    $this->exts->executeSafeScript("arguments[0].click()", [$account_button]);
+                }
+                sleep(5);
+                $this->exts->openUrl($this->invoicePageUrl);
+                $this->processInvoices();
+            }
+        } else {
+            $this->exts->openUrl($this->invoicePageUrl);
+            $this->processInvoices();
+        }
+    }
+
+
+    private function processInvoices($pageCount = 1)
+    {
+        sleep(25);
+        $this->exts->capture("4-invoices-page");
+        for ($paging_count = 1; $paging_count < 50; $paging_count++) {
+            $rows = $this->exts->getElements('table > tbody > tr');
+            for ($i = 0; $i < count($rows); $i++) {
+                $row = $rows[$i];
+                $tags = $this->exts->getElements('td', $row);
+                if (count($tags) >= 5 && $this->exts->getElement('.cta-cell a[href*="/app"]', $tags[5]) != null) {
+                    $this->isNoInvoice = false;
+
+                    $invoiceName = trim($this->getInnerTextByJS($tags[3]));
+                    $invoiceDate = trim($this->getInnerTextByJS($tags[1]));
+
+                    $amountText = trim($this->getInnerTextByJS($tags[4]));
+                    $invoiceAmount = preg_replace('/[^\d\.\,]/', '', $amountText);
+                    if (stripos($amountText, 'A$') !== false) {
+                        $invoiceAmount = $invoiceAmount . ' AUD';
+                    } else if (stripos($amountText, '$') !== false) {
+                        $invoiceAmount = $invoiceAmount . ' USD';
+                    } else if (stripos(urlencode($amountText), '%C2%A3') !== false) {
+                        $invoiceAmount = $invoiceAmount . ' GBP';
+                    } else {
+                        $invoiceAmount = $invoiceAmount . ' EUR';
+                    }
+                    $this->exts->log('-------------' . ($i + 1) . '-------------');
+                    $this->exts->log('invoiceName: ' . $invoiceName);
+                    $this->exts->log('invoiceDate: ' . $invoiceDate);
+                    $this->exts->log('invoiceAmount: ' . $invoiceAmount);
+                    $invoiceFileName = $invoiceName . '.pdf';
+
+                    if ($this->exts->invoice_exists($invoiceName)) {
+                        $this->exts->log('Invoice existed ' . $invoiceFileName);
+                        continue;
+                    } else {
+                        $this->exts->getElement('.cta-cell a[href*="/app"]', $tags[5])->click();
+                        sleep(3);
+
+                        $this->exts->moveToElementAndClick('a[download*=".pdf"]');
+                        $this->exts->wait_and_check_download('pdf');
+                        $downloaded_file = $this->exts->find_saved_file('pdf', $invoiceFileName);
+
+                        if (trim($downloaded_file) != '' && file_exists($downloaded_file)) {
+                            $this->exts->new_invoice($invoiceName, $invoiceDate, $invoiceAmount, $downloaded_file);
+                            sleep(1);
+                        } else {
+                            $this->exts->log(__FUNCTION__ . '::Timeout when download ' . $invoiceFileName);
+                            $this->exts->moveToElementAndClick('a[download*=".pdf"]');
+                            sleep(6);
+                            $this->exts->wait_and_check_download('pdf');
+                            $downloaded_file = $this->exts->find_saved_file('pdf', $invoiceFileName);
+
+                            if (trim($downloaded_file) != '' && file_exists($downloaded_file)) {
+                                $this->exts->new_invoice($invoiceName, $invoiceDate, $invoiceAmount, $downloaded_file);
+                                sleep(1);
+                            }
+                        }
+                    }
+                }
+                $this->exts->moveToElementAndClick('.backBtn');
+                sleep(5);
+                $rows = $this->exts->getElements('table > tbody > tr');
+            }
+            $restrictPages = isset($this->exts->config_array["restrictPages"]) ? (int)@$this->exts->config_array["restrictPages"] : 3;
+            if ($restrictPages == 0 && $this->exts->exists('.table-pagination__btn--next:not(disabled)')) {
+                $this->exts->moveToElementAndClick('.table-pagination__btn--next:not(disabled)');
+                sleep(5);
+            } else {
+                break;
             }
         }
+    }
 
-        // Download all invoices
-        $this->exts->log('Invoices found: ' . count($invoices));
-        foreach ($invoices as $invoice) {
-            $this->exts->log('--------------------------');
-            $this->exts->log('invoiceName: ' . $invoice['invoiceName']);
-            $this->exts->log('invoiceDate: ' . $invoice['invoiceDate']);
-            $this->exts->log('invoiceAmount: ' . $invoice['invoiceAmount']);
-            $this->exts->log('invoiceUrl: ' . $invoice['invoiceUrl']);
-
-            $invoiceFileName = !empty($invoice['invoiceName']) ? $invoice['invoiceName'] . '.pdf' : '';
-            $invoice['invoiceDate'] = $this->exts->parse_date($invoice['invoiceDate'], 'm/d/Y', 'Y-m-d');
-            $this->exts->log('Date parsed: ' . $invoice['invoiceDate']);
-
-            $downloaded_file = $this->exts->direct_download($invoice['invoiceUrl'], 'pdf', $invoiceFileName);
-            if (trim($downloaded_file) != '' && file_exists($downloaded_file)) {
-                $this->exts->new_invoice($invoice['invoiceName'], $invoice['invoiceDate'], $invoice['invoiceAmount'], $downloaded_file);
-                sleep(1);
-            } else {
-                $this->exts->log(__FUNCTION__ . '::No download ' . $invoiceFileName);
+    function getInnerTextByJS($selector_or_object, $parent = null)
+    {
+        if ($selector_or_object == null) {
+            $this->exts->log(__FUNCTION__ . ' Can not get innerText of null');
+            return;
+        }
+        $element = $selector_or_object;
+        if (is_string($selector_or_object)) {
+            $element = $this->exts->getElement($selector_or_object, $parent);
+            if ($element == null) {
+                $element = $this->exts->getElement($selector_or_object, $parent, 'xpath');
             }
+            if ($element == null) {
+                $this->exts->log(__FUNCTION__ . ':: Can not found element with selector/xpath: ' . $selector_or_object);
+            }
+        }
+        if ($element != null) {
+            return $this->exts->executeSafeScript("return arguments[0].innerText", [$element]);
         }
     }
 }
