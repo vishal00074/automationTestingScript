@@ -86,7 +86,7 @@ class PortalScriptCDP
             $this->exts->current_context->webSocketDebuggerUrl,
             "Network.setUserAgentOverride",
             '',
-            ["userAgent" => "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/119.0.0.0 Safari/537.36"]
+            ["userAgent" => "Mozilla/5.0 (Linux; Android 15; SM-S931B Build/AP3A.240905.015.A2; wv) AppleWebKit/537.36"]
         );
 
         $isCookieLoaded = false;
@@ -146,8 +146,6 @@ class PortalScriptCDP
             if ($this->isNoInvoice) {
                 $this->exts->no_invoice();
             }
-
-            $this->exts->success();
         } else {
             $this->exts->log($this->exts->getUrl());
             if ($this->exts->getElementByText($this->login_failed_selector, ['password', 'Passwort', 'passwort', 'card number', 'email address', 'error has occurred'], null, false) != null) {

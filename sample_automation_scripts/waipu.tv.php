@@ -1,5 +1,4 @@
-<?php
-
+<?php // I have added captcha code to handle captcha and successfully tested it on test engine.
 
 /**
  * Chrome Remote via Chrome devtool protocol script, for specific process/portal
@@ -58,8 +57,9 @@ class PortalScriptCDP
         }
     }
 
-    // Server-Portal-ID: 23461 - Last modified: 08.04.2025 14:22:32 UTC - User: 1
+    // Server-Portal-ID: 23461 - Last modified: 30.01.2025 14:04:57 UTC - User: 1
 
+    /*Define constants used in script*/
     public $baseUrl = 'https://customer-self-care.waipu.tv';
     public $loginUrl = 'https://auth.waipu.tv/ui/login';
     public $invoicePageUrl = 'https://customer-self-care.waipu.tv/ui/my_invoices';
@@ -84,45 +84,17 @@ class PortalScriptCDP
         $this->exts->loadCookiesFromFile();
         sleep(1);
         $this->exts->openUrl($this->baseUrl);
-        sleep(10);
-        $this->clearChrome();
-        // after load cookies and open base url, check if user logged in
-        // Wait for selector that make sure user logged in
-        // If user hase not logged in, open the login url and wait for login form
-        $this->exts->log('NOT logged in from initPortal');
-        $this->exts->capture('0-init-portal-not-loggedin');
+        sleep(15);
 
-        $this->exts->openUrl('chrome://extensions/'); 
-        sleep(10);
-        $this->exts->execute_javascript("
-            let manager = document.querySelector('extensions-manager');
-            if (manager && manager.shadowRoot) {
-                let itemList = manager.shadowRoot.querySelector('extensions-item-list');
-                if (itemList && itemList.shadowRoot) {
-                    let items = itemList.shadowRoot.querySelectorAll('extensions-item');
-                    items.forEach(item => {
-                        let toggle = item.shadowRoot.querySelector('#enableToggle[checked]');
-                        if (toggle) toggle.click();
-                    });
-                }
-            }
-        ");
-        sleep(5);
-        $this->exts->openUrl($this->loginUrl);
-        $this->exts->waitTillPresent('iframe[id*="sp_message_iframe"]', 20);
-        $this->switchToFrame('iframe[id*="sp_message_iframe"]');
-        sleep(5);
-        if ($this->exts->exists('button[title="Zustimmen und weiter"]')) {
-            $this->exts->click_by_xdotool('button[title="Zustimmen und weiter"]');
-        }
-        $this->exts->switchToDefault();
-        sleep(10);
-        $this->checkFillLogin(0);
-        sleep(5);
-        if ($this->exts->allExists([$this->password_selector])) {
-            $this->exts->clearCookies();
+        if (!$this->exts->exists($this->checkLoggedinSelector) || !$this->exts->urlContains('waipu.tv/ARD')) {
+            $this->clearChrome();
+            // after load cookies and open base url, check if user logged in
+            // Wait for selector that make sure user logged in
+            // If user hase not logged in, open the login url and wait for login form
+            $this->exts->log('NOT logged in from initPortal');
+            $this->exts->capture('0-init-portal-not-loggedin');
+
             $this->exts->openUrl($this->loginUrl);
-            sleep(5);
             $this->exts->waitTillPresent('iframe[id*="sp_message_iframe"]', 20);
             $this->switchToFrame('iframe[id*="sp_message_iframe"]');
             sleep(5);
@@ -130,21 +102,36 @@ class PortalScriptCDP
                 $this->exts->click_by_xdotool('button[title="Zustimmen und weiter"]');
             }
             $this->exts->switchToDefault();
-            sleep(2);
-        }
-        $this->checkFillLogin(0);
-        sleep(10);
-        $this->exts->capture("2-post-login");
-        if ($this->exts->allExists([$this->password_selector])) {
-            $this->exts->clearCookies();
-            $this->exts->openUrl($this->loginUrl);
+            sleep(10);
+            $this->checkFillLogin();
             sleep(5);
-            $this->checkFillLogin(0);
+            if ($this->exts->allExists([$this->password_selector])) {
+                $this->exts->clearCookies();
+                $this->exts->openUrl($this->loginUrl);
+                sleep(5);
+                $this->exts->waitTillPresent('iframe[id*="sp_message_iframe"]', 20);
+                $this->switchToFrame('iframe[id*="sp_message_iframe"]');
+                sleep(5);
+                if ($this->exts->exists('button[title="Zustimmen und weiter"]')) {
+                    $this->exts->click_by_xdotool('button[title="Zustimmen und weiter"]');
+                }
+                $this->exts->switchToDefault();
+                sleep(2);
+            }
+            $this->checkFillLogin();
             sleep(10);
             $this->exts->capture("2-post-login");
-        }
+            if ($this->exts->allExists([$this->password_selector])) {
+                $this->exts->clearCookies();
+                $this->exts->openUrl($this->loginUrl);
+                sleep(5);
+                $this->checkFillLogin();
+                sleep(10);
+                $this->exts->capture("2-post-login");
+            }
 
-        sleep(15);
+            sleep(15);
+        }
 
         if ($this->exts->exists($this->checkLoggedinSelector) || $this->exts->urlContains('waipu.tv/ARD')) {
             $this->exts->log('User logged in.');
@@ -226,9 +213,7 @@ class PortalScriptCDP
         return false;
     }
 
-   
-
-    private function checkFillLogin($count = 0)
+    private function checkFillLogin()
     {
         $this->exts->waitTillPresent($this->username_selector, 5);
         if ($this->exts->querySelector($this->username_selector) != null) {
@@ -242,6 +227,8 @@ class PortalScriptCDP
             $this->exts->moveToElementAndType($this->password_selector, $this->password);
             sleep(1);
             $this->checkFillRecaptcha();
+            $this->checkFillRecaptcha2();
+            
 
             $this->exts->capture("1-filled-login");
             sleep(5);
@@ -285,25 +272,25 @@ class PortalScriptCDP
 
                 // Step 2, check if callback function need executed
                 $gcallbackFunction = $this->exts->execute_javascript('
-			if(document.querySelector("[data-callback]") != null){
-				return document.querySelector("[data-callback]").getAttribute("data-callback");
-			}
+				if(document.querySelector("[data-callback]") != null){
+					return document.querySelector("[data-callback]").getAttribute("data-callback");
+				}
 
-			var result = ""; var found = false;
-			function recurse (cur, prop, deep) {
-				if(deep > 5 || found){ return;}console.log(prop);
-				try {
-					if(cur == undefined || cur == null || cur instanceof Element || Object(cur) !== cur || Array.isArray(cur)){ return;}
-					if(prop.indexOf(".callback") > -1){result = prop; found = true; return;
-					} else { deep++;
-						for (var p in cur) { recurse(cur[p], prop ? prop + "." + p : p, deep);}
-					}
-				} catch(ex) { console.log("ERROR in function: " + ex); return; }
-			}
+				var result = ""; var found = false;
+				function recurse (cur, prop, deep) {
+					if(deep > 5 || found){ return;}console.log(prop);
+					try {
+						if(cur == undefined || cur == null || cur instanceof Element || Object(cur) !== cur || Array.isArray(cur)){ return;}
+						if(prop.indexOf(".callback") > -1){result = prop; found = true; return;
+						} else { deep++;
+							for (var p in cur) { recurse(cur[p], prop ? prop + "." + p : p, deep);}
+						}
+					} catch(ex) { console.log("ERROR in function: " + ex); return; }
+				}
 
-			recurse(___grecaptcha_cfg.clients[0], "", 0);
-			return found ? "___grecaptcha_cfg.clients[0]." + result : null;
-		');
+				recurse(___grecaptcha_cfg.clients[0], "", 0);
+				return found ? "___grecaptcha_cfg.clients[0]." + result : null;
+			');
                 $this->exts->log('Callback function: ' . $gcallbackFunction);
                 if ($gcallbackFunction != null) {
                     $this->exts->execute_javascript($gcallbackFunction . '("' . $this->exts->recaptcha_answer . '");');
@@ -323,6 +310,71 @@ class PortalScriptCDP
         }
     }
 
+    private function checkFillRecaptcha2($count = 1)
+    {
+        $this->exts->log(__FUNCTION__);
+        $recaptcha_iframe_selector = 'iframe[src*="/recaptcha/api2/anchor"]';
+        $recaptcha_textarea_selector = 'textarea[name="g-recaptcha-response"]';
+        if ($this->exts->exists($recaptcha_iframe_selector)) {
+            $iframeUrl = $this->exts->extract($recaptcha_iframe_selector, null, 'src');
+            $data_siteKey = explode('&', end(explode("&k=", $iframeUrl)))[0];
+            $this->exts->log("iframe url  - " . $iframeUrl);
+            $this->exts->log("SiteKey - " . $data_siteKey);
+
+            $isCaptchaSolved = $this->exts->processRecaptcha($this->exts->getUrl(), $data_siteKey, true);
+            $this->exts->log("isCaptchaSolved - " . $isCaptchaSolved);
+
+            if ($isCaptchaSolved) {
+
+                $this->exts->log(__FUNCTION__ . "::filling reCaptcha response..");
+                $recaptcha_textareas =  $this->exts->getElements($recaptcha_textarea_selector);
+                for ($i = 0; $i < count($recaptcha_textareas); $i++) {
+                    $this->exts->execute_javascript("arguments[0].innerHTML = '" . $this->exts->recaptcha_answer . "';", [$recaptcha_textareas[$i]]);
+                }
+                sleep(2);
+                $this->exts->capture('recaptcha-filled');
+
+                // Step 2, check if callback function need executed
+                $gcallbackFunction = $this->exts->execute_javascript('
+				if(document.querySelector("[data-callback]") != null){
+					return document.querySelector("[data-callback]").getAttribute("data-callback");
+				}
+
+				var result = ""; var found = false;
+				function recurse (cur, prop, deep) {
+					if(deep > 5 || found){ return;}console.log(prop);
+					try {
+						if(cur == undefined || cur == null || cur instanceof Element || Object(cur) !== cur || Array.isArray(cur)){ return;}
+						if(prop.indexOf(".callback") > -1){result = prop; found = true; return;
+						} else { deep++;
+							for (var p in cur) { recurse(cur[p], prop ? prop + "." + p : p, deep);}
+						}
+					} catch(ex) { console.log("ERROR in function: " + ex); return; }
+				}
+
+				recurse(___grecaptcha_cfg.clients[0], "", 0);
+				return found ? "___grecaptcha_cfg.clients[0]." + result : null;
+			');
+                $this->exts->log('Callback function: ' . $gcallbackFunction);
+                if ($gcallbackFunction != null) {
+                    $this->exts->execute_javascript($gcallbackFunction . '("' . $this->exts->recaptcha_answer . '");');
+                    sleep(10);
+                }
+
+                $this->exts->capture('recaptcha-filled');
+            } else {
+                // try again if recaptcha expired
+                if ($count < 5) {
+                    $count++;
+                    $this->checkFillRecaptcha2($count);
+                }
+            }
+        } else {
+            $this->exts->log(__FUNCTION__ . '::Not found reCaptcha');
+        }
+    }
+
+   
 
     private function processInvoices()
     {
@@ -359,6 +411,7 @@ class PortalScriptCDP
                 'invoiceAmount' => $invoiceAmount,
                 'invoiceUrl' => $invoiceUrl
             );
+            $this->isNoInvoice = false;
         }
 
         // Download all invoices

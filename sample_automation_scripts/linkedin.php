@@ -406,10 +406,10 @@ class PortalScriptCDP
 
                 sleep(10);
                 $this->exts->switchToDefault();
-                if ($this->exts->exists('iframe.iframe--authentication')) {
-                    $this->switchToFrame('iframe.iframe--authentication');
-                    sleep(1);
-                }
+                // if ($this->exts->exists('iframe.iframe--authentication')) {
+                //     $this->switchToFrame('iframe.iframe--authentication');
+                //     sleep(1);
+                // }
                 if ($this->exts->exists("iframe#captcha-internal")) {
                     $this->switchToFrame("iframe#captcha-internal");
                 }
@@ -1599,7 +1599,7 @@ class PortalScriptCDP
                 }
                 sleep(3);
             }
-            //$downloaded_file = $this->exts->download_current($invoiceFileName);
+
             $downloaded_file = $this->exts->click_and_print('button#print-button', $invoiceFileName);
 
             if (trim($downloaded_file) != '' && file_exists($downloaded_file)) {
