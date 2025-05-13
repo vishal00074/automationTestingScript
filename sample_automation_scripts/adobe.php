@@ -184,10 +184,10 @@ $this->exts->account_not_ready();
             }
             }
             ");
-                    sleep(1);
-                    $this->exts->openUrl('chrome://extensions/?id=ifibfemgeogfhoebkmokieepdoobkbpo');
-                    sleep(1);
-                    $this->exts->executeSafeScript("if (document.querySelector('extensions-manager').shadowRoot.querySelector('extensions-detail-view').shadowRoot.querySelector('#enableToggle[checked]') != null) {
+        sleep(1);
+        $this->exts->openUrl('chrome://extensions/?id=ifibfemgeogfhoebkmokieepdoobkbpo');
+        sleep(1);
+        $this->exts->executeSafeScript("if (document.querySelector('extensions-manager').shadowRoot.querySelector('extensions-detail-view').shadowRoot.querySelector('#enableToggle[checked]') != null) {
             document.querySelector('extensions-manager').shadowRoot.querySelector('extensions-detail-view').shadowRoot.querySelector('#enableToggle[checked]').click();
             }");
         sleep(2);
@@ -342,25 +342,25 @@ $this->exts->account_not_ready();
 
                 // Step 2, check if callback function need executed
                 $gcallbackFunction = $this->exts->executeSafeScript('
-if(document.querySelector("[data-callback]") != null){
-    return document.querySelector("[data-callback]").getAttribute("data-callback");
-}
+                    if(document.querySelector("[data-callback]") != null){
+                        return document.querySelector("[data-callback]").getAttribute("data-callback");
+                    }
 
-var result = ""; var found = false;
-function recurse (cur, prop, deep) {
-    if(deep > 5 || found){ return;}console.log(prop);
-    try {
-        if(cur == undefined || cur == null || cur instanceof Element || Object(cur) !== cur || Array.isArray(cur)){ return;}
-        if(prop.indexOf(".callback") > -1){result = prop; found = true; return;
-        } else { deep++;
-            for (var p in cur) { recurse(cur[p], prop ? prop + "." + p : p, deep);}
-        }
-    } catch(ex) { console.log("ERROR in function: " + ex); return; }
-}
+                    var result = ""; var found = false;
+                    function recurse (cur, prop, deep) {
+                        if(deep > 5 || found){ return;}console.log(prop);
+                        try {
+                            if(cur == undefined || cur == null || cur instanceof Element || Object(cur) !== cur || Array.isArray(cur)){ return;}
+                            if(prop.indexOf(".callback") > -1){result = prop; found = true; return;
+                            } else { deep++;
+                                for (var p in cur) { recurse(cur[p], prop ? prop + "." + p : p, deep);}
+                            }
+                        } catch(ex) { console.log("ERROR in function: " + ex); return; }
+                    }
 
-recurse(___grecaptcha_cfg.clients[0], "", 0);
-return found ? "___grecaptcha_cfg.clients[0]." + result : null;
-');
+                    recurse(___grecaptcha_cfg.clients[0], "", 0);
+                    return found ? "___grecaptcha_cfg.clients[0]." + result : null;
+                    ');
                 $this->exts->log('Callback function: ' . $gcallbackFunction);
                 if ($gcallbackFunction != null) {
                     $this->exts->executeSafeScript($gcallbackFunction . '("' . $this->exts->recaptcha_answer . '");');
@@ -593,7 +593,7 @@ return found ? "___grecaptcha_cfg.clients[0]." + result : null;
             $this->exts->log('invoiceAmount: ' . $invoice['invoiceAmount']);
             $this->exts->log('invoiceUrl: ' . $invoice['invoiceUrl']);
 
-            $invoiceFileName = !empty($invoice['invoiceName']) ? $invoice['invoiceName'] . '.pdf': '';
+            $invoiceFileName = !empty($invoice['invoiceName']) ? $invoice['invoiceName'] . '.pdf' : '';
             $invoice['invoiceDate'] = $this->exts->parse_date($invoice['invoiceDate'], 'd. F Y', 'Y-m-d');
             $this->exts->log('Date parsed: ' . $invoice['invoiceDate']);
 
@@ -670,7 +670,7 @@ return found ? "___grecaptcha_cfg.clients[0]." + result : null;
             }
             $this->exts->log('Date parsed: ' . $invoice['invoiceDate']);
 
-            $invoiceFileName = !empty($invoice['invoiceName']) ? $invoice['invoiceName'] . '.pdf': '';
+            $invoiceFileName = !empty($invoice['invoiceName']) ? $invoice['invoiceName'] . '.pdf' : '';
             $downloaded_file = $this->exts->direct_download($invoice['invoiceUrl'], 'pdf', $invoiceFileName);
             if (trim($downloaded_file) != '' && file_exists($downloaded_file)) {
                 $this->exts->new_invoice($invoice['invoiceName'], $invoice['invoiceDate'], $invoice['invoiceAmount'], $invoiceFileName);
@@ -715,7 +715,7 @@ return found ? "___grecaptcha_cfg.clients[0]." + result : null;
             $this->exts->log('invoiceAmount: ' . $invoice['invoiceAmount']);
             $this->exts->log('invoiceUrl: ' . $invoice['invoiceUrl']);
 
-            $invoiceFileName = !empty($invoice['invoiceName']) ? $invoice['invoiceName'] . '.pdf': '';
+            $invoiceFileName = !empty($invoice['invoiceName']) ? $invoice['invoiceName'] . '.pdf' : '';
             $invoice['invoiceDate'] = $this->exts->parse_date($invoice['invoiceDate'], 'Y-m-d', 'Y-m-d');
             $this->exts->log('Date parsed: ' . $invoice['invoiceDate']);
 
