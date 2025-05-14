@@ -1,4 +1,6 @@
-<?php
+<?php // handle empty invoice name case updated password selector and updated download invoice code according to multiple account type
+
+// added select profile code in case user has multiple accounts updated 2fa code
 
 /**
  * Chrome Remote via Chrome devtool protocol script, for specific process/portal
@@ -70,11 +72,11 @@ class PortalScriptCDP
     public $remember_me_selector = '';
 
     public $echosign_username_selector = 'form#loginForm input#userEmail';
-    public $echosign_password_selector = 'form#loginForm input#userPassword';
+    public $echosign_password_selector = 'input#PasswordPage-PasswordField, form#loginForm input#userPassword';
     public $submit_login_selector = 'form#adobeid_signin button#sign_in, button.echosign.button-signin, button[data-id="PasswordPage-ContinueButton"]';
 
     public $check_login_failed_selector = 'label[data-id="PasswordPage-PasswordField-Error"], label[data-id="EmailPage-EmailField-Error"]';
-    public $check_echosign_login_success_selector = '#id-navbar-dropdown a[href*="/logout"]';
+    public $check_echosign_login_success_selector = 'div.unav-comp-external-profile, #id-navbar-dropdown a[href*="/logout"]';
     public $check_login_success_selector = 'a[data-profile="sign-out"], button[data-menu-id="profile"], main [data-e2e="plan-card-payment-invoice-btn"]';
 
 
@@ -104,7 +106,7 @@ class PortalScriptCDP
             $this->exts->openUrl($this->echosign_url);
             sleep(15);
             $loginViaEchosign = $this->checkFillEchosignLogin();
-
+            sleep(10);
             //Select 2FA
             if ($this->exts->exists('a[data-id="PasswordlessSignInWait-SelectAnotherMethod"]')) {
                 $this->exts->moveToElementAndClick('a[data-id="PasswordlessSignInWait-SelectAnotherMethod"]');
@@ -124,8 +126,8 @@ class PortalScriptCDP
             $this->checkFillTwoFactor();
 
             /*if($this->exts->querySelector('.spectrum-Heading1') != null && !$this->exts->exists($this->password_selector)){
-$this->exts->account_not_ready();
-}*/
+            $this->exts->account_not_ready();
+            }*/
 
             if (!$this->isLoggedin() && (!$loginViaEchosign || $this->exts->exists($this->username_selector))) {
                 $this->exts->log(__FUNCTION__ . "::User is not legacy Echosign account - Login Adobe");
@@ -146,6 +148,17 @@ $this->exts->account_not_ready();
                 $this->checkConfirmPassword();
             }
         }
+        sleep(5);
+        if ($this->exts->exists('button#onetrust-accept-btn-handler')) {
+            $this->exts->moveToElementAndClick('button#onetrust-accept-btn-handler');
+            sleep(5);
+        }
+
+        if ($this->exts->exists('button[data-testid="multi-offer-upsell-dismiss-btn"]')) {
+            $this->exts->moveToElementAndClick('button[data-testid="multi-offer-upsell-dismiss-btn"]');
+            sleep(5);
+        }
+
 
         if ($this->isLoggedin()) {
             sleep(3);
@@ -223,17 +236,14 @@ $this->exts->account_not_ready();
 
             $this->exts->log(__FUNCTION__ . "::Enter Echosign Username");
             $this->exts->moveToElementAndType($this->echosign_username_selector, $this->username);
-            sleep(2);
+            sleep(5);
             // After input username and click outside username input field
             // If user is NOT legacy echosign user, This site will be redirected to Adobe login page, call Adobelogin module in this case.
             // If user is legacy echosign user, This site will stay here and we can input password
             if ($this->exts->exists($this->echosign_password_selector)) {
                 $this->exts->moveToElementAndType($this->echosign_password_selector, $this->password, 3);
+                sleep(5);
             }
-            sleep(10);
-            // if ($this->exts->exists($this->echosign_password_selector)) {
-            //     $this->exts->moveToElementAndClick($this->echosign_password_selector);
-            // }
             $this->exts->log(__FUNCTION__ . "::Checking Echosign user or Adobe user");
             sleep(15);
             $this->exts->capture("2-login-echosign-after-username");
@@ -248,9 +258,29 @@ $this->exts->account_not_ready();
                 $this->exts->capture("2-login-echosign-page-filled");
 
                 $this->exts->moveToElementAndClick($this->submit_login_selector);
-                sleep(20);
+                sleep(15);
+            }
 
-                return true;
+            // Select Account
+            if ($this->exts->querySelector('div[data-id="PP-ProfileChooser-AuthAccount"]') != null) {
+                $this->exts->click_by_xdotool('div[data-id="PP-ProfileChooser-AuthAccount"]');
+                sleep(25);
+            }
+
+            if ($this->exts->querySelector('div.PP-ProfileChooser__chooser') != null) {
+                $this->exts->click_by_xdotool('div.PP-ProfileChooser__chooser  div.ActionList-Item:nth-child(1)');
+                sleep(25);
+            }
+
+            if ($this->exts->querySelector('div[class*="profile-switch-error"] a') != null) {
+                $this->exts->moveToElementAndClick('div[class*="profile-switch-error"] a');
+                sleep(25);
+            }
+
+
+            if ($this->exts->querySelector('div.PP-ProfileChooser__chooser') != null) {
+                $this->exts->click_by_xdotool('div.PP-ProfileChooser__chooser  div.ActionList-Item:nth-child(1)');
+                sleep(25);
             }
         } else {
             $this->exts->log(__FUNCTION__ . '::Echosign login page not found');
@@ -397,16 +427,14 @@ $this->exts->account_not_ready();
             if (!empty($two_factor_code) && trim($two_factor_code) != '') {
                 $this->exts->log("checkFillTwoFactor: Entering two_factor_code." . $two_factor_code);
                 $resultCodes = str_split($two_factor_code);
-                $code_inputs = $this->exts->getElements('input[data-id*="CodeInput"]');
-                $code_inputs_count = count($code_inputs);
-                for ($key = 0; $key < $code_inputs_count; $key++) {
-                    $code_input = $this->exts->getElements('input[data-id*="CodeInput"]')[$key];
-                    if ($code_input == null) continue;
+
+                $code_inputs = $this->exts->querySelectorAll('input[data-id*="CodeInput"]');
+                foreach ($code_inputs as $key => $code_input) {
                     if (array_key_exists($key, $resultCodes)) {
-                        $this->exts->log('"checkFillTwoFactor: Entering key ' . $resultCodes[$key] . 'to input #' . $code_input->getAttribute('data-id'));
-                        $code_input->sendKeys($resultCodes[$key]);
+                        $this->exts->log('"checkFillTwoFactor: Entering key ' . $resultCodes[$key] . ' to input #');
+                        $this->exts->moveToElementAndType('div[class="CodeInput"] > div:nth-child( ' . ($key + 1) . ') > div > input[data-id*="CodeInput"]s', $resultCodes[$key]);
                     } else {
-                        $this->exts->log('"checkFillTwoFactor: Have no char for input #' . $code_input->getAttribute('data-id'));
+                        $this->exts->log('"checkFillTwoFactor: Have no char for input #');
                     }
                 }
                 sleep(1);
@@ -523,26 +551,8 @@ $this->exts->account_not_ready();
         } else {
             $this->exts->log(__FUNCTION__ . '::This is PERSONAL user');
             sleep(10);
-            // $this->exts->openUrl('https://account.adobe.com/billing-history');
-            // sleep(10);
-
-            //click my account link
-            // $this->exts->moveToElementAndClick('li a[href*="account/myAccount"]');
-            // sleep(10);
-
-            //click billing seciction menu
-            if ($this->exts->exists('//a[contains(text(), "View billing history")]')) {
-                $this->exts->moveToElementAndClick('//a[contains(text(), "View billing history")]');
-            } else {
-                $this->exts->moveToElementAndClick('li[data-pageid="Rechnungsinformationen"]');
-            }
+            $this->exts->openUrl('https://account.adobe.com/orders/billing-history');
             sleep(10);
-
-            //click bills menu
-            // $this->exts->moveToElementAndClick('li[data-pageid="INVOICES"]');
-            // sleep(10);
-
-
             $browser_windows = $this->exts->get_all_tabs();
             $this->exts->switchToTab(end($browser_windows));
             $this->downloadInvoices();
@@ -559,52 +569,81 @@ $this->exts->account_not_ready();
 
     private function downloadInvoices($paging_count = 1)
     {
-        $this->exts->waitTillPresent('table tbody tr', 30);
+        $this->exts->waitTillPresent('div[role="rowgroup"]  div[class*="spectrum-Table-row"]', 30);
         $this->exts->capture("4-invoices-page");
-        $invoices = [];
 
-        $rows = $this->exts->querySelectorAll('table tbody tr');
-        foreach ($rows as $row) {
-            if ($this->exts->querySelector('td:nth-child(6) > div div:nth-child(2) button', $row) != null) {
-                $invoiceUrl = '';
-                $invoiceName = $this->exts->extract('td:nth-child(1)', $row);
-                $invoiceAmount = $this->exts->extract('td:nth-child(5)', $row);
-                $invoiceDate = $this->exts->extract('td:nth-child(1)', $row);
+        $rows = $this->exts->querySelectorAll('div[role="rowgroup"]  div[class*="spectrum-Table-row"]');
 
-                $downloadBtn = $this->exts->querySelector('td:nth-child(6) > div div:nth-child(2) button', $row);
+        if (count($rows) > 0) {
+            foreach ($rows as $row) {
+                $download_button = $this->exts->getElement('button:nth-child(2)', $row);
+                if ($download_button != null) {
+                    $invoiceName = $this->exts->extract('div:nth-child(3)  span span', $row) . '_' . time(); // created custom invoice name 
+                    $invoiceAmount = $this->exts->extract('div:nth-child(5)  span span', $row);
+                    $invoiceDate = $this->exts->extract('div:nth-child(1)  span span', $row);
 
-                array_push($invoices, array(
-                    'invoiceName' => $invoiceName,
-                    'invoiceDate' => $invoiceDate,
-                    'invoiceAmount' => $invoiceAmount,
-                    'invoiceUrl' => $invoiceUrl,
-                    'downloadBtn' => $downloadBtn
-                ));
-                $this->isNoInvoice = false;
+                    $this->isNoInvoice = false;
+
+                    $invoiceFileName = !empty($invoiceName) ? $invoiceName . '.pdf' : '';
+                    $invoiceDate = $this->exts->parse_date($invoiceDate, 'd.m.Y', 'Y-m-d');
+                    $this->exts->log('Date parsed: ' .  $invoiceDate);
+
+                    $downloaded_file = $this->exts->click_and_download($download_button, 'pdf', $invoiceFileName);
+                    sleep(5);
+                    if (trim($downloaded_file) != '' && file_exists($downloaded_file)) {
+                        $this->exts->new_invoice($invoiceName, $invoiceDate, $invoiceAmount, $invoiceFileName);
+                        sleep(1);
+                    } else {
+                        $this->exts->log(__FUNCTION__ . '::No download ' . $invoiceFileName);
+                    }
+                }
             }
-        }
+        } else {
+            $rows = $this->exts->querySelectorAll('table tbody tr');
+            foreach ($rows as $row) {
+                $download_button = $this->exts->getElement('button[data-e2e="download-invoices"]', $row);
+                if ($download_button != null) {
+                    $invoiceName = $this->exts->extract('td:nth-child(3)', $row);
+                    $invoiceAmount = $this->exts->extract('td:nth-child(5)', $row);
+                    $invoiceDate = $this->exts->extract('td:nth-child(1)', $row);
+                    $parsed_date = is_null($invoiceDate) ? null : $this->exts->parse_date($invoiceDate, 'm/d/Y', 'Y-m-d');
 
-        // Download all invoices    
-        $this->exts->log('Invoices found: ' . count($invoices));
-        foreach ($invoices as $invoice) {
-            $this->exts->log('--------------------------');
-            $this->exts->log('invoiceName: ' . $invoice['invoiceName']);
-            $this->exts->log('invoiceDate: ' . $invoice['invoiceDate']);
-            $this->exts->log('invoiceAmount: ' . $invoice['invoiceAmount']);
-            $this->exts->log('invoiceUrl: ' . $invoice['invoiceUrl']);
+                    $this->isNoInvoice = false;
 
-            $invoiceFileName = !empty($invoice['invoiceName']) ? $invoice['invoiceName'] . '.pdf' : '';
-            $invoice['invoiceDate'] = $this->exts->parse_date($invoice['invoiceDate'], 'd. F Y', 'Y-m-d');
-            $this->exts->log('Date parsed: ' . $invoice['invoiceDate']);
+                    try {
+                        $this->exts->log('Click download button');
+                        $download_button->click();
+                    } catch (\Exception $exception) {
+                        $this->exts->log('Click download button by javascript');
+                        $this->exts->executeSafeScript("arguments[0].click()", [$download_button]);
+                    }
+                    sleep(5);
+                    $this->exts->wait_and_check_download('pdf');
+                    $downloaded_file = $this->exts->find_saved_file('pdf');
 
-            // $downloaded_file = $this->exts->direct_download($invoice['invoiceUrl'], 'pdf', $invoiceFileName);
-            $downloaded_file = $this->exts->click_and_download($invoice['downloadBtn'], 'pdf', $invoiceFileName);
+                    if (trim($downloaded_file) != '' && file_exists($downloaded_file)) {
+                        $invoiceFileName = basename($downloaded_file);
+                        $invoiceName = explode('.pdf', $invoiceFileName)[0];
+                        $invoiceName = explode('(', $invoiceName)[0];
+                        $invoiceName = str_replace(' ', '', $invoiceName);
+                        $this->exts->log('--------------------------');
+                        $this->exts->log('invoiceName: ' . $invoiceFileName);
+                        $this->exts->log('Date parsed: ' . $invoiceDate);
+                        $this->exts->log('invoiceAmount: ' . $invoiceAmount);
+                        $this->exts->log('Final invoice name: ' . $invoiceName);
+                        $invoiceFileName = !empty($invoiceName) ? $invoiceName . '.pdf' : '';
+                        @rename($downloaded_file, $this->exts->config_array['download_folder'] . $invoiceFileName);
 
-            if (trim($downloaded_file) != '' && file_exists($downloaded_file)) {
-                $this->exts->new_invoice($invoice['invoiceName'], $invoice['invoiceDate'], $invoice['invoiceAmount'], $invoiceFileName);
-                sleep(1);
-            } else {
-                $this->exts->log(__FUNCTION__ . '::No download ' . $invoiceFileName);
+                        if ($this->exts->invoice_exists($invoiceName)) {
+                            $this->exts->log('Invoice existed ' . $invoiceFileName);
+                        } else {
+                            $this->exts->new_invoice($invoiceName, '', '', $invoiceFileName);
+                            sleep(1);
+                        }
+                    } else {
+                        $this->exts->log(__FUNCTION__ . '::No download ' . $invoiceName);
+                    }
+                }
             }
         }
     }

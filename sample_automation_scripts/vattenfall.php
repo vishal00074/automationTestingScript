@@ -1,4 +1,5 @@
-<?php // added condition in case invoice name is empty
+<?php // added condition in case invoice name is empty added clear chrome function and updated download code 
+// added trigger account_not_ready in case ip bloked by website.
 
 /**
  * Chrome Remote via Chrome devtool protocol script, for specific process/portal
@@ -95,6 +96,8 @@ class PortalScriptCDP
         // If the user has not logged in from cookie, do login.
         if ($this->exts->getElement($this->check_login_success_selector) === null) {
             $this->exts->log('NOT logged in via cookie');
+            $this->exts->openUrl($this->loginUrl);
+            sleep(10);
 
             // If it did not redirect to login page after opening baseUrl, open loginUrl and wait for login page.
             $this->checkFillLogin();
@@ -118,12 +121,17 @@ class PortalScriptCDP
             $this->exts->success();
         } else {
             $this->exts->log(__FUNCTION__ . '::User login failed');
+            $this->exts->log(__FUNCTION__ . '::Last URL: ' . $this->exts->getUrl());
+            $this->exts->capture('login-failed');
+            $isIpBlocked = strtolower($this->exts->extract('div.ip-blocked-box h1'));
+            $this->exts->log($isIpBlocked);
 
-            $this->exts->log(__FUNCTION__ . '::Use login failed');
             if ($this->exts->getElement($this->check_login_failed_selector) != null || $this->exts->getElement('.cso-box.cso-error-handler .link.link--custom.link--button') != null) {
                 $this->exts->loginFailure(1);
             } else if (strpos(strtolower($this->exts->extract('p.server-error', null, 'innerText')), 'und ihrem passwort ist falsch') !== false) {
                 $this->exts->loginFailure(1);
+            } else if (stripos($isIpBlocked, strtolower('Bitte versuchen Sie es nach 24 Stunden erneut')) !== false) {
+                $this->exts->account_not_ready();
             } else {
                 $this->exts->loginFailure();
             }
@@ -212,19 +220,13 @@ class PortalScriptCDP
 
         $rows = $this->exts->getElements('.cso-box .panel');
         $this->exts->log('invoice found: ' . count($rows));
-
-        for ($i = 1; $i <= count($rows); $i++) {
-            $row = $this->exts->getElement('.cso-box .panel:nth-child(' . $i . ')');
-            $tags = $this->exts->getElements('div', $row);
-            if (count($tags) >= 3 && $this->exts->getElement('div.download span:nth-child(2)', $row) != null) {
-                $this->isNoInvoice = false;
-
-
-                $download_button = $this->exts->getElement('div.download span:nth-child(2)', $row);
+        foreach ($rows as $row) {
+            $download_button = $this->exts->getElement('div.download span:nth-child(2)', $row);
+            if ($download_button != null) {
                 $invoiceDate = $this->exts->extract('div[class="date-column"]', $row);
                 $parsed_date = is_null($invoiceDate) ? null : $this->exts->parse_date($invoiceDate, 'm/d/Y', 'Y-m-d');
                 $invoiceName = $contractNumber . '_' . $invoiceDate . '_' . trim($this->exts->extract('div[class="name-column"]', $row));
-                $invoiceFileName = !empty($invoiceName) ? $invoiceName . '.pdf': '';
+                $invoiceFileName = !empty($invoiceName) ? $invoiceName . '.pdf' : '';
                 $invoiceAmount = null;
 
                 $this->exts->log('--------------------------');
@@ -232,6 +234,8 @@ class PortalScriptCDP
                 $this->exts->log('invoiceDate: ' . $invoiceDate);
                 $this->exts->log('invoiceAmount: ' . $invoiceAmount);
                 $this->exts->log('Date parsed: ' . $parsed_date);
+
+                $this->isNoInvoice = false;
 
                 // Download invoice if it not exisited
                 if ($this->exts->invoice_exists($invoiceName)) {
