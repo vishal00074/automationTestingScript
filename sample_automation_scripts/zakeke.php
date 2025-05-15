@@ -1,5 +1,4 @@
-<?php //added  trigger loginfailedConfirmed in case credential are not correct
-
+<?php //added  trigger loginfailedConfirmed after submitting the login form in case credential are not correct
 /**
  * Chrome Remote via Chrome devtool protocol script, for specific process/portal
  *
@@ -245,11 +244,8 @@ class PortalScriptCDP
 
 
     /**
-
      * Method to Check where user is logged in or not
-
      * return boolean true/false
-
      */
     function checkLogin()
     {
