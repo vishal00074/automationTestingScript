@@ -1,4 +1,4 @@
-<?php // i have updated download orderInvoice code added change selectbox function and successfully tested it on test engine.
+<?php // updated  fill form function optimize script performance migrated script on remote chrome
 
 /**
  * Chrome Remote via Chrome devtool protocol script, for specific process/portal
@@ -56,21 +56,22 @@ class PortalScriptCDP
             echo 'Script execution failed.. ' . "\n";
         }
     }
-    // Server-Portal-ID: 10251 - Last modified: 28.04.2025 14:40:34 UTC - User: 1
+    // Server-Portal-ID: 20302 - Last modified: 22.08.2024 14:46:43 UTC - User: 1
 
-    public $baseUrl = "https://www.amazon.es";
-    public $orderPageUrl = "https://www.amazon.es/gp/css/order-history/ref=nav_youraccount_orders";
-    public $messagePageUrl = "https://www.amazon.es/gp/message?e=UTF8&cl=1&ref_=ya_d_l_msg_center#!/inbox";
-    public $businessPrimeUrl = "https://www.amazon.es/businessprimeversand";
+    /*Define constants used in script*/
+    public $baseUrl = "https://www.amazon.nl";
+    public $orderPageUrl = "https://www.amazon.nl/gp/css/order-history/ref=nav_youraccount_orders";
+    public $messagePageUrl = "https://www.amazon.nl/gp/message?ie=UTF8&cl=1&ref_=ya_mc_bsm&#!/inbox";
+    public $businessPrimeUrl = "https://www.amazon.nl/businessprimeversand";
     public $loginLinkPrim = "div[id=\"nav-flyout-ya-signin\"] a";
     public $loginLinkSec = "div[id=\"nav-signin-tooltip\"] a";
     public $loginLinkThr = "div#nav-tools a#nav-link-yourAccount";
-    public $username_selector = 'input[autocomplete="username"]';
+    public $username_selector = "#ap_email";
     public $password_selector = "#ap_password";
-    public $submit_button_selector = "#signInSubmit";
+    public $submit_button_selector = '#signInSubmit, input[type="submit"]';
     public $continue_button_selector = "#continue";
-    public $logout_link = 'a#nav-item-signout, #nav-main a[href*="/sign-out.html"]';
-    public $remember_me = "input[name=\"rememberMe\"]";
+    public $logout_link = "a#nav-item-signout";
+    public $remember_me = 'input[name="rememberMe"]:not(:checked)';
     public $login_tryout = 0;
     public $msg_invoice_triggerd = 0;
     public $restrictPages = 3;
@@ -78,7 +79,7 @@ class PortalScriptCDP
     public $amazon_download_overview;
     public $download_invoice_from_message;
     public $auto_request_invoice;
-    public $procurment_report = 0;
+    public $pay_as_invoice = 0;
     public $only_years;
     public $auto_tagging;
     public $marketplace_invoice_tags;
@@ -90,10 +91,8 @@ class PortalScriptCDP
     public $last_invoice_date = "";
     public $last_state = array();
     public $current_state = array();
-    public $invalid_filename_keywords = array('agb', 'terms', 'datenschutz', 'privacy', 'rechnungsbeilage', 'informationsblatt', 'gesetzliche', 'retouren', 'widerruf', 'allgemeine gesch', 'mfb-buchung', 'informationen zu zahlung', 'nachvertragliche', 'retourenschein', 'allgemeine_gesch', 'rcklieferschein');
-    public $invalid_filename_pattern = '';
     public $isNoInvoice = true;
-    public $check_login_failed_selector = 'div#auth-error-message-box div.a-alert-content';
+    public $invalid_filename_keywords = array('agb', 'terms', 'datenschutz', 'privacy', 'rechnungsbeilage', 'informationsblatt', 'gesetzliche', 'retouren', 'widerruf', 'allgemeine gesch', 'mfb-buchung', 'informationen zu zahlung', 'nachvertragliche', 'retourenschein', 'allgemeine_gesch', 'rcklieferschein');
 
     /**
      * Entry Method thats called for a portal
@@ -108,6 +107,7 @@ class PortalScriptCDP
             $this->amazon_download_overview = isset($this->exts->config_array["download_overview_pdf"]) ? (int)$this->exts->config_array["download_overview_pdf"] : 0;
             $this->download_invoice_from_message = isset($this->exts->config_array["download_invoice_from_message"]) ? (int)$this->exts->config_array["download_invoice_from_message"] : 0;
             $this->auto_request_invoice = isset($this->exts->config_array["auto_request_invoice"]) ? (int)$this->exts->config_array["auto_request_invoice"] : 0;
+            $this->pay_as_invoice = isset($this->exts->config_array["pay_as_invoice"]) ? (int)$this->exts->config_array["pay_as_invoice"] : 0;
             $this->only_years = isset($this->exts->config_array["only_years"]) ? $this->exts->config_array["only_years"] : '';
             $this->auto_tagging = isset($this->exts->config_array["auto_tagging"]) ? $this->exts->config_array["auto_tagging"] : '';
             $this->marketplace_invoice_tags = isset($this->exts->config_array["marketplace_invoice_tags"]) ? $this->exts->config_array["marketplace_invoice_tags"] : '';
@@ -115,7 +115,6 @@ class PortalScriptCDP
             $this->amazon_invoice_tags = isset($this->exts->config_array["amazon_invoice_tags"]) ? $this->exts->config_array["amazon_invoice_tags"] : '';
             $this->start_page = isset($this->exts->config_array["start_page"]) ? $this->exts->config_array["start_page"] : '';
             $this->last_invoice_date = isset($this->exts->config_array["last_invoice_date"]) ? $this->exts->config_array["last_invoice_date"] : '';
-            $this->procurment_report = isset($this->exts->config_array["procurment_report"]) ? (int)$this->exts->config_array["procurment_report"] : 0;
 
 
             $this->exts->log('amazon_download_overview ' . $this->amazon_download_overview);
@@ -128,7 +127,8 @@ class PortalScriptCDP
             $this->exts->log('amazon_invoice_tags ' . $this->amazon_invoice_tags);
             $this->exts->log('start_page ' . $this->start_page);
             $this->exts->log('last_invoice_date ' . $this->last_invoice_date);
-            $this->exts->log('procurment_report ' . $this->procurment_report);
+            $this->exts->log('pay_as_invoice ' . $this->pay_as_invoice);
+
 
 
             $this->invalid_filename_pattern = '';
@@ -252,33 +252,6 @@ class PortalScriptCDP
         }
     }
 
-    private function changeSelectbox($select_box = '', $option_value = '')
-    {
-        $this->exts->waitTillPresent($select_box, 10);
-        if ($this->exts->exists($select_box)) {
-            $option = $option_value;
-            $this->exts->click_by_xdotool($select_box);
-            sleep(2);
-            $optionIndex = $this->exts->executeSafeScript('
-			const selectBox = document.querySelector("' . $select_box . '");
-			const targetValue = "' . $option_value . '";
-			const optionIndex = [...selectBox.options].findIndex(option => option.value === targetValue);
-			return optionIndex;
-		');
-            $this->exts->log($optionIndex);
-            sleep(1);
-            for ($i = 0; $i < $optionIndex; $i++) {
-                $this->exts->log('>>>>>>>>>>>>>>>>>> Down');
-                // Simulate pressing the down arrow key
-                $this->exts->type_key_by_xdotool('Down');
-                sleep(1);
-            }
-            $this->exts->type_key_by_xdotool('Return');
-        } else {
-            $this->exts->log('Select box does not exist');
-        }
-    }
-
     /**
      * Method to fill login form
      * @param Integer $count Number of times portal is retried.
@@ -301,7 +274,7 @@ class PortalScriptCDP
                 sleep(4);
             }
 
-            if ($this->login_tryout == 0) {
+            if ($this->exts->login_tryout == 0) {
                 if ($this->exts->querySelector($this->password_selector) != null || $this->exts->querySelector($this->username_selector) != null) {
                     $this->exts->capture("1-pre-login");
                     $formType = $this->exts->querySelector($this->password_selector);
@@ -501,6 +474,41 @@ class PortalScriptCDP
         }
     }
 
+    /**
+     * Method to check captcha form
+     * return boolean true/false
+     */
+    function checkCaptcha()
+    {
+        $this->exts->capture("check-captcha");
+
+        $isCaptchaFound = false;
+        if ($this->exts->getElement("input#ap_captcha_guess") != null || $this->exts->getElement("input#auth-captcha-guess") != null) {
+            $this->exts->login_tryout = (int)$this->exts->login_tryout + 1;
+            $isCaptchaFound = true;
+        }
+
+        return $isCaptchaFound;
+    }
+
+    /**
+     * Method to check Two Factor form
+     * return boolean true/false
+     */
+    public function checkMultiFactorAuth()
+    {
+        $this->exts->capture("check-two-factor");
+
+        $isTwoFactorFound = false;
+        if ($this->exts->querySelector("form#auth-mfa-form") != null) {
+            $isTwoFactorFound = true;
+        } else if ($this->exts->querySelector("form.cvf-widget-form[action=\"verify\"]") != null) {
+            $isTwoFactorFound = true;
+        }
+
+        return $isTwoFactorFound;
+    }
+
     private function checkFillTwoFactor($two_factor_selector, $two_factor_submit_selector, $two_factor_message_selector)
     {
         if ($this->exts->querySelector($two_factor_selector) != null && $this->exts->two_factor_attempts < 3) {
@@ -551,15 +559,15 @@ class PortalScriptCDP
 
     private function checkFillAnswerSerQuestion($two_factor_selector, $two_factor_submit_selector, $two_factor_message_selector)
     {
-        if ($this->exts->querySelector($two_factor_selector) != null && $this->exts->two_factor_attempts < 3) {
+        if ($this->exts->getElement($two_factor_selector) != null && $this->exts->two_factor_attempts < 3) {
             $this->exts->log("Two factor page found.");
             $this->exts->capture("2.1-two-factor");
 
-            if ($this->exts->querySelector($two_factor_message_selector) != null) {
-                $total_2fa = count($this->exts->querySelectorAll($two_factor_message_selector));
+            if ($this->exts->getElement($two_factor_message_selector) != null) {
+                $total_2fa = count($this->exts->getElements($two_factor_message_selector));
                 $this->exts->two_factor_notif_msg_en = "";
                 for ($i = 0; $i < $total_2fa; $i++) {
-                    $this->exts->two_factor_notif_msg_en = $this->exts->two_factor_notif_msg_en . $this->exts->querySelectorAll($two_factor_message_selector)[$i]->getText() . "\n";
+                    $this->exts->two_factor_notif_msg_en = $this->exts->two_factor_notif_msg_en . $this->exts->getElements($two_factor_message_selector)[$i]->getText() . "\n";
                 }
                 $this->exts->two_factor_notif_msg_en = 'Please enter answer of below question (MM/YYYY): ' . trim($this->exts->two_factor_notif_msg_en);
                 $this->exts->two_factor_notif_msg_de = 'Bitte geben Sie die Antwort der folgenden Frage ein (MM/YYYY): ' . $this->exts->two_factor_notif_msg_en;
@@ -582,15 +590,15 @@ class PortalScriptCDP
                 sleep(3);
                 $this->exts->capture("2.2-two-factor-filled-" . $this->exts->two_factor_attempts);
 
-                $this->exts->click_by_xdotool($two_factor_submit_selector);
+                $this->exts->moveToElementAndClick($two_factor_submit_selector);
                 sleep(15);
 
-                if ($this->exts->querySelector($two_factor_selector) == null) {
+                if ($this->exts->getElement($two_factor_selector) == null) {
                     $this->exts->log("Two factor solved");
                 } else if ($this->exts->two_factor_attempts < 3) {
                     $this->exts->two_factor_attempts++;
                     $this->exts->notification_uid = '';
-                    $this->checkFillTwoFactor($two_factor_selector, $two_factor_submit_selector, $two_factor_message_selector);
+                    $this->checkFillAnswerSerQuestion($two_factor_selector, $two_factor_submit_selector, $two_factor_message_selector);
                 } else {
                     $this->exts->log("Two factor can not solved");
                 }
@@ -606,11 +614,11 @@ class PortalScriptCDP
             $this->exts->log("Two factor page found.");
             $this->exts->capture("2.1-two-factor");
 
-            if ($this->exts->querySelector($two_factor_message_selector) != null) {
-                $total_2fa = count($this->exts->querySelectorAll($two_factor_message_selector));
+            if ($this->exts->getElement($two_factor_message_selector) != null) {
+                $total_2fa = count($this->exts->getElements($two_factor_message_selector));
                 $this->exts->two_factor_notif_msg_en = "";
                 for ($i = 0; $i < $total_2fa; $i++) {
-                    $this->exts->two_factor_notif_msg_en = $this->exts->two_factor_notif_msg_en . $this->exts->querySelectorAll($two_factor_message_selector)[$i]->getText() . "\n";
+                    $this->exts->two_factor_notif_msg_en = $this->exts->two_factor_notif_msg_en . $this->exts->getElements($two_factor_message_selector)[$i]->getText() . "\n";
                 }
                 $this->exts->two_factor_notif_msg_en = trim($this->exts->two_factor_notif_msg_en) . 'Please input "OK" after responded email/approve notification!';
                 $this->exts->two_factor_notif_msg_de = $this->exts->two_factor_notif_msg_en . 'Please input "OK" after responded email/approve notification!';;
@@ -626,7 +634,7 @@ class PortalScriptCDP
                 $this->exts->log("checkFillTwoFactor: Entering two_factor_code." . $two_factor_code);
                 sleep(15);
 
-                if ($this->exts->querySelector($two_factor_message_selector) == null && !$this->exts->exists('input[name="transactionApprovalStatus"]')) {
+                if ($this->exts->getElement($two_factor_message_selector) == null && !$this->exts->exists('input[name="transactionApprovalStatus"]')) {
                     $this->exts->log("Two factor solved");
                 } else if ($this->exts->two_factor_attempts < 3) {
                     $this->exts->two_factor_attempts++;
@@ -642,41 +650,6 @@ class PortalScriptCDP
     }
 
     /**
-     * Method to check captcha form
-     * return boolean true/false
-     */
-    public function checkCaptcha()
-    {
-        $this->exts->capture("check-captcha");
-
-        $isCaptchaFound = false;
-        if ($this->exts->querySelector("input#ap_captcha_guess") != null || $this->exts->querySelector("input#auth-captcha-guess") != null) {
-            $this->login_tryout = (int)$this->login_tryout + 1;
-            $isCaptchaFound = true;
-        }
-
-        return $isCaptchaFound;
-    }
-
-    /**
-     * Method to check Two Factor form
-     * return boolean true/false
-     */
-    public function checkMultiFactorAuth()
-    {
-        $this->exts->capture("check-two-factor");
-
-        $isTwoFactorFound = false;
-        if ($this->exts->querySelector("form#auth-mfa-form") != null) {
-            $isTwoFactorFound = true;
-        } else if ($this->exts->querySelector("form.cvf-widget-form[action=\"verify\"]") != null) {
-            $isTwoFactorFound = true;
-        }
-
-        return $isTwoFactorFound;
-    }
-
-    /**
      * Method to Check where user is logged in or not
      * return boolean true/false
      */
@@ -685,8 +658,8 @@ class PortalScriptCDP
         $this->exts->log("Begin checkLogin ");
         $isLoggedIn = false;
         try {
-            if ($this->exts->querySelector($this->logout_link) != null) {
-                // $this->exts->waitForCssSelectorPresent($this->logout_link, function() {
+            if ($this->exts->querySelector($this->exts->logout_link) != null) {
+                // $this->exts->waitForCssSelectorPresent($this->exts->logout_link, function() {
                 $this->exts->log(">>>>>>>>>>>>>>>Login successful!!!!");
                 // 	$isLoggedIn = true;
                 // }, function() {
@@ -728,6 +701,42 @@ class PortalScriptCDP
         return $isLoggedIn;
     }
 
+    private function processCaptcha($captcha_image_selector, $captcha_input_selector)
+    {
+        $this->exts->log("--IMAGE CAPTCHA--");
+        if ($this->exts->exists($captcha_image_selector)) {
+            $image_path = $this->exts->captureElement($this->exts->process_uid, $captcha_image_selector);
+            $source_image = imagecreatefrompng($image_path);
+            imagejpeg($source_image, $this->exts->screen_capture_location . $this->exts->process_uid . '.jpg', 90);
+
+            if (!empty($this->exts->config_array['captcha_shell_script'])) {
+                $cmd = $this->exts->config_array['captcha_shell_script'] . " --PROCESS_UID::" . $this->exts->process_uid;
+                $this->exts->log('Executing command : ' . $cmd);
+                exec($cmd, $output, $return_var);
+                $this->exts->log('Command Result : ' . print_r($output, true));
+
+                if (!empty($output)) {
+                    $output = $output[0];
+                    if (stripos($output, 'OK|') !== false) {
+                        $captcha_code = trim(end(explode("OK|", $output)));
+                    } else {
+                        $this->exts->log('1:processCaptcha::ERROR when get response:' . $output);
+                    }
+                }
+                if ($captcha_code == '') {
+                    $this->exts->log("Can not get result from API");
+                } else {
+                    $this->exts->moveToElementAndType($captcha_input_selector, $captcha_code);
+                    return true;
+                }
+            }
+        } else {
+            $this->exts->log("Image does not found!");
+        }
+
+        return false;
+    }
+
     /**
      * Method to Process Image Catcha and Password field if present
      */
@@ -754,7 +763,7 @@ class PortalScriptCDP
             sleep(2);
         }
 
-        if (stripos($this->exts->getUrl(), "amazon.es/ap/signin") === false) {
+        if (stripos($this->exts->getUrl(), "amazon.nl/ap/signin") === false) {
             $isMultiAccount = count($this->exts->querySelectorAll("select[name=\"selectedB2BGroupKey\"] option")) > 1 ? true : false;
             $this->exts->log("isMultiAccount - " . $isMultiAccount);
 
@@ -815,7 +824,7 @@ class PortalScriptCDP
             }
 
             if ($this->procurment_report == 1) {
-                $this->exts->openUrl('https://www.amazon.es/b2b/aba/dashboard');
+                $this->exts->openUrl('https://www.amazon.nl/b2b/aba/dashboard');
                 if ($this->exts->querySelector($this->password_selector) != null || $this->exts->urlContains('ap/signin')) {
                     $this->fillForm(0);
                     sleep(4);
@@ -842,7 +851,7 @@ class PortalScriptCDP
             }
 
             //Check Business Prime Account
-            //https://www.amazon.es/businessprimeversand
+            //https://www.amazon.nl/businessprimeversand
             if (empty($this->last_state['stage']) || $this->last_state['stage'] == 'BUSINESS_PRIME') {
                 // Keep current state of processing
                 $this->exts->log('access BUSINESS_PRIME');
@@ -1127,8 +1136,8 @@ class PortalScriptCDP
                                     $columns = $rowItem->querySelectorAll('div.order-info div.a-fixed-right-grid-col.actions ul a.a-link-normal, a[href*="/order-details"]');
                                     if (count($columns) > 0) {
                                         $detailPageUrl = $columns[0]->getAttribute("href");
-                                        if (stripos($detailPageUrl, "https://www.amazon.es") === false && stripos($detailPageUrl, "https://") === false) {
-                                            $detailPageUrl = "https://www.amazon.es" . trim($detailPageUrl);
+                                        if (stripos($detailPageUrl, "https://www.amazon.nl") === false && stripos($detailPageUrl, "https://") === false) {
+                                            $detailPageUrl = "https://www.amazon.nl" . trim($detailPageUrl);
                                         }
 
                                         $filename = !empty($invoice_number) ? trim($invoice_number) . ".pdf" : '';
@@ -1441,13 +1450,13 @@ class PortalScriptCDP
                                                                 $filename = !empty($item_invoice_number) ?  $item_invoice_number . ".pdf" : '';
                                                             }
 
-                                                            if (stripos($invoice_url, "https://www.amazon.es") === false && stripos($invoice_url, "https://") === false) {
-                                                                $invoice_url = "https://www.amazon.es" . $invoice_url;
+                                                            if (stripos($invoice_url, "https://www.amazon.nl") === false && stripos($invoice_url, "https://") === false) {
+                                                                $invoice_url = "https://www.amazon.nl" . $invoice_url;
                                                             }
                                                             $this->exts->log("invoice_url - " . $invoice_url);
 
-                                                            if (trim($overview_link) != "" && stripos($overview_link, "https://www.amazon.es") === false && stripos($overview_link, "https://") === false) {
-                                                                $overview_link = "https://www.amazon.es" . $overview_link;
+                                                            if (trim($overview_link) != "" && stripos($overview_link, "https://www.amazon.nl") === false && stripos($overview_link, "https://") === false) {
+                                                                $overview_link = "https://www.amazon.nl" . $overview_link;
                                                             }
 
                                                             if (stripos($invoice_url, "print") !== false) {
@@ -1478,7 +1487,7 @@ class PortalScriptCDP
 
                                                                         sleep(2);
 
-                                                                        if (stripos($this->exts->getUrl(), "amazon.es/ap/signin") !== false) {
+                                                                        if (stripos($this->exts->getUrl(), "amazon.nl/ap/signin") !== false) {
                                                                             $this->fillForm(0);
                                                                             sleep(4);
                                                                             if ($this->exts->exists('a#ap-account-fixup-phone-skip-link')) {
@@ -1501,7 +1510,7 @@ class PortalScriptCDP
                                                                                     'orderPrice' => $orderPrice
                                                                                 );
                                                                             }
-                                                                        } else if (stripos($this->exts->getUrl(), "amazon.es/ap/signin") === false && (stripos($this->exts->getUrl(), "order-document.pdf") !== false || stripos($this->exts->getUrl(), ".pdf") !== false)) {
+                                                                        } else if (stripos($this->exts->getUrl(), "amazon.nl/ap/signin") === false && (stripos($this->exts->getUrl(), "order-document.pdf") !== false || stripos($this->exts->getUrl(), ".pdf") !== false)) {
                                                                             // Wait for completion of file download
                                                                             $this->exts->wait_and_check_download('pdf');
 
@@ -1580,7 +1589,7 @@ class PortalScriptCDP
                                                                         // $this->exts->openUrl($invoice_url);
                                                                         sleep(2);
 
-                                                                        if (stripos($this->exts->getUrl(), "amazon.es/ap/signin") !== false) {
+                                                                        if (stripos($this->exts->getUrl(), "amazon.nl/ap/signin") !== false) {
                                                                             $this->fillForm(0);
                                                                             sleep(4);
                                                                             if ($this->exts->exists('a#ap-account-fixup-phone-skip-link')) {
@@ -1629,7 +1638,7 @@ class PortalScriptCDP
                                                                 } else {
                                                                     //Sometime while downloading pdf we get login form, but not in opening any other page.
                                                                     //So detect such case and process login again
-                                                                    if (stripos($this->exts->getUrl(), "amazon.es/ap/signin") !== false) {
+                                                                    if (stripos($this->exts->getUrl(), "amazon.nl/ap/signin") !== false) {
                                                                         $this->fillForm(0);
                                                                         sleep(4);
 
@@ -1706,8 +1715,8 @@ class PortalScriptCDP
                                                     foreach ($savedInvoices as $savedInvoice) {
                                                         if (stripos($savedInvoice['invoice_url'], "print") !== false) {
                                                             $contact_url = $savedInvoice['contact_url'];
-                                                            if (trim($contact_url) != "" && stripos($contact_url, "https://www.amazon.es") === false) {
-                                                                $contact_url = "https://www.amazon.es" . $contact_url;
+                                                            if (trim($contact_url) != "" && stripos($contact_url, "https://www.amazon.nl") === false) {
+                                                                $contact_url = "https://www.amazon.nl" . $contact_url;
                                                             }
 
                                                             $invoice_note = "Order Overview - " . $savedInvoice['invoiceName'];
@@ -1889,8 +1898,8 @@ class PortalScriptCDP
                 try {
                     $invoice_url = $this->exts->querySelector("a#business-prime-shipping-view-last-invoice")->getAttribute("href");
                     $this->exts->log("prime invoice URL - " . $invoice_url);
-                    if (trim($invoice_url) != "" && stripos($invoice_url, "https://www.amazon.es") === false && stripos($invoice_url, "https://") === false) {
-                        $invoice_url = "https://www.amazon.es" . $invoice_url;
+                    if (trim($invoice_url) != "" && stripos($invoice_url, "https://www.amazon.nl") === false && stripos($invoice_url, "https://") === false) {
+                        $invoice_url = "https://www.amazon.nl" . $invoice_url;
                     }
                     $this->exts->log("prime invoice URL - " . $invoice_url);
                 } catch (\Exception $exception) {
@@ -1900,8 +1909,8 @@ class PortalScriptCDP
                 try {
                     $invoice_url = $this->exts->querySelector("a[href*=\"/documents/download/\"]")->getAttribute("href");
                     $this->exts->log("prime invoice URL - " . $invoice_url);
-                    if (trim($invoice_url) != "" && stripos($invoice_url, "https://www.amazon.es") === false && stripos($invoice_url, "https://") === false) {
-                        $invoice_url = "https://www.amazon.es" . $invoice_url;
+                    if (trim($invoice_url) != "" && stripos($invoice_url, "https://www.amazon.nl") === false && stripos($invoice_url, "https://") === false) {
+                        $invoice_url = "https://www.amazon.nl" . $invoice_url;
                     }
                     $this->exts->log("prime invoice URL - " . $invoice_url);
                 } catch (\Exception $exception) {
@@ -1955,7 +1964,7 @@ class PortalScriptCDP
         }
     }
 
-    public function triggerMsgInvoice()
+    function triggerMsgInvoice()
     {
         if ((int)@$this->msg_invoice_triggerd == 0) {
             $this->msg_invoice_triggerd = 1;
@@ -1970,7 +1979,7 @@ class PortalScriptCDP
     {
 
         if ((int)@$currentMessagePage == 0) {
-            $this->exts->openUrl('https://www.amazon.es/gp/message');
+            $this->exts->openUrl('https://www.amazon.nl/gp/message');
             sleep(15);
 
             $this->exts->click_by_xdotool('li[data-a-tab-name="inbox_bsm_tab"] a');
@@ -2092,8 +2101,8 @@ class PortalScriptCDP
                                     $filename = !empty($invoice_name) ? $invoice_name . ".pdf" : '';
 
                                     $invoice_url = $invoice_data['invoice_url'];
-                                    if (trim($invoice_url) != "" && stripos($invoice_url, "https://www.amazon.es") === false && stripos($invoice_url, "https://") === false) {
-                                        $invoice_url = "https://www.amazon.es" . $invoice_url;
+                                    if (trim($invoice_url) != "" && stripos($invoice_url, "https://www.amazon.nl") === false && stripos($invoice_url, "https://") === false) {
+                                        $invoice_url = "https://www.amazon.nl" . $invoice_url;
                                     }
 
                                     $downloaded_file = $this->exts->direct_download($invoice_url, "pdf", $filename);
@@ -2118,206 +2127,96 @@ class PortalScriptCDP
         }
     }
 
-    public function download_procurment_document($pageNum = 1)
+    function download_pay_invoice($count = 0, $page = 1)
     {
-        //Added do /while and remove calling recursive function because after 256 php stop recurssion.
-        do {
-            if ($pageNum > 1) {
-                if ((int)$this->restrictPages == 0) {
-                    if ($this->exts->exists('.report-table-footer button[data-testid="next-button"]') && !$this->exts->exists('.report-table-footer button[data-testid="next-button"][disabled]')) {
-                        $this->exts->click_by_xdotool('.report-table-footer button[data-testid="next-button"]');
-                        sleep(15);
-                        $pageNum++;
-                    } else {
-                        break;
-                    }
+        $this->exts->log("Start downloading business Pay Invoice");
+        $receipts = $this->exts->getElements('div.invoicing-tab-invoices a[href*="/b2b/invoices/details?"]');
+        $total_receipts = count($receipts);
+        $this->exts->log('Total Receipts Found - ' . $total_receipts);
+        if ($total_receipts > 0) {
+            foreach ($receipts as $receipt) {
+                $invoice_name = $this->exts->getElement('div.invoicing-statement span.invoicing-id-col', $receipt)->getText();
+                $this->exts->log("Invoice Name: " . $invoice_name);
+
+                $invoice_date = $this->exts->getElement('div.invoicing-statement span.invoicing-date-col', $receipt)->getText();
+                $this->exts->log("Invoice Date: " . $invoice_date);
+                $parsed_date = $this->exts->parse_date($invoice_date);
+                if (trim($parsed_date) != "") $invoice_date = $parsed_date;
+                $this->exts->log("Invoice Date: " . $invoice_date);
+
+                $invoice_amount = $this->exts->getElement('div.invoicing-statement span.invoicing-amount-col', $receipt)->getText();
+                $this->exts->log("Invoice Name: " . $invoice_amount);
+                $invoice_amount = preg_replace('/[^\d\.,]/m', '', $invoice_amount);
+                $this->exts->log("Invoice Name: " . $invoice_amount);
+                $invoice_amount = $invoice_amount . ' EUR';
+                $this->exts->log("Invoice Name: " . $invoice_amount);
+
+                $invoice_url = $receipt->getAttribute("href");
+                if (trim($invoice_url) != "" && stripos($invoice_url, "https://www.amazon.nl") === false && stripos($invoice_url, "https://") === false) {
+                    $invoice_url = "https://www.amazon.nl" . $invoice_url;
+                }
+                $this->isNoInvoice = false;
+                // Open New window To process Invoice
+                $newTab = $this->exts->openNewTab();
+
+                // Call Processing function to process current page invoices
+                $this->exts->openUrl($invoice_url);
+                sleep(2);
+
+                $download_url = "";
+                if ($this->exts->exists('a.a-button-text[href*="/documents/download/"]')) {
+                    $download_url = $this->exts->getElement('a.a-button-text[href*="/documents/download/"]')->getAttribute("href");
                 } else {
-                    if ($this->exts->exists('.report-table-footer button[data-testid="next-button"]') && !$this->exts->exists('.report-table-footer button[data-testid="next-button"][disabled]') && $pageNum < 50) {
-                        $this->exts->click_by_xdotool('.report-table-footer button[data-testid="next-button"]');
-                        sleep(15);
-                        $pageNum++;
-                    } else {
-                        break;
+                    if (count($this->exts->getElement('a[href*="/documents/download/"]')) > 0) {
+                        $download_url = $this->exts->getElement('a[href*="/documents/download/"]')->getAttribute("href");
                     }
                 }
+
+                if (trim($download_url) != "") {
+                    if (trim($download_url) != "" && stripos($download_url, "https://www.amazon.nl") === false && stripos($download_url, "https://") === false) {
+                        $download_url = "https://www.amazon.nl" . $download_url;
+                    }
+                    $filename = !empty($invoice_name) ? trim($invoice_name) . ".pdf" : '';
+                    $downloaded_file = $this->exts->direct_download($download_url, "pdf", $filename);
+                    if (trim($downloaded_file) != "" && file_exists($downloaded_file)) {
+                        $this->exts->new_invoice($invoice_name, $invoice_date, $invoice_amount, $filename);
+                    }
+                }
+
+                // Close new window
+                $this->exts->closeTab($newTab);
+            }
+
+            if ($this->restrictPages == 0 && $this->exts->exists('ul.a-pagination li.a-last a[href*="/b2b/invoices?groupId="]')) {
+                $this->exts->moveToElementAndClick('ul.a-pagination li.a-last a[href*="/b2b/invoices?groupId="]');
+                sleep(10);
+                $page++;
+
+                if (stripos($this->exts->getUrl(), "amazon.nl/ap/signin") !== false) {
+                    $this->fillForm(0);
+                    sleep(4);
+                }
+                $this->download_pay_invoice(0, $page);
+            }
+        } else {
+            if ($count < 4) {
+                $count++;
+                sleep(10);
+                $this->download_pay_invoice($count, $page);
             } else {
-                $pageNum++;
+                $this->exts->success();
             }
-            sleep(15);
-            $rows = $this->exts->querySelectorAll('.report-table .column:nth-child(3) [class*="cell-row-"]');
-            foreach ($rows as $key => $row) {
-                $row =  $this->exts->querySelectorAll('.report-table .column:nth-child(3) [class*="cell-row-"]')[$key];
-                $linkBtn = $this->exts->querySelector('[data-action="a-popover"] a', $row);
+        }
+    }
 
-                if ($linkBtn != null) {
-                    $orderNum = trim($linkBtn->getText());
-                    $this->exts->log('Order - ' . $orderNum);
-                    try {
-                        $this->exts->click_element($linkBtn);
-                    } catch (\Exception $exception) {
-                        $this->exts->executeSafeScript('arguments[0].click();', [$linkBtn]);
-                    }
-                    sleep(1);
+    public function invoice_overview_exists($invoice_number)
+    {
+        $this->exts->update_process_lock();
 
-
-                    if ($this->exts->exists('.a-popover .a-popover-content a')) {
-                        $linkElements = $this->exts->querySelectorAll('.a-popover .a-popover-content a');
-                        $this->exts->log('Total Link - ' . count($linkElements));
-                        $downloadLinks = array();
-                        foreach ($linkElements as $linkElement) {
-                            $url = $linkElement->getAttribute('href');
-                            $this->exts->log('URL - ' . $url);
-                            if ((int)@$this->amazon_download_overview == 1) {
-                                $downloadLinks[] = $url;
-                            } else if (stripos($url, '/b2b/aba/order-summary/') === false) {
-                                $downloadLinks[] = $url;
-                            }
-                        }
-
-                        $currentUrl = $this->exts->getUrl();
-
-                        foreach ($downloadLinks as $downloadLink) {
-                            if (stripos($downloadLink, '/b2b/aba/order-summary/') !== false) {
-                                if (trim($orderNum) !== '' && !$this->exts->invoice_exists($orderNum)) {
-                                    $invoice_name = $orderNum;
-                                    $fileName = !empty($orderNum) ? $orderNum . '.pdf' : '';
-
-                                    // Open New window To process Invoice
-                                    $this->exts->openNewTab();
-
-                                    // Call Processing function to process current page invoices
-                                    $this->exts->openUrl($downloadLink);
-                                    sleep(2);
-
-                                    if (stripos($this->exts->getUrl(), "amazon.es/ap/signin") !== false) {
-                                        $this->fillForm(0);
-                                        sleep(4);
-                                    }
-                                    sleep(2);
-
-                                    if (stripos($this->exts->getUrl(), "amazon.es/ap/signin") === false && stripos($this->exts->getUrl(), "/print.html") !== false) {
-                                        $downloaded_file = $this->exts->download_current($fileName, 10);
-                                        if (trim($downloaded_file) != "" && file_exists($downloaded_file)) {
-                                            $invoice_note = "Order Overview - " . $invoice_name;
-                                            $this->exts->new_invoice($invoice_name, '', '', $downloaded_file, 1, $invoice_note, 0, '', array(
-                                                'extra_data' => "AMAZON_NO_DOWNLOAD",
-                                                'tags' => (int)@$this->auto_tagging == 1 && !empty($this->order_overview_tags) ? $this->order_overview_tags : ''
-                                            ));
-
-                                            $invoice_note = ":::" . $invoice_note;
-                                            $this->exts->sendRequestEx($invoice_name . ":::AMAZON_NO_DOWNLOAD", "===EXTRA-DATA===");
-                                            $this->exts->sendRequestEx($invoice_name . $invoice_note, "===NOTE-DATA===");
-
-                                            if ((int)@$this->auto_tagging == 1 && !empty($this->order_overview_tags)) {
-                                                $this->exts->sendRequestEx($invoice_name . ":::" . $this->order_overview_tags, "===INVOICE-TAGS===");
-                                            }
-                                        }
-                                    } else if (stripos($this->exts->getUrl(), "amazon.de/ap/signin") === false && (stripos($this->exts->getUrl(), "order-document.pdf") !== false || stripos($this->exts->getUrl(), ".pdf") !== false)) {
-                                        // Wait for completion of file download
-                                        $this->exts->wait_and_check_download('pdf');
-
-                                        // find new saved file and return its path
-                                        $downloaded_file = $this->exts->find_saved_file('pdf', $fileName);
-                                        if (trim($downloaded_file) != "" && file_exists($downloaded_file)) {
-                                            $invoice_note = "Order Overview - " . $invoice_name;
-                                            $this->exts->new_invoice($invoice_name, '', '', $downloaded_file, 1, $invoice_note, 0, '', array(
-                                                'extra_data' => "AMAZON_NO_DOWNLOAD",
-                                                'tags' => (int)@$this->auto_tagging == 1 && !empty($this->order_overview_tags) ? $this->order_overview_tags : ''
-                                            ));
-
-                                            $invoice_note = ":::" . $invoice_note;
-                                            $this->exts->sendRequestEx($invoice_name . ":::AMAZON_NO_DOWNLOAD", "===EXTRA-DATA===");
-                                            $this->exts->sendRequestEx($invoice_name . $invoice_note, "===NOTE-DATA===");
-
-                                            if ((int)@$this->auto_tagging == 1 && !empty($this->order_overview_tags)) {
-                                                $this->exts->sendRequestEx($invoice_name . ":::" . $this->order_overview_tags, "===INVOICE-TAGS===");
-                                            }
-                                        }
-                                    } else {
-                                        $this->exts->log('Current URL - ' . $this->exts->getUrl());
-                                        // Wait for completion of file download
-                                        $this->exts->wait_and_check_download('pdf');
-
-                                        // find new saved file and return its path
-                                        $downloaded_file = $this->exts->find_saved_file('pdf', $fileName);
-                                        if (trim($downloaded_file) != "" && file_exists($downloaded_file)) {
-                                            $invoice_note = "Order Overview - " . $invoice_name;
-                                            $this->exts->new_invoice($invoice_name, '', '', $downloaded_file, 1, $invoice_note, 0, '', array(
-                                                'extra_data' => "AMAZON_NO_DOWNLOAD",
-                                                'tags' => (int)@$this->auto_tagging == 1 && !empty($this->order_overview_tags) ? $this->order_overview_tags : ''
-                                            ));
-
-                                            $invoice_note = ":::" . $invoice_note;
-                                            $this->exts->sendRequestEx($invoice_name . ":::AMAZON_NO_DOWNLOAD", "===EXTRA-DATA===");
-                                            $this->exts->sendRequestEx($invoice_name . $invoice_note, "===NOTE-DATA===");
-
-                                            if ((int)@$this->auto_tagging == 1 && !empty($this->order_overview_tags)) {
-                                                $this->exts->sendRequestEx($invoice_name . ":::" . $this->order_overview_tags, "===INVOICE-TAGS===");
-                                            }
-                                        }
-                                    }
-
-                                    //This is needed if URL shows print.html
-                                    $this->exts->openUrl($this->baseUrl);
-                                    sleep(2);
-                                    if ($this->exts->exists('a[href="/gp/css/homepage.html/ref=nav_bb_ya"]')) {
-                                        $this->exts->click_by_xdotool('a[href="/gp/css/homepage.html/ref=nav_bb_ya"]');
-                                        sleep(2);
-                                    }
-
-                                    // Close new window
-                                    $this->exts->switchToInitTab();
-                                    sleep(2);
-                                    $this->exts->closeAllTabsButThis();
-                                } else {
-                                    $this->exts->log('Already Invoice Exists - ' . $orderNum);
-                                }
-                            } else {
-                                //I am opening this becasue sometime download link gives technical error.
-                                $this->exts->openNewTab();
-
-                                $this->exts->openUrl($this->baseUrl);
-                                sleep(2);
-                                if ($this->exts->exists('a[href="/gp/css/homepage.html/ref=nav_bb_ya"]')) {
-                                    $this->exts->click_by_xdotool('a[href="/gp/css/homepage.html/ref=nav_bb_ya"]');
-                                    sleep(2);
-                                }
-
-                                $downloaded_file = $this->exts->direct_download($downloadLink, "pdf", '');
-                                if (trim($downloaded_file) != "" && file_exists($downloaded_file)) {
-                                    $invoice_name = basename($downloaded_file, '.pdf');
-                                    $this->exts->new_invoice($invoice_name, '', '', $downloaded_file);
-                                } else {
-                                    $downloadLink = urldecode($downloadLink);
-                                    $downloadLink = preg_replace('/\s+/', '', $downloadLink);
-                                    $downloaded_file = $this->exts->direct_download($downloadLink, "pdf", '');
-                                    if (trim($downloaded_file) != "" && file_exists($downloaded_file)) {
-                                        $invoice_name = basename($downloaded_file, '.pdf');
-                                        $this->exts->new_invoice($invoice_name, '', '', $downloaded_file);
-                                    }
-                                }
-
-                                $this->exts->switchToInitTab();
-                                sleep(2);
-                                $this->exts->closeAllTabsButThis();
-                            }
-                        }
-                    } else {
-                        $this->exts->log('No Invoice - ' . $orderNum);
-                    }
-                }
-
-                $popups = $this->exts->querySelectorAll('.a-popover.a-popover-no-header.a-arrow-right');
-                if (count($popups) > 0) {
-                    $this->exts->execute_javascript("
-                    var popups = document.querySelectorAll(\".a-popover.a-popover-no-header.a-arrow-right\");
-                    for(var i=0; i<popups.length; i++) {
-                        popups[i].remove();
-                    }
-                ");
-                }
-            }
-        } while ($this->exts->exists('.report-table-footer button[data-testid="next-button"]') && !$this->exts->exists('.report-table-footer button[data-testid="next-button"][disabled]') && $pageNum > 1);
+        if (!empty($invoice_number) && !empty($this->exts->config_array['overview_invoices'])) {
+            return in_array($invoice_number, $this->exts->config_array['overview_invoices']);
+        }
+        return false;
     }
 }
 
