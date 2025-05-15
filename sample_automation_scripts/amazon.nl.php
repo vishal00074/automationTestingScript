@@ -1,5 +1,4 @@
 <?php // updated  fill form function optimize script performance migrated script on remote chrome
-
 /**
  * Chrome Remote via Chrome devtool protocol script, for specific process/portal
  *
@@ -116,7 +115,6 @@ class PortalScriptCDP
             $this->start_page = isset($this->exts->config_array["start_page"]) ? $this->exts->config_array["start_page"] : '';
             $this->last_invoice_date = isset($this->exts->config_array["last_invoice_date"]) ? $this->exts->config_array["last_invoice_date"] : '';
 
-
             $this->exts->log('amazon_download_overview ' . $this->amazon_download_overview);
             $this->exts->log('download_invoice_from_message ' . $this->download_invoice_from_message);
             $this->exts->log('auto_request_invoice ' . $this->auto_request_invoice);
@@ -128,8 +126,6 @@ class PortalScriptCDP
             $this->exts->log('start_page ' . $this->start_page);
             $this->exts->log('last_invoice_date ' . $this->last_invoice_date);
             $this->exts->log('pay_as_invoice ' . $this->pay_as_invoice);
-
-
 
             $this->invalid_filename_pattern = '';
             if (!empty($this->invalid_filename_keywords)) {
