@@ -47,11 +47,13 @@ private function initPortal($count)
 
         $this->exts->success();
     } else {
+        $this->exts->log(__FUNCTION__ . '::Use login failed');
+        $this->exts->log(__FUNCTION__ . '::Last URL: ' . $this->exts->getUrl());
         if ($this->isFailedLogin) {
             $this->exts->log("Wrong credential !!!!");
             $this->exts->loginFailure(1);
         } else if ($this->exts->urlContains('Login?error=')) {
-                $this->exts->capture("LoginFailed");
+            $this->exts->capture("LoginFailed");
             $this->exts->log("Wrong credential !!!!");
             $this->exts->loginFailure(1);
         } else {
@@ -83,32 +85,40 @@ private function isExists($selector = '')
     }
 }
 
-function fillForm($count)
+public function fillForm($count)
 {
     $this->exts->log("Begin fillForm " . $count);
     $this->waitFor($this->username_selector, 10);
-    try {
-        if ($this->exts->querySelector($this->username_selector) != null) {
 
-            $this->exts->capture("1-pre-login");
-            $this->exts->log("Enter Username");
-            $this->exts->moveToElementAndType($this->username_selector, $this->username);
+    if ($this->exts->querySelector($this->username_selector) != null) {
 
-            sleep(2);
+        $this->exts->capture("1-pre-login");
+        $this->exts->log("Enter Username");
+        $this->exts->moveToElementAndType($this->username_selector, $this->username);
 
-            $this->exts->log("Enter Password");
-            $this->exts->moveToElementAndType($this->password_selector, $this->password);
-            sleep(1);
+        sleep(2);
 
-            $this->exts->capture("1-login-page-filled");
-            sleep(5);
-            if ($this->isExists($this->submit_login_selector)) {
-                $this->exts->click_element($this->submit_login_selector);
-            }
+        $this->exts->log("Enter Password");
+        $this->exts->moveToElementAndType($this->password_selector, $this->password);
+        sleep(1);
+
+        $this->exts->capture("1-login-page-filled");
+        sleep(5);
+        if ($this->isExists($this->submit_login_selector)) {
+            $this->exts->click_element($this->submit_login_selector);
+            sleep(10);
         }
-    } catch (\Exception $exception) {
 
-        $this->exts->log("Exception filling loginform " . $exception->getMessage());
+        if ($this->exts->urlContains('Login?error=')) {
+            $this->exts->capture("LoginFailed-incorrect-cred");
+            $this->exts->log(__FUNCTION__ . '::Use login failed');
+            $this->exts->log(__FUNCTION__ . '::Last URL: ' . $this->exts->getUrl());
+            $this->exts->log("Wrong credential !!!!");
+            $this->exts->loginFailure(1);
+        }
+    } else {
+        $this->exts->log(__FUNCTION__ . '::Login page not found');
+        $this->exts->capture("2-login-page-not-found");
     }
 }
 

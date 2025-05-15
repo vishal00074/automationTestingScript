@@ -54,15 +54,11 @@ private function initPortal(int $count): void
         $this->exts->log(__FUNCTION__ . '::User login failed');
         $this->exts->log(__FUNCTION__ . '::Last URL: ' . $this->exts->getUrl());
         $this->exts->capture('login-failed');
-        $isIpBlocked = strtolower($this->exts->extract('div.ip-blocked-box h1'));
-        $this->exts->log($isIpBlocked);
 
         if ($this->exts->getElement($this->check_login_failed_selector) != null || $this->exts->getElement('.cso-box.cso-error-handler .link.link--custom.link--button') != null) {
             $this->exts->loginFailure(1);
         } else if (strpos(strtolower($this->exts->extract('p.server-error', null, 'innerText')), 'und ihrem passwort ist falsch') !== false) {
             $this->exts->loginFailure(1);
-        } else if (stripos($isIpBlocked, strtolower('Bitte versuchen Sie es nach 24 Stunden erneut')) !== false) {
-            $this->exts->account_not_ready();
         } else {
             $this->exts->loginFailure();
         }
@@ -97,28 +93,4 @@ private function checkFillLogin(): void
         $this->exts->log(__FUNCTION__ . '::Login page not found');
         $this->exts->capture("2-login-page-not-found");
     }
-}
-
-private function clearChrome()
-{
-    $this->exts->log("Clearing browser history, cookie, cache");
-    $this->exts->openUrl('chrome://settings/clearBrowserData');
-    sleep(10);
-    $this->exts->capture("clear-page");
-    for ($i = 0; $i < 2; $i++) {
-        $this->exts->type_key_by_xdotool('Tab');
-    }
-    $this->exts->type_key_by_xdotool('Tab');
-    $this->exts->type_key_by_xdotool('Return');
-    $this->exts->type_key_by_xdotool('a');
-    sleep(1);
-    $this->exts->type_key_by_xdotool('Return');
-    sleep(3);
-    $this->exts->capture("clear-page");
-    for ($i = 0; $i < 5; $i++) {
-        $this->exts->type_key_by_xdotool('Tab');
-    }
-    $this->exts->type_key_by_xdotool('Return');
-    sleep(10);
-    $this->exts->capture("after-clear");
 }

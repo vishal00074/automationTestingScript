@@ -1,5 +1,4 @@
-<?php // added condition in case invoice name is empty added clear chrome function and updated download code 
-// added trigger account_not_ready in case ip bloked by website.
+<?php // added condition in case invoice name is empty 
 
 /**
  * Chrome Remote via Chrome devtool protocol script, for specific process/portal
@@ -123,15 +122,11 @@ class PortalScriptCDP
             $this->exts->log(__FUNCTION__ . '::User login failed');
             $this->exts->log(__FUNCTION__ . '::Last URL: ' . $this->exts->getUrl());
             $this->exts->capture('login-failed');
-            $isIpBlocked = strtolower($this->exts->extract('div.ip-blocked-box h1'));
-            $this->exts->log($isIpBlocked);
 
             if ($this->exts->getElement($this->check_login_failed_selector) != null || $this->exts->getElement('.cso-box.cso-error-handler .link.link--custom.link--button') != null) {
                 $this->exts->loginFailure(1);
             } else if (strpos(strtolower($this->exts->extract('p.server-error', null, 'innerText')), 'und ihrem passwort ist falsch') !== false) {
                 $this->exts->loginFailure(1);
-            } else if (stripos($isIpBlocked, strtolower('Bitte versuchen Sie es nach 24 Stunden erneut')) !== false) {
-                $this->exts->account_not_ready();
             } else {
                 $this->exts->loginFailure();
             }
