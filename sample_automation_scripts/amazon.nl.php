@@ -274,7 +274,7 @@ class PortalScriptCDP
                 sleep(4);
             }
 
-            if ($this->exts->login_tryout == 0) {
+            if ($this->login_tryout == 0) {
                 if ($this->exts->querySelector($this->password_selector) != null || $this->exts->querySelector($this->username_selector) != null) {
                     $this->exts->capture("1-pre-login");
                     $formType = $this->exts->querySelector($this->password_selector);
@@ -484,7 +484,7 @@ class PortalScriptCDP
 
         $isCaptchaFound = false;
         if ($this->exts->getElement("input#ap_captcha_guess") != null || $this->exts->getElement("input#auth-captcha-guess") != null) {
-            $this->exts->login_tryout = (int)$this->exts->login_tryout + 1;
+            $this->login_tryout = (int)$this->login_tryout + 1;
             $isCaptchaFound = true;
         }
 
@@ -658,8 +658,8 @@ class PortalScriptCDP
         $this->exts->log("Begin checkLogin ");
         $isLoggedIn = false;
         try {
-            if ($this->exts->querySelector($this->exts->logout_link) != null) {
-                // $this->exts->waitForCssSelectorPresent($this->exts->logout_link, function() {
+            if ($this->exts->querySelector($this->logout_link) != null) {
+                // $this->exts->waitForCssSelectorPresent($this->logout_link, function() {
                 $this->exts->log(">>>>>>>>>>>>>>>Login successful!!!!");
                 // 	$isLoggedIn = true;
                 // }, function() {
