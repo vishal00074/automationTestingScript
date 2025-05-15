@@ -1,4 +1,4 @@
-<?php // updated two factor code handle empty invoice name  updated login code skip after submitting loigin form
+<?php //
 
 /**
  * Chrome Remote via Chrome devtool protocol script, for specific process/portal
@@ -123,6 +123,20 @@ class PortalScriptCDP
                 $this->exts->click_by_xdotool('div[data-nemo="twofactorPage"] button');
             }
             $this->checkFillTwoFactor();
+            $isTwoExipred = $this->exts->extract('h1');
+            $this->exts->capture('otp-filled-0');
+
+            $this->exts->log("isTwoExipred:: " . $isTwoExipred);
+            if (stripos(strtolower($isTwoExipred), 'code expired') !== false) {
+
+                if ($this->exts->querySelector('a#resendBtn') != null) {
+                    $this->exts->moveToElementAndClick('a#resendBtn');
+                    sleep(10);
+                    $this->exts->capture('otp-filled-1');
+                }
+                $this->checkFillTwoFactor();
+                $this->exts->capture('otp-filled-2');
+            }
         }
 
 
@@ -149,6 +163,12 @@ class PortalScriptCDP
             }
             $this->exts->success();
         } else {
+            $isTwoExipred = $this->exts->extract('h1');
+            $isTwoErrorMessage = $this->exts->extract('p.otp-error-message');
+
+            $this->exts->log("isTwoExipred:: " . $isTwoExipred);
+
+            $this->exts->log("isTwoErrorMessage:: " . $isTwoErrorMessage);
             if (
                 stripos(strtolower($this->exts->extract($this->check_login_failed_selector)), 'passwor') !== false ||
                 stripos(strtolower($this->exts->extract($this->check_login_failed_selector)), 'correct') !== false
@@ -175,6 +195,10 @@ class PortalScriptCDP
                 } else {
                     $this->exts->loginFailure();
                 }
+            } else if (stripos(strtolower($isTwoExipred), 'code expired') !== false) {
+                $this->exts->loginFailure(1);
+            } else if (stripos(strtolower($isTwoErrorMessage), strtolower('Check the code and try again')) !== false) {
+                $this->exts->loginFailure(1);
             } else {
                 $this->exts->loginFailure();
             }

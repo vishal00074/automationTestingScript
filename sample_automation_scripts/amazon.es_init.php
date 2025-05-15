@@ -134,7 +134,6 @@ private function initPortal($count)
 
     if (!$isCookieLoginSuccess) {
         if ($this->checkLogin()) {
-            $this->exts->openUrl($this->orderPageUrl);
             sleep(5);
 
             $this->exts->capture("LoginSuccess");
@@ -152,13 +151,13 @@ private function initPortal($count)
 
             sleep(5);
             if ($this->checkLogin()) {
-                $this->exts->openUrl($this->orderPageUrl);
                 sleep(5);
                 $this->exts->capture("LoginSuccess");
 
                 if (!empty($this->exts->config_array['allow_login_success_request'])) {
                     $this->exts->triggerLoginSuccess();
                 }
+
                 $this->exts->success();
             } else {
                 $this->exts->log(__FUNCTION__ . '::Use login failed');
@@ -192,10 +191,7 @@ private function initPortal($count)
         sleep(5);
         $this->exts->capture("LoginSuccess");
 
-        if (!empty($this->exts->config_array['allow_login_success_request'])) {
-            $this->exts->triggerLoginSuccess();
-        }
-
+        $this->processAfterLogin(0);
         $this->exts->success();
     }
 }

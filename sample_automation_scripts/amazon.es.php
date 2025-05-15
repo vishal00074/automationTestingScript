@@ -1,4 +1,4 @@
-<?php // updated download code extract invoice name and added config valurable log 
+<?php // i have updated download orderInvoice code added change selectbox functionality
 
 /**
  * Chrome Remote via Chrome devtool protocol script, for specific process/portal
@@ -56,8 +56,7 @@ class PortalScriptCDP
             echo 'Script execution failed.. ' . "\n";
         }
     }
-
-    // Server-Portal-ID: 10251 - Last modified: 11.04.2025 14:09:01 UTC - User: 1
+    // Server-Portal-ID: 10251 - Last modified: 28.04.2025 14:40:34 UTC - User: 1
 
     public $baseUrl = "https://www.amazon.es";
     public $orderPageUrl = "https://www.amazon.es/gp/css/order-history/ref=nav_youraccount_orders";
@@ -250,6 +249,33 @@ class PortalScriptCDP
 
             $this->processAfterLogin(0);
             $this->exts->success();
+        }
+    }
+
+    private function changeSelectbox($select_box = '', $option_value = '')
+    {
+        $this->exts->waitTillPresent($select_box, 10);
+        if ($this->exts->exists($select_box)) {
+            $option = $option_value;
+            $this->exts->click_by_xdotool($select_box);
+            sleep(2);
+            $optionIndex = $this->exts->executeSafeScript('
+			const selectBox = document.querySelector("' . $select_box . '");
+			const targetValue = "' . $option_value . '";
+			const optionIndex = [...selectBox.options].findIndex(option => option.value === targetValue);
+			return optionIndex;
+		');
+            $this->exts->log($optionIndex);
+            sleep(1);
+            for ($i = 0; $i < $optionIndex; $i++) {
+                $this->exts->log('>>>>>>>>>>>>>>>>>> Down');
+                // Simulate pressing the down arrow key
+                $this->exts->type_key_by_xdotool('Down');
+                sleep(1);
+            }
+            $this->exts->type_key_by_xdotool('Return');
+        } else {
+            $this->exts->log('Select box does not exist');
         }
     }
 
@@ -854,7 +880,7 @@ class PortalScriptCDP
 
         // Get Order Filter years
         $optionSelectors = array();
-        $selectElements = $this->exts->querySelectorAll("select[name=\"orderFilter\"] option");
+        $selectElements = $this->exts->querySelectorAll('select[name="timeFilter"] option');
         if (count($selectElements) == 0) {
             $selectElements = $this->exts->querySelectorAll('select[name="timeFilter"] option');
             $this->exts->log("selectElements " . count($selectElements));
@@ -909,14 +935,19 @@ class PortalScriptCDP
         }
     }
 
-    public function processYears($optionSelectors)
+    private function processYears($optionSelectors)
     {
+        //Update the lock so that window is not closed by cron.
+        $this->exts->update_process_lock();
+
         $this->exts->capture("Process-Years");
 
         foreach ($optionSelectors as $optionSelector) {
             $this->exts->log("processing year  " . $optionSelector);
 
-            if ($this->dateLimitReached == 1) break;
+            if ($this->dateLimitReached == 1) {
+                break;
+            }
 
             // In restart mode, process only those years which is not processed yet
             if ($this->exts->docker_restart_counter > 0 && !empty($this->last_state['years']) && in_array($optionSelector, $this->last_state['years'])) {
@@ -924,741 +955,857 @@ class PortalScriptCDP
                 continue;
             }
 
-            // Fill order Select
             $this->exts->log("processing year element  " . $optionSelector);
-            if ($this->exts->exists("select[name=\"orderFilter\"]")) {
-                $optionSelEle = "select[name=\"orderFilter\"] option[value=\"" . $optionSelector . "\"]";
+            if ($this->exts->exists('span[data-a-class="order-filter-dropdown"] span[role="button"]')) {
+                $this->exts->click_element('span[data-a-class="order-filter-dropdown"] span[role="button"]');
+                sleep(3);
+
+                $optionSelEle = 'a[id*="orderFilter"][data-value*="' . $optionSelector . '"]';
                 $selectElement = $this->exts->querySelector($optionSelEle);
                 $this->exts->click_element($selectElement);
+            } else {
+                $this->changeSelectbox("select[name='timeFilter']", $optionSelector);
             }
+
             sleep(2);
 
             if ($this->exts->querySelector($this->password_selector) != null || stripos($this->exts->getUrl(), "/ap/signin?") !== FALSE) {
                 if ($this->login_tryout == 0) {
                     $this->fillForm(0);
+                    if ($this->exts->exists('a#ap-account-fixup-phone-skip-link')) {
+                        $this->exts->click_by_xdotool('a#ap-account-fixup-phone-skip-link');
+                        sleep(2);
+                    }
+                } else {
+                    $this->exts->init_required();
                 }
             }
 
             $this->exts->capture("orders-" . $optionSelector);
-            $pages = $this->getTotalYearPages(0);
 
-            $this->exts->log("Total pages -" . $pages);
-            $total_pages_found = $pages;
+            if ($this->exts->querySelector($this->password_selector) != null || stripos($this->exts->getUrl(), "/ap/signin?") !== false) {
+                $this->fillForm(0);
+                sleep(4);
 
-            $hrefsArr = array();
-            if ($total_pages_found > 1) {
-                $firstPageHref = $this->exts->getUrl();
-                if ($this->start_page == 0) $this->start_page = 1;
-
-                $l = -1;
-                if ($this->exts->querySelector("span.num-orders-for-orders-by-date span.num-orders") != null) {
-                    $total_data = $this->exts->querySelector("span.num-orders-for-orders-by-date span.num-orders")->getText();
-                    $this->exts->log("total_data -" . $total_data);
-                    $tempArr = explode(" ", $total_data);
-                    if (count($tempArr)) {
-                        $total_data = trim($tempArr[0]);
-                    }
-                    $this->exts->log("total_data -" . $total_data);
-                    if ((int)$total_data > 0) {
-                        $l = round($total_data / 10);
-                    }
+                $this->checkFillTwoFactor();
+                if ($this->exts->exists('a#ap-account-fixup-phone-skip-link')) {
+                    $this->exts->click_by_xdotool('a#ap-account-fixup-phone-skip-link');
+                    sleep(2);
                 }
-
-                if ($l == -1) {
-                    $pageEle = $this->exts->querySelectorAll("div.pagination-full a");
-                    $liCount = count($pageEle);
-                    if ($liCount > 2) {
-                        $l = (int)trim($pageEle[$liCount - 2]->getText());
-                    }
-                }
-
-                $pageEle = $this->exts->querySelectorAll("div.pagination-full a");
-                $this->exts->log("Paging Total element -" . count($pageEle));
-                if (count($pageEle) > 0) {
-                    $href = $pageEle[0]->getAttribute("href");
-                    $this->exts->log("First Loading page url -" . $href);
-                    $firstPageHref = $href;
-                    $href = substr($href, 0, strlen($href) - 1);
-                    if (stripos($href, "https://www.amazon.es") === false && stripos($href, "https://") === false) {
-                        $href = "https://www.amazon.es" . trim($href);
-                    }
-                }
-                $this->exts->log("First Loading page url -" . $href);
-
-                // In restart mode start from where it was left
-                if ($this->exts->docker_restart_counter > 0 && !empty($this->last_state['last_page_count'])) {
-                    $this->start_page = (int)$this->last_state['last_page_count'];
-                }
-
-                for ($i = $this->start_page; $i <= $total_pages_found; $i++) {
-                    if ($i == 1) {
-                        $hrefsArr[] = array(
-                            "url" => $firstPageHref,
-                            'page' => $i
-                        );
-                    } elseif ($i == $this->start_page && !empty($this->last_state['order_page_list']) && $this->start_page > 1) {
-                        $hrefsArr[] = array(
-                            "url" => $this->last_state['order_page_list'],
-                            'page' => $i
-                        );
-                    } else {
-                        $hrefsArr[] = array(
-                            "url" => $href . (($i - 1) * 10),
-                            'page' => $i
-                        );
-                    }
-                }
-            } else {
-                $selectedB2BGroupKey = "";
-                $currentUrl = $this->exts->getUrl();
-                preg_match('/selectedB2BGroupKey\=[^&]+/', $currentUrl, $matches);
-                if (count($matches) > 0) {
-                    $this->exts->log("GOT B2B ACCOUNT -" . $matches[0]);
-                } else {
-                    $selectedB2BGroupKey = "";
-                }
-
-                $hrefsArr[] = array(
-                    "url" => $currentUrl,
-                    'page' => 1
-                );
             }
 
-            $this->exts->log("Order pages url total - " . count($hrefsArr));
-            if (count($hrefsArr) > 0) {
-                $firstPageUrl = $hrefsArr[0]['url'];
-                $currentPageCount = 1;
-                foreach ($hrefsArr as $key1 => $hrefArr) {
-                    $this->exts->log("Crawling orders page - " . $this->exts->getUrl());
+            $this->exts->waitTillPresent("div.a-box-group.a-spacing-base.order, .order-card", 30);
 
-                    try {
-                        if ($key1 == 0) {
-                            $this->exts->openUrl($firstPageUrl);
-                        } else {
-                            if ($this->exts->querySelector("div.pagination-full ul.a-pagination li.a-last a[href*=\"/gp/your-account/order-history/ref=oh_aui_pagination\"]") != null) {
-                                $this->exts->click_element("div.pagination-full ul.a-pagination li.a-last a[href*=\"/gp/your-account/order-history/ref=oh_aui_pagination\"]");
-                                $this->exts->log("Clicked next page");
-                            } else if ($this->exts->querySelector("div.pagination-full ul.a-pagination li.a-last a[href*=\"/gp/your-account/order-history/ref=ppx_yo_dt_b_pagination\"]") != null) {
-                                $this->exts->click_element("div.pagination-full ul.a-pagination li.a-last a[href*=\"/gp/your-account/order-history/ref=ppx_yo_dt_b_pagination\"]");
-                                $this->exts->log("Clicked next page");
+            if (!$this->exts->exists("div.a-box-group.a-spacing-base.order, .order-card")) {
+                sleep(15);
+            }
+            $totalPages = 100;
+            if ($this->exts->exists('.a-pagination li#paginationButton')) {
+                $totalPages = count($this->exts->getElements('.a-pagination li#paginationButton'));
+            }
+            $this->exts->log('Total-order-pages:: ' . $totalPages);
+
+            $this->exts->capture('order-page');
+            for ($paging_count = 1; $paging_count < $totalPages; $paging_count++) {
+                sleep(5);
+                if ($this->exts->exists('.order-card a[href*="/ajax/invoice/"]')) {
+
+                    // Huy added this 2023-01
+                    $count_order_card = count($this->exts->querySelectorAll('.order-card a[href*="/ajax/invoice/"]'));
+                    $order_invoices = [];
+                    for ($i = 0; $i < $count_order_card; $i++) {
+                        $order_card_invoice_dropdown = $this->exts->querySelectorAll('.order-card a[href*="/ajax/invoice/"]')[$i];
+                        $temp_url = $order_card_invoice_dropdown->getAttribute('href');
+                        $temp_array = explode('orderId=', $temp_url);
+                        $order_invoice_name = end($temp_array);
+                        $temp_array = explode('&', $order_invoice_name);
+                        $order_invoice_name = reset($temp_array);
+
+                        try {
+                            $this->exts->click_element($order_card_invoice_dropdown);
+                        } catch (Exception $e) {
+                            $this->exts->execute_javascript('arguments[0].click()', [$order_card_invoice_dropdown]);
+                        }
+                        sleep(5);
+                        if ($this->exts->exists('.a-popover[style*="visibility: visible"]:not([aria-hidden="true"]) a[href*="/invoice.pdf"]')) {
+                            $order_invoice_url = $this->exts->querySelector('.a-popover[style*="visibility: visible"]:not([aria-hidden="true"]) a[href*="/invoice.pdf"]')->getAttribute('href');
+                            $this->exts->log('--------------------------');
+                            $this->exts->log('order_invoice_name: ' . $order_invoice_name);
+                            $this->exts->log('order_invoice_url: ' . $order_invoice_url);
+
+                            $invoiceFileName = !empty($order_invoice_name) ? $order_invoice_name . '.pdf' : '';
+
+                            $downloaded_file = $this->exts->direct_download($order_invoice_url, 'pdf', $invoiceFileName);
+                            if (trim($downloaded_file) != '' && file_exists($downloaded_file)) {
+                                //This is needed by system to not check overview as invoice and bypass overview number in system
+                                $invoice_note = "Amazon Direct - " . $order_invoice_name;
+                                $this->exts->new_invoice($order_invoice_name, '', '', $downloaded_file, 0, $invoice_note, 0, '', array(
+                                    'tags' => (int)@$this->auto_tagging == 1 && !empty($this->amazon_invoice_tags) ? $this->amazon_invoice_tags : ''
+                                ));
+
+                                $this->exts->sendRequestEx($order_invoice_name . ":::" . $invoice_note, "===NOTE-DATA===");
+                                if ((int)@$this->auto_tagging == 1 && !empty($this->amazon_invoice_tags)) {
+                                    $this->exts->sendRequestEx($order_invoice_name . ":::" . $this->amazon_invoice_tags, "===INVOICE-TAGS===");
+                                }
                             } else {
-                                break;
+                                $this->exts->log(__FUNCTION__ . '::No download ' . $order_invoice_name);
                             }
                         }
+                        $this->exts->click_by_xdotool('[data-action="a-popover-close"]');
+                        sleep(2);
+                    }
+                } else if ($this->exts->querySelector(".order-card, .js-order-card") != null) {
+                    $this->exts->log("Invoice Found");
 
-                        if ($this->dateLimitReached == 1) break;
-                        sleep(4);
+                    $invoice_data_arr = array();
+                    $rows = $this->exts->querySelectorAll(".order-card, .js-order-card");
+                    $this->exts->log("Invoice Rows- " . count($rows));
+                    $total_rows = count($rows);
+                    if (count($rows) > 0) {
+                        for ($i = 0, $j = 2; $i < $total_rows; $i++, $j++) {
+                            $rowItem = $rows[$i];
+                            try {
+                                $columns = $rowItem->querySelectorAll('div.order-info div.a-fixed-right-grid-col:nth-child(1) span.a-color-secondary.value, .order-header .a-row:nth-child(2) .a-color-secondary');
+                                $this->exts->log("Invoice Row columns- $i - " . count($columns));
+                                if (count($columns) > 0) {
+                                    $invoice_date = trim($columns[0]->getText());
+                                    $this->exts->log("invoice_date - " . $invoice_date);
 
-                        if ($this->exts->querySelector($this->password_selector) != null || stripos($this->exts->getUrl(), "/ap/signin?") !== false) {
-                            $this->fillForm(0);
-                            sleep(4);
-                        }
+                                    if ($this->start_date != "" && !empty($this->start_date)) {
+                                        try {
+                                            $parsed_date = $this->exts->parse_date($invoice_date);
+                                        } catch (\Exception $exception) {
+                                            $this->exts->log('ERROR in parsing Date - ' . $invoice_date);
+                                            $parsed_date = '';
+                                        }
 
-                        if ($this->exts->querySelector("div.a-box-group.a-spacing-base.order") != null) {
-                            $this->exts->log("Invoice Found");
+                                        if (!empty($parsed_date) && $this->start_date > strtotime($parsed_date)) {
+                                            $this->dateLimitReached = 1;
+                                            break;
+                                        }
+                                    }
+                                    $invoice_amount = trim($columns[count($columns) - 1]->getText());
+                                    if (stripos($invoice_amount, "EUR") !== false && stripos($invoice_amount, "EUR") <= 1) {
+                                        $invoice_amount = trim(substr($invoice_amount, 3)) . " EUR";
+                                    } else if (stripos($invoice_amount, "EUR") !== false && stripos($invoice_amount, "EUR") > 1) {
+                                        $invoice_amount = trim(substr($invoice_amount, 3, strlen($invoice_amount) - 3)) . " EUR";
+                                    } else if (stripos($invoice_amount, "USD") !== false && stripos($invoice_amount, "USD") <= 1) {
+                                        $invoice_amount = trim(substr($invoice_amount, 3)) . " USD";
+                                    } else if (stripos($invoice_amount, "USD") !== false && stripos($invoice_amount, "USD") > 1) {
+                                        $invoice_amount = trim(substr($invoice_amount, 3, strlen($invoice_amount) - 3)) . " USD";
+                                    }
 
-                            $invoice_data_arr = array();
-                            $rows = $this->exts->querySelectorAll("div.a-box-group.a-spacing-base.order");
-                            $this->exts->log("Invoice Rows- " . count($rows));
-                            if (count($rows) > 0) {
-                                $total_rows = count($rows);
-                                for ($i = 0, $j = 2; $i < $total_rows; $i++, $j++) {
-                                    $rowItem = $rows[$i];
-                                    try {
-                                        $columns = $this->exts->querySelectorAll("div.order-info div.a-fixed-right-grid-col:nth-child(1) span.a-color-secondary.value", $rowItem);
-                                        $this->exts->log("Invoice Row columns- $i - " . count($columns));
-                                        if (count($columns) > 0) {
-                                            $invoice_date = trim($columns[0]->getText());
-                                            $this->exts->log("invoice_date - " . $invoice_date);
+                                    $columns = $rowItem->querySelectorAll('div.order-info div.a-fixed-right-grid-col:nth-child(1) span.a-color-secondary.value, .order-header .a-row:nth-child(2) .a-color-secondary');
+                                    $invoice_number = $this->exts->extract('[class*="order-id"] .a-color-secondary:nth-child(2)', $rowItem, 'innerText');
+                                    $invoice_number = trim($invoice_number);
+                                    $this->exts->log("invoice_number - " . $invoice_number);
 
-                                            $invoice_amount = trim($columns[count($columns) - 1]->getText());
-                                            if (stripos($invoice_amount, "EUR") !== false && stripos($invoice_amount, "EUR") <= 1) {
-                                                $invoice_amount = trim(substr($invoice_amount, 3)) . " EUR";
-                                            } else if (stripos($invoice_amount, "EUR") !== false && stripos($invoice_amount, "EUR") > 1) {
-                                                $invoice_amount = trim(substr($invoice_amount, 3, strlen($invoice_amount) - 3)) . " EUR";
-                                            } else if (stripos($invoice_amount, "USD") !== false && stripos($invoice_amount, "USD") <= 1) {
-                                                $invoice_amount = trim(substr($invoice_amount, 3)) . " USD";
-                                            } else if (stripos($invoice_amount, "USD") !== false && stripos($invoice_amount, "USD") > 1) {
-                                                $invoice_amount = trim(substr($invoice_amount, 3, strlen($invoice_amount) - 3)) . " USD";
+                                    $orderItems = $this->exts->querySelectorAll("div.a-box.shipment div.a-fixed-right-grid-col div.a-fixed-left-grid", $rowItem);
+                                    $orderItemCount = count($orderItems);
+                                    $this->exts->log("Order Item count - " . $orderItemCount);
+
+                                    $this->exts->log("starting process for invoice_number - " . $invoice_number);
+                                    $sellerName = "";
+                                    $sellerColumns = $rowItem->querySelectorAll("div.a-box.shipment div.a-fixed-left-grid-col.a-col-right span.a-color-secondary");
+                                    if (count($sellerColumns) > 0) {
+                                        $sellerName = trim($sellerColumns[0]->getText());
+                                        if (trim($sellerName) != "" && stripos(trim($sellerName), ": Amazon EU S.a.r.L.") !== false && count($sellerColumns) > 1) {
+                                            $sellerColumns1 = $rowItem->querySelectorAll("div.a-box.shipment div.a-fixed-left-grid-col.a-col-right span.a-size-small.a-color-secondary");
+                                            if (count($sellerColumns1) > 0) {
+                                                foreach ($sellerColumns1 as $sellerColumnEle) {
+                                                    $sellerColumnEleText = trim($sellerColumnEle->getText());
+                                                    if (trim($sellerColumnEleText) != "" && stripos(trim($sellerColumnEleText), ": Amazon EU S.a.r.L.") === false) {
+                                                        $sellerName = trim($sellerColumnEleText);
+                                                        break;
+                                                    }
+                                                }
                                             }
+                                        }
+                                    }
 
-                                            $columns = $this->exts->querySelectorAll("div.order-info div.a-fixed-right-grid-col.actions span.a-color-secondary.value", $rowItem);
-                                            $invoice_number = trim($columns[count($columns) - 1]->getText());
-                                            $this->exts->log("invoice_number - " . $invoice_number);
+                                    $detailPageUrl = "";
+                                    $columns = $rowItem->querySelectorAll('div.order-info div.a-fixed-right-grid-col.actions ul a.a-link-normal, a[href*="/order-details"]');
+                                    if (count($columns) > 0) {
+                                        $detailPageUrl = $columns[0]->getAttribute("href");
+                                        if (stripos($detailPageUrl, "https://www.amazon.fr") === false && stripos($detailPageUrl, "https://") === false) {
+                                            $detailPageUrl = "https://www.amazon.fr" . trim($detailPageUrl);
+                                        }
 
-                                            if (!$this->exts->invoice_exists($invoice_number)) {
-                                                $sellerName = "";
-                                                $sellerColumns = $this->exts->querySelectorAll("div.a-box.shipment div.a-fixed-left-grid-col.a-col-right span.a-color-secondary");
-                                                if (count($sellerColumns) > 0) {
-                                                    $sellerName = trim($sellerColumns[0]->getText());
+                                        $filename = !empty($invoice_number) ? trim($invoice_number) . ".pdf" : '';
+
+                                        //Stop Downloading invoice if invoice is older than 90 days. 45*24 = 1080
+                                        /*if($this->last_invoice_date != "" && !empty($this->last_invoice_date)) {
+                              $last_date_timestamp = strtotime($this->last_invoice_date);
+                              $last_date_timestamp = $last_date_timestamp-(1080*60*60);
+                              $parsed_date = $this->exts->parse_date($invoice_date);
+                              if(trim($parsed_date) != "") $invoice_date = $parsed_date;
+                              if($last_date_timestamp > strtotime($invoice_date) && trim($parsed_date) != "") {
+                                  $this->exts->log("Skip invoice download as it is not newer than " . $this->last_invoice_date . " - " . $invoice_date);
+                                  $this->dateLimitReached = 1;
+                                  break;
+                              }
+                          }*/
+
+                                        if (trim($detailPageUrl) != "" && $this->dateLimitReached == 0) {
+                                            if ($this->last_invoice_date != "" && !empty($this->last_invoice_date)) {
+                                                $last_date_timestamp = strtotime($this->last_invoice_date);
+                                                $last_date_timestamp = $last_date_timestamp - (1080 * 60 * 60);
+                                            }
+                                            try {
+                                                $parsed_date = $this->exts->parse_date($invoice_date);
+                                            } catch (\Exception $exception) {
+                                                $this->exts->log('ERROR in parsing Date - ' . $invoice_date);
+                                                $parsed_date = '';
+                                            }
+                                            if (trim($parsed_date) != "") $invoice_date = $parsed_date;
+                                            if ($last_date_timestamp > strtotime($invoice_date) && $this->last_invoice_date != "" && !empty($this->last_invoice_date) && trim($parsed_date) != "") {
+                                                $this->exts->log("Skip invoice download as it is not newer than " . $this->last_invoice_date . " - " . $invoice_date);
+                                                $this->dateLimitReached = 1;
+                                                break;
+                                            } else {
+                                                $prices = array();
+                                                $price_blocks = $rowItem->querySelectorAll("div.a-box.shipment div.a-fixed-left-grid-col.a-col-right span.a-color-price");
+                                                if (!is_string($price_blocks) && count($price_blocks) > 0) {
+                                                    foreach ($price_blocks as $price_block) {
+                                                        $currentBlockPrice = $price_block->getText();
+                                                        $currentBlockPrice = trim($currentBlockPrice);
+                                                        $currentBlockPrice = str_replace("EUR", "", $currentBlockPrice);
+                                                        $currentBlockPrice = str_replace(".", "", $currentBlockPrice);
+                                                        $currentBlockPrice = str_replace(",", ".", $currentBlockPrice);
+
+                                                        $prices[] = $currentBlockPrice;
+                                                    }
                                                 }
 
-                                                $detailPageUrl = "";
-                                                $columns = $this->exts->querySelectorAll("div.order-info div.a-fixed-right-grid-col.actions ul a.a-link-normal", $rowItem);
-                                                if (count($columns) > 0) {
-                                                    $detailPageUrl = $columns[0]->getAttribute("href");
-                                                    if (stripos($detailPageUrl, "https://www.amazon.es") === false && stripos($detailPageUrl, "https://") === false) {
-                                                        $detailPageUrl = "https://www.amazon.es" . trim($detailPageUrl);
+                                                $isPopOver = $rowItem->querySelectorAll('a[href*="/ajax/invoice/"], [data-a-popover*="invoice"] a');
+
+                                                $invoice_urls = array();
+                                                if (count($isPopOver) > 0) {
+                                                    $invoice_popover_button = $this->exts->getElement('a[href*="/ajax/invoice/"], [data-a-popover*="invoice"] a', $rowItem);
+                                                    $this->exts->click_element($invoice_popover_button);
+                                                    sleep(2);
+                                                    $this->exts->waitTillPresent(' .a-popover[aria-hidden="false"] .invoice-list a[href*=download]', 10);
+                                                    $links = $this->exts->querySelector(' .a-popover[aria-hidden="false"] .invoice-list a[href*=download]');
+
+                                                    $this->exts->log("Popover Links found - " . count($links));
+                                                    if (empty($links)) {
+                                                        $this->exts->log("No Invoice Url found So moving to next row - " . $invoice_number);
+                                                        continue;
                                                     }
 
-                                                    $filename = !empty($invoice_number) ? trim($invoice_number) . ".pdf" : '';
+                                                    // Find overview link
+                                                    $overview_link = "";
 
-                                                    //Stop Downloading invoice if invoice is older than 90 days.
-                                                    if ($this->last_invoice_date != "" && !empty($this->last_invoice_date)) {
-                                                        $last_date_timestamp = strtotime($this->last_invoice_date);
-                                                        $last_date_timestamp = $last_date_timestamp - (45 * 24 * 60 * 60);
-                                                        $parsed_date = $this->exts->parse_date($invoice_date, '', '', 'es');
-                                                        if (trim($parsed_date) != "") $invoice_date = $parsed_date;
-                                                        if ($last_date_timestamp > strtotime($invoice_date)) {
-                                                            $this->exts->log("Skip invoice download as it is not newer than " . $this->last_invoice_date . " - " . $invoice_date);
-                                                            $this->dateLimitReached = 1;
+                                                    // Find contact link
+                                                    $contact_link = "";
+                                                    foreach ($links as $link_item) {
+                                                        $currItemLink = $link_item->getAttribute('href');
+                                                        $currItemLink = trim($currItemLink);
+                                                        if (stripos($currItemLink, "contact.html") !== false) {
+                                                            $contact_link = $currItemLink;
                                                             break;
                                                         }
                                                     }
 
-                                                    if (trim($detailPageUrl) != "" && $this->dateLimitReached == 0) {
-                                                        $last_date_timestamp = strtotime($this->last_invoice_date);
-                                                        $last_date_timestamp = $last_date_timestamp - (45 * 24 * 60 * 60);
-                                                        $parsed_date = $this->exts->parse_date($invoice_date, '', '', 'es');
-                                                        if (trim($parsed_date) != "") $invoice_date = $parsed_date;
-                                                        if ($last_date_timestamp > strtotime($invoice_date)) {
-                                                            $this->exts->log("Skip invoice download as it is not newer than " . $this->last_invoice_date . " - " . $invoice_date);
-                                                            $this->dateLimitReached = 1;
-                                                            break;
-                                                        } else {
-                                                            $prices = array();
-                                                            $price_blocks = $this->exts->querySelectorAll("div.a-box.shipment div.a-fixed-left-grid-col.a-col-right span.a-color-price", $rowItem);
-                                                            if (count($price_blocks) > 0) {
-                                                                foreach ($price_blocks as $price_block) {
-                                                                    $currentBlockPrice = $price_block->getText();
-                                                                    $currentBlockPrice = trim($currentBlockPrice);
-                                                                    $currentBlockPrice = str_replace("EUR", "", $currentBlockPrice);
-                                                                    $currentBlockPrice = str_replace(".", "", $currentBlockPrice);
-                                                                    $currentBlockPrice = str_replace(",", ".", $currentBlockPrice);
+                                                    // Find invoice links
+                                                    $inv_num = 1;
+                                                    $tempInvUrls = array();
+                                                    foreach ($links as $lkey =>  $link_item) {
+                                                        $currItemLinkText = $link_item->getText();
+                                                        $currItemLinkText = trim($currItemLinkText);
 
-                                                                    $prices[] = $currentBlockPrice;
+                                                        if (stripos($currItemLinkText, "Rechnung oder Gutschrift") === false) {
+                                                            // Sometime in .de language appears as english, so along with Rechnung, replace Invoice
+                                                            $currItemLinkText = str_replace("Rechnung ", "", $currItemLinkText);
+                                                            $currItemLinkText = str_replace("Invoice ", "", $currItemLinkText);
+
+                                                            if ((int)trim($currItemLinkText) == $inv_num) {
+                                                                $currItemLink = $link_item->getAttribute('href');
+                                                                $currItemLink = trim($currItemLink);
+
+                                                                $tempInvUrls[] = array(
+                                                                    'link' => $currItemLink,
+                                                                    'overview_link' => $overview_link,
+                                                                    'contact_url' => "",
+                                                                    'price' => isset($prices[$lkey]) ? $prices[$lkey] : 0,
+                                                                    'is_credit_note' => 0
+                                                                );
+                                                                $inv_num++;
+                                                            }
+                                                        }
+                                                    }
+
+                                                    // Check if invoice request link is available and no invoice link is present, then request invoice
+                                                    $this->exts->log("Checking here that Invoice Request is needed or not. Total Invoice URLS - " . count($tempInvUrls));
+                                                    if (trim($contact_link) != "" && (empty($tempInvUrls) || count($tempInvUrls) < $orderItemCount)) {
+                                                        $invoice_urls[] = array(
+                                                            'link' => $overview_link,
+                                                            'overview_link' => $overview_link,
+                                                            'contact_url' => $contact_link,
+                                                            'price' => 0,
+                                                            'is_credit_note' => 0
+                                                        );
+                                                    }
+                                                    if (count($tempInvUrls) > 0) {
+                                                        foreach ($tempInvUrls as $tempInvUrl) {
+                                                            $invoice_urls[] = $tempInvUrl;
+                                                        }
+                                                    }
+                                                    $this->exts->log("Total Invoice URLS After Invoice Request Check - " . count($invoice_urls));
+
+                                                    $inv_num = 1;
+                                                    //if(trim($contact_link) == "") {
+                                                    // Download credit note only if no contact link is available, because if contact link is available
+                                                    // system will download overview and do a invoice request
+                                                    // virtually in this way, system will never download credit note and in either way we don't need it.
+                                                    //07-02-2019 - This restriction is removed because now OCR remove delivery note and need to download adjustment
+                                                    foreach ($links as $lkey =>  $link_item) {
+                                                        $currItemLinkText = $link_item->getText();
+                                                        $currItemLinkText = trim($currItemLinkText);
+
+                                                        if (stripos($currItemLinkText, "Rechnung oder Gutschrift") !== false) {
+                                                            $currItemLinkText = str_replace("Rechnung oder Gutschrift ", "", $currItemLinkText);
+                                                            if ((int)trim($currItemLinkText) == $inv_num) {
+                                                                $currItemLink = $link_item->getAttribute('href');
+                                                                $currItemLink = trim($currItemLink);
+
+                                                                $invoice_urls[] = array(
+                                                                    'link' => $currItemLink,
+                                                                    'overview_link' => $overview_link,
+                                                                    'contact_url' => $contact_link,
+                                                                    'price' => isset($prices[$lkey]) ? $prices[$lkey] : 0,
+                                                                    'is_credit_note' => 1
+                                                                );
+                                                                $inv_num++;
+                                                            }
+                                                        } else {
+                                                            $currItemLinkText = str_replace("Rechnungskorrektur ", "", $currItemLinkText);
+                                                            if ((int)trim($currItemLinkText) == $inv_num) {
+                                                                $currItemLink = $link_item->getAttribute('href');
+                                                                $currItemLink = trim($currItemLink);
+
+                                                                $invoice_urls[] = array(
+                                                                    'link' => $currItemLink,
+                                                                    'overview_link' => $overview_link,
+                                                                    'contact_url' => $contact_link,
+                                                                    'price' => isset($prices[$lkey]) ? $prices[$lkey] : 0,
+                                                                    'is_credit_note' => 1
+                                                                );
+                                                                $inv_num++;
+                                                            }
+                                                        }
+                                                    }
+                                                    //}
+                                                    $this->exts->log("Total Invoice URLS After Invoice Request & Credit Note Check - " . count($invoice_urls));
+
+                                                    if (empty($invoice_urls)) {
+                                                        $invoice_urls[] = array(
+                                                            'link' => trim($links[0]->getAttribute('href')),
+                                                            'overview_link' => $overview_link,
+                                                            'contact_url' => $contact_link,
+                                                            'price' => 0,
+                                                            'is_credit_note' => 0
+                                                        );
+                                                    } else {
+                                                        //10-06-2021- adding this because now if invoice url is there then amazon removed overview url
+                                                        //Check in Invoice URL array is having overview array url or not because if not then order number will be invoice number and if user selected to download overview, invoice will not get saved because of overview
+                                                        $checkOverviewArray = false;
+                                                        foreach ($invoice_urls as $item_arr) {
+                                                            if (stripos($item_arr['link'], "print") !== false) {
+                                                                $checkOverviewArray = true;
+                                                                break;
+                                                            }
+                                                        }
+
+                                                        if (!$checkOverviewArray) {
+                                                            $temp_invoice_urls = array();
+                                                            $temp_invoice_urls[] = array(
+                                                                'link' => trim($links[0]->getAttribute('href')),
+                                                                'overview_link' => $overview_link,
+                                                                'contact_url' => $contact_link,
+                                                                'price' => 0,
+                                                                'is_credit_note' => 0
+                                                            );
+                                                            foreach ($invoice_urls as $item_arr) {
+                                                                $temp_invoice_urls[] = $item_arr;
+                                                            }
+                                                            $invoice_urls = $temp_invoice_urls;
+                                                        }
+                                                    }
+                                                } else {
+                                                    $links = $rowItem->querySelectorAll("div.orderSummary a.a-link-normal");
+                                                    if (count($links) > 0) {
+                                                        $invoice_urls[] = array(
+                                                            'link' => count($links) > 0 ? trim($links[0]->getAttribute('href')) : "",
+                                                            'overview_link' => "",
+                                                            'contact_url' => "",
+                                                            'price' => 0,
+                                                            'is_credit_note' => 0
+                                                        );
+                                                    }
+                                                }
+
+
+                                                //Remove invoice triggered popups
+                                                if ($this->exts->exists('[data-action="a-popover-close"]')) {
+                                                    $this->exts->click_by_xdotool('[data-action="a-popover-close"]');
+                                                }
+
+                                                if (!empty($invoice_urls)) {
+                                                    $invoicePrefix = 0;
+                                                    $invoiceSize = 0;
+                                                    $savedInvoices = array();
+                                                    $org_inv_number = '';
+
+                                                    $total_dinv = 0;
+                                                    if (count($invoice_urls) > 1 && $this->exts->invoice_exists($invoice_number)) {
+                                                        $total_invUrl = count($invoice_urls);
+                                                        for ($mki = 0; $mki < $total_invUrl; $mki++) {
+                                                            if (!empty($invoice_urls[$mki]['link'])) {
+                                                                if ($mki == 0) {
+                                                                    $tempInvNum = $invoice_number;
+                                                                } else {
+                                                                    $tempInvNum = $invoice_number . '-' . $mki;
+                                                                }
+                                                                $this->exts->log('Link check - ' . $invoice_urls[$mki]['link']);
+                                                                $this->exts->log('Number Check - ' . $tempInvNum);
+                                                                if ((stripos(trim($invoice_urls[$mki]['link']), '/download.html') !== false || stripos(trim($invoice_urls[$mki]['link']), '/documents/download/') !== false) && !empty($this->exts->config_array['download_invoices']) && !empty($tempInvNum) && in_array($tempInvNum, $this->exts->config_array['download_invoices'])) {
+                                                                    $total_dinv++;
                                                                 }
                                                             }
+                                                        }
+                                                        if ($total_dinv < ($total_invUrl - 1)) {
+                                                            $invoicePrefix = $total_invUrl;
+                                                        }
+                                                    }
+                                                    $this->exts->log('Total already downloaded documents for this number - ' . $invoice_number . ' - ' . count($invoice_urls) . ' - ' . $total_dinv);
 
-                                                            $isPopOver = $this->exts->$rowItem("div.order-info div.a-fixed-right-grid-col.actions ul a.a-popover-trigger.a-declarative", $rowItem);
-                                                            if (count($isPopOver) > 0) {
-                                                                $this->exts->click_element($isPopOver[0]);
+                                                    foreach ($invoice_urls as $invoice_url_item) {
+                                                        $item_invoice_number = $invoice_number;
+                                                        $this->exts->log("sellerName - " . $sellerName);
+                                                        $this->exts->log("Invoice url - " . $invoice_url_item['link']);
+                                                        $this->exts->log("Invoice Contact url - " . $invoice_url_item['contact_url']);
+                                                        $this->exts->log("Invoice Overview url - " . $invoice_url_item['overview_link']);
+                                                        $this->exts->log("Invoice cost - " . $invoice_url_item['price']);
+                                                        $this->exts->log("Invoice is_credit_note - " . $invoice_url_item['is_credit_note']);
+
+                                                        $contact_url = $invoice_url_item['contact_url'];
+                                                        $invoice_url = $invoice_url_item['link'];
+                                                        $overview_link = $invoice_url_item['overview_link'];
+                                                        $orderPrice = $invoice_url_item['price'];
+                                                        $org_inv_number = $item_invoice_number;
+
+                                                        if ((int)$invoice_url_item['is_credit_note'] == 1) {
+                                                            $item_invoice_number = $item_invoice_number . "-CN";
+                                                        } else {
+                                                            if (stripos($invoice_url, "print") === false) {
+                                                                $contact_url = "";
                                                             }
-                                                            sleep(4);
+                                                        }
 
-                                                            $invoice_urls = array();
-                                                            if (count($isPopOver) > 0) {
-                                                                $links = $this->exts->querySelectorAll(".a-popover-content a.a-link-normal");
-                                                                if (empty($links)) {
-                                                                    sleep(4);
-                                                                    $isPopOver = $this->exts->querySelectorAll(".a-spacing-none .a-popover-trigger");
-                                                                    if (count($isPopOver) > 0) {
-                                                                        $this->exts->click_element($isPopOver[0]);
+                                                        if (trim($invoice_url) != "") {
+                                                            if (stripos($invoice_url, "contact") !== false) {
+                                                                $links = $rowItem->querySelectorAll(".a-popover-content a.a-link-normal");
+                                                                $contact_url = $invoice_url;
+                                                                $invoice_url = $links[1]->getAttribute('href');
+                                                            }
+                                                        }
+
+                                                        if (trim($invoice_url) == "") {
+                                                            $invoice_url = trim($detailPageUrl) . "&print=1";
+                                                        }
+                                                        $this->exts->log("invoice_url - " . $invoice_url);
+
+                                                        // If seller is amazon, then download orders only after 2 day.
+                                                        // we have noticed sometime it downloads credit note linked as invoice 2*24*60*60 = 86400
+                                                        if (trim($sellerName) != "" && stripos(trim($sellerName), ": Amazon EU S.a.r.L.") !== false) {
+                                                            $this->exts->log("invoiceDate - " . $invoice_date);
+                                                            $timeDiff = strtotime("now") - strtotime($invoice_date);
+                                                            $diffDays = ceil($timeDiff / (172800));
+                                                            $this->exts->log("diffDays - " . $diffDays);
+                                                            if ($diffDays < 2) {
+                                                                $invoice_url = "";
+                                                                $this->exts->log("Skipped Amazon seller invoice as it is not 2 days old");
+                                                                continue;
+                                                            }
+                                                        }
+
+                                                        if (stripos($invoice_url, "oh_aui_ajax_request_invoice") !== false) {
+                                                            $invoice_url = "";
+                                                            $this->exts->log("Skipped Business Account, No Invoice Url, No Auto Request url");
+                                                        }
+
+                                                        if (trim($invoice_url) != "") {
+                                                            if ($invoicePrefix > 0) {
+                                                                $item_invoice_number = $item_invoice_number . "-" . $invoicePrefix;
+                                                                $filename = !empty($item_invoice_number) ?  $item_invoice_number . ".pdf" : '';
+                                                            }
+
+                                                            if (stripos($invoice_url, "https://www.amazon.fr") === false && stripos($invoice_url, "https://") === false) {
+                                                                $invoice_url = "https://www.amazon.fr" . $invoice_url;
+                                                            }
+                                                            $this->exts->log("invoice_url - " . $invoice_url);
+
+                                                            if (trim($overview_link) != "" && stripos($overview_link, "https://www.amazon.fr") === false && stripos($overview_link, "https://") === false) {
+                                                                $overview_link = "https://www.amazon.fr" . $overview_link;
+                                                            }
+
+                                                            if (stripos($invoice_url, "print") !== false) {
+                                                                // Check if user has opted for auto invoice request, then download overview only if amazon is not seller
+                                                                $download_overview = (int)@$this->amazon_download_overview;
+                                                                if ((int)$this->auto_request_invoice == 1 && $contact_url != "") {
+                                                                    $download_overview = 1;
+                                                                }
+
+                                                                if ($download_overview == 1 && (trim($sellerName) == "" || (trim($sellerName) != "" && stripos(trim($sellerName), ": Amazon EU S.a.r.L.") === false))) {
+                                                                    $this->exts->log("New Overview invoiceName- " . $item_invoice_number . ' Original Invoice Number - ' . $org_inv_number);
+                                                                    if (!$this->exts->invoice_exists($item_invoice_number) && !$this->invoice_overview_exists($item_invoice_number) && !$this->exts->invoice_exists($org_inv_number) && !$this->invoice_overview_exists($org_inv_number)) {
+                                                                        $this->exts->log("Downloading overview page as invoice");
+
+                                                                        $this->exts->log("New Overview invoiceName- " . $item_invoice_number);
+                                                                        $this->exts->log("New Overview invoiceAmount- " . $invoice_amount);
+                                                                        $this->exts->log("New Overview Filename- " . $filename);
+
+                                                                        //Sometime while capturing overview page we get login form, but not in opening any other page.
+                                                                        //So detect such case and process login again
+
+                                                                        $currentUrl = $this->exts->getUrl();
+
+                                                                        // Open New window To process Invoice
+
+                                                                        $this->exts->openNewTab($invoice_url);
+                                                                        // Call Processing function to process current page invoices
+
+                                                                        sleep(2);
+
+                                                                        if (stripos($this->exts->getUrl(), "amazon.fr/ap/signin") !== false) {
+                                                                            $this->fillForm(0);
+                                                                            sleep(4);
+                                                                            if ($this->exts->exists('a#ap-account-fixup-phone-skip-link')) {
+                                                                                $this->exts->click_by_xdotool('a#ap-account-fixup-phone-skip-link');
+                                                                                sleep(2);
+                                                                            }
+                                                                        }
+
+                                                                        if (($this->exts->urlContains('/print.html') || $this->exts->urlContains('print=1')) && !$this->exts->urlContains('/ap/signin')) {
+                                                                            $downloaded_file = $this->exts->download_current($filename, 5);
+                                                                            if (trim($downloaded_file) != "" && file_exists($downloaded_file)) {
+                                                                                $savedInvoices[] = array(
+                                                                                    'invoiceName' => $item_invoice_number,
+                                                                                    'invoiceAmount' => $invoice_amount,
+                                                                                    'invoiceDate' => $invoice_date,
+                                                                                    'filename' => $filename,
+                                                                                    'invoiceSize' => filesize($downloaded_file),
+                                                                                    'contact_url' => $contact_url,
+                                                                                    'invoice_url' => $invoice_url,
+                                                                                    'orderPrice' => $orderPrice
+                                                                                );
+                                                                            }
+                                                                        } else if (stripos($this->exts->getUrl(), "amazon.fr/ap/signin") === false && (stripos($this->exts->getUrl(), "order-document.pdf") !== false || stripos($this->exts->getUrl(), ".pdf") !== false)) {
+                                                                            // Wait for completion of file download
+                                                                            $this->exts->wait_and_check_download('pdf');
+
+                                                                            // find new saved file and return its path
+                                                                            $downloaded_file = $this->exts->find_saved_file('pdf', $filename);
+                                                                            if (trim($downloaded_file) != "" && file_exists($downloaded_file)) {
+                                                                                $savedInvoices[] = array(
+                                                                                    'invoiceName' => $item_invoice_number,
+                                                                                    'invoiceAmount' => $invoice_amount,
+                                                                                    'invoiceDate' => $invoice_date,
+                                                                                    'filename' => $filename,
+                                                                                    'invoiceSize' => filesize($downloaded_file),
+                                                                                    'contact_url' => $contact_url,
+                                                                                    'invoice_url' => $invoice_url,
+                                                                                    'orderPrice' => $orderPrice
+                                                                                );
+                                                                            }
+                                                                        } else {
+                                                                            $this->exts->log('Current URL - ' . $this->exts->getUrl());
+                                                                            // Wait for completion of file download
+                                                                            $this->exts->wait_and_check_download('pdf');
+
+                                                                            // find new saved file and return its path
+                                                                            $downloaded_file = $this->exts->find_saved_file('pdf', $filename);
+                                                                            if (trim($downloaded_file) != "" && file_exists($downloaded_file)) {
+                                                                                $savedInvoices[] = array(
+                                                                                    'invoiceName' => $item_invoice_number,
+                                                                                    'invoiceAmount' => $invoice_amount,
+                                                                                    'invoiceDate' => $invoice_date,
+                                                                                    'filename' => $filename,
+                                                                                    'invoiceSize' => filesize($downloaded_file),
+                                                                                    'contact_url' => $contact_url,
+                                                                                    'invoice_url' => $invoice_url,
+                                                                                    'orderPrice' => $orderPrice
+                                                                                );
+                                                                            }
+                                                                        }
+
+                                                                        // Close new window
+                                                                        $this->exts->switchToInitTab();
+                                                                        $this->exts->closeAllTabsButThis();
+                                                                    } else {
+                                                                        $this->exts->log("Invoice Overview is already downloaded");
+                                                                    }
+                                                                } else {
+                                                                    if (trim($sellerName) != "" && stripos(trim($sellerName), ": Amazon EU S.a.r.L.") !== false) {
+                                                                        $this->exts->log("Skip download overview for amazon");
+                                                                    } else {
+                                                                        $this->exts->log("Skip download overview as user has not opted for");
+                                                                    }
+                                                                }
+                                                            } else {
+                                                                $currentUrl = $this->exts->getUrl();
+                                                                $downloaded_file = $this->exts->direct_download($invoice_url, "pdf", $filename);
+                                                                if (trim($downloaded_file) != "" && file_exists($downloaded_file)) {
+                                                                    $pdf_content = file_get_contents($downloaded_file);
+                                                                    if (stripos($pdf_content, "%PDF") !== false) {
+                                                                        $savedInvoices[] = array(
+                                                                            'invoiceName' => $item_invoice_number,
+                                                                            'invoiceAmount' => $invoice_amount,
+                                                                            'invoiceDate' => $invoice_date,
+                                                                            'filename' => $filename,
+                                                                            'invoiceSize' => filesize($downloaded_file),
+                                                                            'contact_url' => $contact_url,
+                                                                            'invoice_url' => $invoice_url,
+                                                                            'orderPrice' => $orderPrice
+                                                                        );
+                                                                    } else {
+                                                                        //Sometime while downloading pdf we get login form, but not in opening any other page.
+                                                                        //So detect such case and process login again
+
+                                                                        // Open New window To process Invoice
+                                                                        $this->exts->openNewTab($invoice_url);
+
+                                                                        // Call Processing function to process current page invoices
+                                                                        // $this->exts->openUrl($invoice_url);
+                                                                        sleep(2);
+
+                                                                        if (stripos($this->exts->getUrl(), "amazon.fr/ap/signin") !== false) {
+                                                                            $this->fillForm(0);
+                                                                            sleep(4);
+                                                                            if ($this->exts->exists('a#ap-account-fixup-phone-skip-link')) {
+                                                                                $this->exts->click_by_xdotool('a#ap-account-fixup-phone-skip-link');
+                                                                                sleep(2);
+                                                                            }
+                                                                        }
+
+                                                                        unlink($downloaded_file);
+                                                                        $downloaded_file = $this->exts->direct_download($invoice_url, "pdf", $filename);
+                                                                        if (trim($downloaded_file) != "" && file_exists($downloaded_file)) {
+                                                                            $pdf_content = file_get_contents($downloaded_file);
+                                                                            if (stripos($pdf_content, "%PDF") !== false) {
+                                                                                $savedInvoices[] = array(
+                                                                                    'invoiceName' => $item_invoice_number,
+                                                                                    'invoiceAmount' => $invoice_amount,
+                                                                                    'invoiceDate' => $invoice_date,
+                                                                                    'filename'      => $filename,
+                                                                                    'invoiceSize'   => filesize($downloaded_file),
+                                                                                    'contact_url'   => $contact_url,
+                                                                                    'invoice_url'   => $invoice_url,
+                                                                                    'orderPrice'    => $orderPrice
+                                                                                );
+                                                                            }
+                                                                        }
+
+                                                                        // Close new window
+                                                                        $this->exts->switchToInitTab();
+                                                                        sleep(2);
+                                                                        $this->exts->closeAllTabsButThis();
+
+                                                                        if (stripos($this->exts->getUrl(), "/your-account/order-history") === false) {
+                                                                            $this->exts->openUrl($currentUrl);
+                                                                            sleep(2);
+                                                                        }
+
+                                                                        $rows = $this->exts->querySelectorAll("div.a-box-group.a-spacing-base.order, .order-card");
+                                                                        $this->exts->log("Invoice Rows- " . count($rows));
+                                                                        $total_rows = count($rows);
+                                                                        if ($total_rows == 0) {
+                                                                            $this->exts->openUrl($currentUrl);
+                                                                            sleep(10);
+                                                                            $this->exts->log("Invoice Rows- " . count($rows));
+                                                                        }
+                                                                    }
+                                                                } else {
+                                                                    //Sometime while downloading pdf we get login form, but not in opening any other page.
+                                                                    //So detect such case and process login again
+                                                                    if (stripos($this->exts->getUrl(), "amazon.fr/ap/signin") !== false) {
+                                                                        $this->fillForm(0);
                                                                         sleep(4);
 
-                                                                        $links = $this->exts->querySelectorAll(".a-popover-content a.a-link-normal");
-                                                                    }
-                                                                }
-
-                                                                // Still no links, move to next
-                                                                if (empty($links)) {
-                                                                    $popups = $this->exts->querySelectorAll("div.a-popover.a-popover-no-header.a-arrow-bottom");
-                                                                    if (count($popups) > 0) {
-                                                                        $this->exts->execute_javascript("
-																	var popups = document.querySelectorAll(\"div.a-popover.a-popover-no-header.a-arrow-bottom\");
-																	for(var i=0; i<popups.length; i++) {
-																		popups[i].remove();
-																	}
-																");
-                                                                    }
-                                                                    continue;
-                                                                }
-
-                                                                // Find overview link
-                                                                $overview_link = "";
-                                                                foreach ($links as $link_item) {
-                                                                    $currItemLink = $link_item->getAttribute('href');
-                                                                    $currItemLink = trim($currItemLink);
-                                                                    if (stripos($currItemLink, "print.html") !== false) {
-                                                                        $overview_link = $currItemLink;
-                                                                        break;
-                                                                    }
-                                                                }
-
-                                                                // Find contact link
-                                                                $contact_link = "";
-                                                                foreach ($links as $link_item) {
-                                                                    $currItemLink = $link_item->getAttribute('href');
-                                                                    $currItemLink = trim($currItemLink);
-                                                                    if (stripos($currItemLink, "contact.html") !== false) {
-                                                                        $contact_link = $currItemLink;
-                                                                        break;
-                                                                    }
-                                                                }
-
-                                                                // Find invoice links
-                                                                $inv_num = 1;
-                                                                foreach ($links as $lkey =>  $link_item) {
-                                                                    $currItemLinkText = $link_item->getText();
-                                                                    $currItemLinkText = trim($currItemLinkText);
-
-                                                                    if (stripos($currItemLinkText, "Factura o nota de crÃƒÆ’Ã‚Â©dito") === false) {
-                                                                        // Sometime in .de language appears as english, so alongwith Rechnung, replace Invoice
-                                                                        $currItemLinkText = str_replace("Factura ", "", $currItemLinkText);
-                                                                        $currItemLinkText = str_replace("Rechnung ", "", $currItemLinkText);
-                                                                        $currItemLinkText = str_replace("Invoice ", "", $currItemLinkText);
-
-                                                                        if ((int)trim($currItemLinkText) == $inv_num) {
-                                                                            $currItemLink = $link_item->getAttribute('href');
-                                                                            $currItemLink = trim($currItemLink);
-
-                                                                            $invoice_urls[] = array(
-                                                                                'link' => $currItemLink,
-                                                                                'overview_link' => $overview_link,
-                                                                                'contact_url' => "",
-                                                                                'price' => isset($prices[$lkey]) ? $prices[$lkey] : 0,
-                                                                                'is_credit_note' => 0
-                                                                            );
-                                                                            $inv_num++;
-                                                                        } else {
-                                                                            $tempArr = explode(" ", $currItemLinkText);
-                                                                            $tempInvNum = trim($tempArr[count($tempArr) - 1]);
-                                                                            if ((int)trim($tempInvNum) == $inv_num) {
-                                                                                $currItemLink = $link_item->getAttribute('href');
-                                                                                $currItemLink = trim($currItemLink);
-
-                                                                                $invoice_urls[] = array(
-                                                                                    'link' => $currItemLink,
-                                                                                    'overview_link' => $overview_link,
-                                                                                    'contact_url' => "",
-                                                                                    'price' => isset($prices[$lkey]) ? $prices[$lkey] : 0,
-                                                                                    'is_credit_note' => 0
+                                                                        unlink($downloaded_file);
+                                                                        $downloaded_file = $this->exts->direct_download($invoice_url, "pdf", $filename);
+                                                                        if (trim($downloaded_file) != "" && file_exists($downloaded_file)) {
+                                                                            $pdf_content = file_get_contents($downloaded_file);
+                                                                            if (stripos($pdf_content, "%PDF") !== false) {
+                                                                                $savedInvoices[] = array(
+                                                                                    'invoiceName' => $item_invoice_number,
+                                                                                    'invoiceAmount' => $invoice_amount,
+                                                                                    'invoiceDate' => $invoice_date,
+                                                                                    'filename'      => $filename,
+                                                                                    'invoiceSize'   => filesize($downloaded_file),
+                                                                                    'contact_url'   => $contact_url,
+                                                                                    'invoice_url'   => $invoice_url,
+                                                                                    'orderPrice'    => $orderPrice
                                                                                 );
-                                                                                $inv_num++;
                                                                             }
                                                                         }
                                                                     }
-                                                                }
 
-                                                                // Check if invoice request link is available, then request invoice
-                                                                if (trim($contact_link) != "" && empty($invoice_urls)) {
-                                                                    $invoice_urls[] = array(
-                                                                        'link' => $overview_link,
-                                                                        'overview_link' => $overview_link,
-                                                                        'contact_url' => $contact_link,
-                                                                        'price' => 0,
-                                                                        'is_credit_note' => 0
-                                                                    );
-                                                                }
+                                                                    //Sometime download URL give 404 page.
+                                                                    //Even if login page comes direct download open URL in current tab only so login form will destroy the previous collected elements.
+                                                                    if (stripos($this->exts->getUrl(), "/your-account/order-history") === false) {
+                                                                        $this->exts->openUrl($currentUrl);
+                                                                        sleep(2);
+                                                                    }
 
-                                                                $inv_num = 1;
-                                                                if (trim($contact_link) == "") {
-                                                                    // Download credit note only if no contact link is available, because if contact link is available
-                                                                    // system will download overview and do a invoice request
-                                                                    // virtually in this way, system will never download credit note and in either way we don't need it.
-                                                                    foreach ($links as $lkey =>  $link_item) {
-                                                                        $currItemLinkText = $link_item->getText();
-                                                                        $currItemLinkText = trim($currItemLinkText);
-
-                                                                        if (stripos($currItemLinkText, "Factura o nota de crÃƒÆ’Ã‚Â©dito") !== false) {
-                                                                            $currItemLinkText = str_replace("Factura o nota de crÃƒÆ’Ã‚Â©dito ", "", $currItemLinkText);
-                                                                            if ((int)trim($currItemLinkText) == $inv_num) {
-                                                                                $currItemLink = $link_item->getAttribute('href');
-                                                                                $currItemLink = trim($currItemLink);
-
-                                                                                $invoice_urls[] = array(
-                                                                                    'link' => $currItemLink,
-                                                                                    'overview_link' => $overview_link,
-                                                                                    'contact_url' => $contact_link,
-                                                                                    'price' => isset($prices[$lkey]) ? $prices[$lkey] : 0,
-                                                                                    'is_credit_note' => 1
-                                                                                );
-                                                                                $inv_num++;
-                                                                            }
-                                                                        } else {
-                                                                            $currItemLinkText = str_replace("rÃƒÆ’Ã‚Â©glage facture ", "", $currItemLinkText);
-                                                                            $currItemLinkText = str_replace("ajustement de facture ", "", $currItemLinkText);
-                                                                            if ((int)trim($currItemLinkText) == $inv_num) {
-                                                                                $currItemLink = $link_item->getAttribute('href');
-                                                                                $currItemLink = trim($currItemLink);
-
-                                                                                $invoice_urls[] = array(
-                                                                                    'link' => $currItemLink,
-                                                                                    'overview_link' => $overview_link,
-                                                                                    'contact_url' => $contact_link,
-                                                                                    'price' => isset($prices[$lkey]) ? $prices[$lkey] : 0,
-                                                                                    'is_credit_note' => 1
-                                                                                );
-                                                                                $inv_num++;
-                                                                            }
-                                                                        }
+                                                                    $rows = $this->exts->querySelectorAll("div.a-box-group.a-spacing-base.order, .order-card");
+                                                                    $this->exts->log("Invoice Rows- " . count($rows));
+                                                                    $total_rows = count($rows);
+                                                                    if ($total_rows == 0) {
+                                                                        $this->exts->openUrl($currentUrl);
+                                                                        sleep(10);
+                                                                        $this->exts->log("Invoice Rows- " . count($rows));
                                                                     }
                                                                 }
+                                                            }
+                                                            $invoicePrefix++;
+                                                        }
+                                                    }
+                                                }
 
-                                                                if (empty($invoice_urls)) {
-                                                                    $invoice_urls[] = array(
-                                                                        'link' => trim($links[0]->getAttribute('href')),
-                                                                        'overview_link' => $overview_link,
-                                                                        'contact_url' => $contact_link,
-                                                                        'price' => 0,
-                                                                        'is_credit_note' => 0
-                                                                    );
-                                                                }
+                                                if (!empty($savedInvoices)) {
+                                                    foreach ($savedInvoices as $sikey => $savedInvoice) {
+                                                        $this->exts->log("Invoice Name - " . $savedInvoice['invoiceName']);
+                                                        $this->exts->log("Invoice Date - " . $savedInvoice['invoiceDate']);
+                                                        $this->exts->log("Invoice Amount - " . $savedInvoice['invoiceAmount']);
+                                                        $this->exts->log("Invoice filename - " . $savedInvoice['filename']);
+                                                        $this->exts->log("Invoice invoiceSize - " . $savedInvoice['invoiceSize']);
+                                                        $this->exts->log("Invoice contact_url - " . $savedInvoice['contact_url']);
+                                                        $this->exts->log("Invoice invoice_url - " . $savedInvoice['invoice_url']);
+                                                        $this->exts->log("Invoice orderPrice - " . $savedInvoice['orderPrice']);
 
-                                                                //Remove invoice triggered popups
-                                                                $this->exts->execute_javascript("
-															var popups = document.querySelectorAll(\"div.a-popover.a-popover-no-header.a-arrow-bottom\");
-															for(var i=0; i<popups.length; i++) {
-																popups[i].remove();
-															}
-														");
+                                                        $useOrderPrice = 0;
+                                                        $inv_size = 0;
+                                                        if ($sikey == 0) {
+                                                            $inv_size = $savedInvoice['invoiceSize'];
+                                                        } else {
+                                                            if ($inv_size == $savedInvoice['invoiceSize'] && $sikey == 1) {
+                                                                $useOrderPrice = 1;
+                                                            }
+                                                        }
+                                                    }
+                                                    $this->exts->log("Use order price -  -" . $useOrderPrice);
+
+                                                    if (count($savedInvoices) > 1) {
+                                                        foreach ($savedInvoices as $sikey => $savedInvoice) {
+                                                            $savedInvoices[$sikey]['invoiceAmount'] = ($useOrderPrice == 1) ? $savedInvoices[$sikey]['orderPrice'] : 0;
+                                                        }
+                                                    }
+
+                                                    foreach ($savedInvoices as $savedInvoice) {
+                                                        if (stripos($savedInvoice['invoice_url'], "print") !== false) {
+                                                            $contact_url = $savedInvoice['contact_url'];
+                                                            if (trim($contact_url) != "" && stripos($contact_url, "https://www.amazon.fr") === false) {
+                                                                $contact_url = "https://www.amazon.fr" . $contact_url;
+                                                            }
+
+                                                            $invoice_note = "Order Overview - " . $savedInvoice['invoiceName'];
+                                                            $this->exts->new_invoice($savedInvoice['invoiceName'], $savedInvoice['invoiceDate'], $savedInvoice['invoiceAmount'], $savedInvoice['filename'], 1, $invoice_note, 0, '', array(
+                                                                'extra_data' => !empty($contact_url) ? $contact_url : "AMAZON_NO_DOWNLOAD",
+                                                                'tags' => (int)@$this->auto_tagging == 1 && !empty($this->order_overview_tags) ? $this->order_overview_tags : ''
+                                                            ));
+                                                            $invoice_note = ":::" . $invoice_note;
+                                                            if (trim($contact_url) != "") {
+                                                                $this->exts->sendRequestEx($savedInvoice['invoiceName'] . ":::" . $contact_url, "===EXTRA-DATA===");
                                                             } else {
-                                                                $links = $this->exts->querySelectorAll("div.orderSummary a.a-link-normal", $rowItem);
-                                                                if (count($links) > 0) {
-                                                                    $invoice_urls[] = array(
-                                                                        'link' => count($links) > 0 ? trim($links[0]->getAttribute('href')) : "",
-                                                                        'overview_link' => "",
-                                                                        'contact_url' => "",
-                                                                        'price' => 0,
-                                                                        'is_credit_note' => 0
-                                                                    );
-                                                                }
-
-                                                                $popups = $this->exts->querySelectorAll("div.a-popover.a-popover-no-header.a-arrow-bottom");
-                                                                if (count($popups) > 0) {
-                                                                    $this->exts->execute_javascript("
-																var popups = document.querySelectorAll(\"div.a-popover.a-popover-no-header.a-arrow-bottom\");
-																for(var i=0; i<popups.length; i++) {
-																	popups[i].remove();
-																}
-															");
-                                                                }
+                                                                $this->exts->sendRequestEx($savedInvoice['invoiceName'] . ":::AMAZON_NO_DOWNLOAD", "===EXTRA-DATA===");
                                                             }
+                                                            $this->exts->sendRequestEx($savedInvoice['invoiceName'] . $invoice_note, "===NOTE-DATA===");
 
-                                                            if (!empty($invoice_urls)) {
-                                                                $invoicePrefix = 0;
-                                                                $invoiceSize = 0;
-                                                                $savedInvoices = array();
-
-                                                                foreach ($invoice_urls as $invoice_url_item) {
-                                                                    $item_invoice_number = $invoice_number;
-                                                                    $this->exts->log("Invoice url - " . $invoice_url_item['link']);
-                                                                    $this->exts->log("Invoice Overview url - " . $invoice_url_item['overview_link']);
-                                                                    $this->exts->log("Invoice cost - " . $invoice_url_item['price']);
-                                                                    $this->exts->log("Invoice is_credit_note - " . $invoice_url_item['is_credit_note']);
-
-                                                                    $contact_url = $invoice_url_item['contact_url'];
-                                                                    $invoice_url = $invoice_url_item['link'];
-                                                                    $overview_link = $invoice_url_item['overview_link'];
-                                                                    $orderPrice = $invoice_url_item['price'];
-
-                                                                    if ((int)$invoice_url_item['is_credit_note'] == 1) {
-                                                                        $item_invoice_number = $item_invoice_number . "-CN";
-                                                                    } else {
-                                                                        if (stripos($invoice_url, "print") === false) {
-                                                                            $contact_url = "";
-                                                                        }
-                                                                    }
-
-                                                                    if (trim($invoice_url) != "") {
-                                                                        if (stripos($invoice_url, "contact") !== false) {
-                                                                            $links = $this->exts->querySelectorAll(".a-popover-content a.a-link-normal", $rowItem);
-                                                                            $contact_url = $invoice_url;
-                                                                            $invoice_url = $links[1]->getAttribute('href');
-                                                                        }
-                                                                    }
-
-                                                                    if (trim($invoice_url) == "") {
-                                                                        $invoice_url = trim($detailPageUrl) . "&print=1";
-                                                                    }
-                                                                    $this->exts->log("invoice_url - " . $invoice_url);
-
-                                                                    // If seller is amazon, then download orders only after 2 day.
-                                                                    // we have noticed sometime it downloads credit note linked as invoice
-                                                                    if (trim($sellerName) != "" && trim($sellerName) == "Vendu par : Amazon EU S.a.r.L.") {
-                                                                        $this->exts->log("invoiceDate - " . $invoice_date);
-                                                                        $timeDiff = strtotime("now") - strtotime($invoice_date);
-                                                                        $diffDays = ceil($timeDiff / (3600 * 24));
-                                                                        $this->exts->log("diffDays - " . $diffDays);
-                                                                        if ($diffDays < 2) {
-                                                                            $invoice_url = "";
-                                                                            $this->exts->log("Skipped Amazon seller invoice as it is not 2 days old");
-                                                                            continue;
-                                                                        }
-                                                                    }
-
-                                                                    if (stripos($invoice_url, "oh_aui_ajax_request_invoice") !== false) {
-                                                                        $invoice_url = "";
-                                                                        $this->exts->log("Skipped Business Account, No Invoice Url, No Auto Request url");
-                                                                    }
-
-                                                                    if (trim($invoice_url) != "") {
-                                                                        if ($invoicePrefix > 0) {
-                                                                            $item_invoice_number = $item_invoice_number . "-" . $invoicePrefix;
-                                                                            $filename =  !empty($item_invoice_number) ?  $item_invoice_number . ".pdf" : '';
-                                                                        }
-
-                                                                        if (stripos($invoice_url, "https://www.amazon.es") === false && stripos($invoice_url, "https://") === false) {
-                                                                            $invoice_url = "https://www.amazon.es" . $invoice_url;
-                                                                        }
-                                                                        $this->exts->log("invoice_url - " . $invoice_url);
-
-                                                                        if (trim($overview_link) != "" && stripos($overview_link, "https://www.amazon.es") === false && stripos($overview_link, "https://") === false) {
-                                                                            $overview_link = "https://www.amazon.es" . $overview_link;
-                                                                        }
-
-                                                                        if (stripos($invoice_url, "print") !== false) {
-                                                                            // Check if user has opted for auto invoice request, then download overview only if amazon is not seller
-                                                                            $download_overview = $this->amazon_download_overview;
-                                                                            if ((int)$this->auto_request_invoice == 1 && $contact_url != "") {
-                                                                                $download_overview = 1;
-                                                                            }
-
-                                                                            if ($download_overview == 1 && trim($sellerName) != "" && trim($sellerName) != "Vendu par : Amazon EU S.a.r.L.") {
-                                                                                $this->exts->log("Downloading overview page as invoice");
-
-                                                                                $this->exts->log("New Overview invoiceName- " . $item_invoice_number);
-                                                                                $this->exts->log("New Overview invoiceAmount- " . $invoice_amount);
-                                                                                $this->exts->log("New Overview Filename- " . $filename);
-
-                                                                                //Sometime while capturing overview page we get login form, but not in opening any other page.
-                                                                                //So detect such case and process login again
-
-                                                                                $currentUrl = $this->exts->getUrl();
-
-                                                                                // Open New window To process Invoice
-                                                                                // Call Processing function to process current page invoices
-                                                                                $this->exts->openNewTab($invoice_url);
-                                                                                sleep(2);
-
-                                                                                if (stripos($this->exts->getUrl(), "amazon.es/ap/signin") !== false) {
-                                                                                    $this->fillForm(0);
-                                                                                    sleep(4);
-
-                                                                                    $downloaded_file = $this->exts->download_current($filename, 5);
-                                                                                    if (trim($downloaded_file) != "" && file_exists($downloaded_file)) {
-                                                                                        $pdf_content = file_get_contents($downloaded_file);
-                                                                                        if (stripos($pdf_content, "%PDF") !== false) {
-                                                                                            $savedInvoices[] = array(
-                                                                                                'invoiceName' => $item_invoice_number,
-                                                                                                'invoiceAmount' => $invoice_amount,
-                                                                                                'invoiceDate' => $invoice_date,
-                                                                                                'filename' => $filename,
-                                                                                                'invoiceSize' => filesize($downloaded_file),
-                                                                                                'contact_url' => $contact_url,
-                                                                                                'invoice_url' => $invoice_url,
-                                                                                                'orderPrice' => $orderPrice
-                                                                                            );
-                                                                                        } else {
-                                                                                            $this->exts->log("Not Valid PDF - " . $filename);
-                                                                                        }
-                                                                                    }
-                                                                                }
-
-                                                                                // Close new window
-                                                                                $this->exts->switchToInitTab();
-                                                                                sleep(2);
-                                                                                $this->exts->closeAllTabsButThis();
-                                                                            } else {
-                                                                                if (trim($sellerName) != "" && trim($sellerName) == "Vendu par : Amazon EU S.a.r.L.") {
-                                                                                    $this->exts->log("Skip download overview for amazon");
-                                                                                } else {
-                                                                                    $this->exts->log("Skip download overview as user has not opted for");
-                                                                                }
-                                                                            }
-                                                                        } else {
-                                                                            $downloaded_file = $this->exts->direct_download($invoice_url, "pdf", $filename);
-                                                                            if (trim($downloaded_file) != "" && file_exists($downloaded_file)) {
-                                                                                $pdf_content = file_get_contents($downloaded_file);
-                                                                                if (stripos($pdf_content, "%PDF") !== false) {
-                                                                                    $savedInvoices[] = array(
-                                                                                        'invoiceName' => $item_invoice_number,
-                                                                                        'invoiceAmount' => $invoice_amount,
-                                                                                        'invoiceDate' => $invoice_date,
-                                                                                        'filename' => $filename,
-                                                                                        'invoiceSize' => filesize($downloaded_file),
-                                                                                        'contact_url' => $contact_url,
-                                                                                        'invoice_url' => $invoice_url,
-                                                                                        'orderPrice' => $orderPrice
-                                                                                    );
-                                                                                } else {
-                                                                                    //Sometime while downloading pdf we get login form, but not in opening any other page.
-                                                                                    //So detect such case and process login again
-
-                                                                                    $currentUrl = $this->exts->getUrl();
-
-                                                                                    // Open New window To process Invoice
-                                                                                    $this->exts->openNewTab();
-
-                                                                                    // Call Processing function to process current page invoices
-                                                                                    $this->exts->openUrl($invoice_url);
-                                                                                    sleep(2);
-
-                                                                                    if (stripos($this->exts->getUrl(), "amazon.es/ap/signin") !== false) {
-                                                                                        $this->fillForm(0);
-                                                                                        sleep(4);
-
-                                                                                        unlink($downloaded_file);
-                                                                                        $downloaded_file = $this->exts->direct_download($invoice_url, "pdf", $filename);
-                                                                                        if (trim($downloaded_file) != "" && file_exists($downloaded_file)) {
-                                                                                            $pdf_content = file_get_contents($downloaded_file);
-                                                                                            if (stripos($pdf_content, "%PDF") !== false) {
-                                                                                                $savedInvoices[] = array(
-                                                                                                    'invoiceName' => $item_invoice_number,
-                                                                                                    'invoiceAmount' => $invoice_amount,
-                                                                                                    'invoiceDate' => $invoice_date,
-                                                                                                    'filename'      => $filename,
-                                                                                                    'invoiceSize'   => filesize($downloaded_file),
-                                                                                                    'contact_url'   => $contact_url,
-                                                                                                    'invoice_url'   => $invoice_url,
-                                                                                                    'orderPrice'    => $orderPrice
-                                                                                                );
-                                                                                            }
-                                                                                        }
-                                                                                    }
-
-                                                                                    // Close new window
-                                                                                    $this->exts->switchToInitTab();
-                                                                                    sleep(2);
-                                                                                    $this->exts->closeAllTabsButThis();
-                                                                                }
-                                                                            }
-                                                                        }
-                                                                        $invoicePrefix++;
-                                                                    }
-                                                                }
+                                                            if ((int)@$this->auto_tagging == 1 && !empty($this->order_overview_tags)) {
+                                                                $this->exts->sendRequestEx($savedInvoice['invoiceName'] . ":::" . $this->order_overview_tags, "===INVOICE-TAGS===");
                                                             }
+                                                        } else {
+                                                            $invoice_note = "Amazon Direct - " . $savedInvoice['invoiceName'];
+                                                            $this->exts->new_invoice($savedInvoice['invoiceName'], $savedInvoice['invoiceDate'], $savedInvoice['invoiceAmount'], $savedInvoice['filename'], 0, $invoice_note, 0, '', array(
+                                                                'tags' => (int)@$this->auto_tagging == 1 && !empty($this->amazon_invoice_tags) ? $this->amazon_invoice_tags : ''
+                                                            ));
 
-                                                            if (!empty($savedInvoices)) {
-                                                                foreach ($savedInvoices as $sikey => $savedInvoice) {
-                                                                    $this->exts->log("Invoice Name - " . $savedInvoice['invoiceName']);
-                                                                    $this->exts->log("Invoice Date - " . $savedInvoice['invoiceDate']);
-                                                                    $this->exts->log("Invoice Amount - " . $savedInvoice['invoiceAmount']);
-                                                                    $this->exts->log("Invoice filename - " . $savedInvoice['filename']);
-                                                                    $this->exts->log("Invoice invoiceSize - " . $savedInvoice['invoiceSize']);
-                                                                    $this->exts->log("Invoice contact_url - " . $savedInvoice['contact_url']);
-                                                                    $this->exts->log("Invoice invoice_url - " . $savedInvoice['invoice_url']);
-                                                                    $this->exts->log("Invoice orderPrice - " . $savedInvoice['orderPrice']);
-
-                                                                    $useOrderPrice = 0;
-                                                                    $inv_size = 0;
-                                                                    if ($sikey == 0) {
-                                                                        $inv_size = $savedInvoice['invoiceSize'];
-                                                                    } else {
-                                                                        if ($inv_size == $savedInvoice['invoiceSize'] && $sikey == 1) {
-                                                                            $useOrderPrice = 1;
-                                                                        }
-                                                                    }
-                                                                }
-                                                                $this->exts->log("Use order price -  -" . $useOrderPrice);
-
-                                                                if (count($savedInvoices) > 1) {
-                                                                    foreach ($savedInvoices as $sikey => $savedInvoice) {
-                                                                        $savedInvoices[$sikey]['invoiceAmount'] = ($useOrderPrice == 1) ? $savedInvoices[$sikey]['orderPrice'] : 0;
-                                                                    }
-                                                                }
-
-                                                                foreach ($savedInvoices as $savedInvoice) {
-                                                                    if (stripos($savedInvoice['invoice_url'], "print") !== false) {
-                                                                        $this->exts->new_invoice($savedInvoice['invoiceName'], $savedInvoice['invoiceDate'], $savedInvoice['invoiceAmount'], $savedInvoice['filename']);
-
-                                                                        $contact_url = $savedInvoice['contact_url'];
-                                                                        if (trim($contact_url) != "") {
-                                                                            if (stripos($contact_url, "https://www.amazon.es") === false) {
-                                                                                $contact_url = "https://www.amazon.es" . $contact_url;
-                                                                            }
-                                                                            $this->exts->sendRequestEx($savedInvoice['invoiceName'] . ":::" . $contact_url, "===EXTRA-DATA===");
-                                                                        } else {
-                                                                            $this->exts->sendRequestEx($savedInvoice['invoiceName'] . ":::AMAZON_NO_DOWNLOAD", "===EXTRA-DATA===");
-                                                                        }
-                                                                        $this->exts->sendRequestEx($savedInvoice['invoiceName'] . ":::Order Overview - " . $savedInvoice['invoiceName'], "===NOTE-DATA===");
-
-                                                                        if ((int)@$this->auto_tagging == 1 && !empty($this->order_overview_tags)) {
-                                                                            $this->exts->sendRequestEx($savedInvoice['invoiceName'] . ":::" . $this->order_overview_tags, "===INVOICE-TAGS===");
-                                                                        }
-                                                                    } else {
-                                                                        $this->exts->new_invoice($savedInvoice['invoiceName'], $savedInvoice['invoiceDate'], $savedInvoice['invoiceAmount'], $savedInvoice['filename']);
-
-                                                                        $this->exts->sendRequestEx($savedInvoice['invoiceName'] . ":::Amazon Direct - " . $savedInvoice['invoiceName'], "===NOTE-DATA===");
-                                                                        if ((int)@$this->auto_tagging == 1 && !empty($this->amazon_invoice_tags)) {
-                                                                            $this->exts->sendRequestEx($savedInvoice['invoiceName'] . ":::" . $this->amazon_invoice_tags, "===INVOICE-TAGS===");
-                                                                        }
-                                                                    }
-                                                                }
+                                                            $this->exts->sendRequestEx($savedInvoice['invoiceName'] . ":::" . $invoice_note, "===NOTE-DATA===");
+                                                            if ((int)@$this->auto_tagging == 1 && !empty($this->amazon_invoice_tags)) {
+                                                                $this->exts->sendRequestEx($savedInvoice['invoiceName'] . ":::" . $this->amazon_invoice_tags, "===INVOICE-TAGS===");
                                                             }
                                                         }
                                                     }
                                                 }
                                             }
                                         }
-                                    } catch (\Exception $exception) {
-                                        $this->exts->log("Exception finding columns element " . $exception->getMessage());
                                     }
                                 }
-                                sleep(2);
-                            }
-                        } else if ($this->exts->exists('.order-card a[href*="/ajax/invoice/"]')) {
-                            // Huy added this 2023-01
-                            $count_order_card = count($this->exts->getElements('.order-card a[href*="/ajax/invoice/"]'));
-                            $order_invoices = [];
-                            for ($i = 0; $i < $count_order_card; $i++) {
-                                $order_card_invoice_dropdown = $this->exts->getElements('.order-card a[href*="/ajax/invoice/"]')[$i];
-                                $temp_url = $order_card_invoice_dropdown->getAttribute('href');
-
-                                $parsedUrl = parse_url($temp_url);
-                                parse_str($parsedUrl['query'], $queryParams);
-
-                                $order_invoice_name = $queryParams['orderId'];
-                                $temp_array = explode('&', $order_invoice_name);
-                                $order_invoice_name = reset($temp_array);
-
-                                try {
-                                    $this->exts->click_element($order_card_invoice_dropdown);
-                                } catch (Exception $e) {
-                                    $this->exts->executeSafeScript('arguments[0].click()', [$order_card_invoice_dropdown]);
-                                }
-                                sleep(5);
-                                if ($this->exts->exists('.a-popover[style*="visibility: visible"]:not([aria-hidden="true"]) a[href*="/invoice.pdf"]')) {
-                                    $order_invoice_url = $this->exts->getElement('.a-popover[style*="visibility: visible"]:not([aria-hidden="true"]) a[href*="/invoice.pdf"]')->getAttribute('href');
-                                    $this->exts->log('--------------------------');
-                                    $this->exts->log('order_invoice_name: ' . $order_invoice_name);
-                                    $this->exts->log('order_invoice_url: ' . $order_invoice_url);
-
-                                    $invoiceFileName = !empty($order_invoice_name) ? $order_invoice_name . '.pdf' : '';
-                                    $downloaded_file = $this->exts->direct_download($order_invoice_url, 'pdf', $invoiceFileName);
-                                    if (trim($downloaded_file) != '' && file_exists($downloaded_file)) {
-                                        $this->exts->new_invoice($order_invoice_name, '', '', $downloaded_file);
-                                    } else {
-                                        $this->exts->log(__FUNCTION__ . '::No download ' . $order_invoice_name);
-                                    }
-                                }
-                                $this->exts->click_by_xdotool('[data-action="a-popover-close"]');
-                                sleep(2);
+                            } catch (\Exception $exception) {
+                                $this->exts->log("Exception finding columns element " . $exception->getMessage());
                             }
                         }
+                        sleep(2);
+                    }
+                } else if ($this->exts->querySelector('a[href*="/vps/pslip/ref"]') != null) {
+                    $this->exts->capture('print-orders');
+                    sleep(5);
+                    $invoices = [];
+                    $rows = $this->exts->getElements('div#yourOrderHistorySection div#orderCard');
+                    foreach ($rows as $key => $row) {
+                        $invoiceLink = $this->exts->getElement('a[href*="/vps/pslip/ref"]', $row);
+                        if ($invoiceLink != null) {
+                            $invoiceUrl = $invoiceLink->getAttribute("href");
+                            preg_match('/orderId=([0-9\-]+)/', $invoiceUrl, $matches);
+                            $invoiceName = isset($matches[1]) ?  $matches[1] : '';
+                            $invoiceDate = '';
+                            $invoiceAmount = $this->exts->extract('span[class*="price"]', $row);
 
-                        // Keep last processed page count
-                        $this->last_state['last_page_count'] = '';
-                        $this->current_state['last_page_count'] = $hrefArr['page'];
+                            array_push($invoices, array(
+                                'invoiceName' => $invoiceName,
+                                'invoiceDate' => $invoiceDate,
+                                'invoiceAmount' => $invoiceAmount,
+                                'invoiceUrl' => $invoiceUrl,
+                            ));
+                            $this->isNoInvoice = false;
+                        }
+                    }
 
-                        // Keep last processed order page list url
-                        $this->last_state['order_page_list'] = '';
-                        $this->current_state['order_page_list'] = $this->exts->getUrl();
-                    } catch (\Exception $excp) {
-                        $this->exts->log("Orders - " . $excp->getMessage());
+                    $this->exts->log('Invoices found: ' . count($invoices));
+                    foreach ($invoices as $invoice) {
+                        $this->exts->log('--------------------------');
+                        $this->exts->log('invoiceName: ' . $invoice['invoiceName']);
+                        $this->exts->log('invoiceDate: ' . $invoice['invoiceDate']);
+                        $this->exts->log('invoiceAmount: ' . $invoice['invoiceAmount']);
+                        $this->exts->log('invoiceUrl: ' . $invoice['invoiceUrl']);
+
+                        $invoiceFileName = !empty($invoice['invoiceName']) ?  $invoice['invoiceName'] . '.pdf' : '';
+                        $invoice['invoiceDate'] = $this->exts->parse_date($invoice['invoiceDate'], 'd.m.Y', 'Y-m-d');
+                        $this->exts->log('Date parsed: ' . $invoice['invoiceDate']);
+
+                        $downloaded_file = $this->exts->direct_download($invoice['invoiceUrl'], 'pdf', $invoiceFileName);
+                        if (trim($downloaded_file) != '' && file_exists($downloaded_file)) {
+                            $this->exts->new_invoice($invoice['invoiceName'], $invoice['invoiceDate'], $invoice['invoiceAmount'], $invoiceFileName);
+                            sleep(1);
+                        } else {
+                            $this->exts->log(__FUNCTION__ . '::No download ' . $invoiceFileName);
+                        }
                     }
                 }
-            } else {
-                $this->exts->log("No Invoice Found");
-            }
 
+                if ($this->exts->exists('.a-pagination a[href="#pagination/next/"]')) {
+                    $this->exts->log('NEXT page ' . $paging_count);
+                    $this->exts->click_by_xdotool('.a-pagination a[href="#pagination/next/"]');
+                    sleep(10);
+                } else {
+                    break;
+                }
+            }
             // Keep processed years
             $this->last_state['years'] = array();
             $this->current_state['years'][] = $optionSelector;
-            // for ($i = 0; $i < 5 && $this->exts->urlContains('errors/400.html'); $i++) {
-            //     $this->exts->navigate()->back();
-            //     sleep(5);
-            // }
         }
     }
 
@@ -2163,11 +2310,11 @@ class PortalScriptCDP
                 $popups = $this->exts->querySelectorAll('.a-popover.a-popover-no-header.a-arrow-right');
                 if (count($popups) > 0) {
                     $this->exts->execute_javascript("
-		var popups = document.querySelectorAll(\".a-popover.a-popover-no-header.a-arrow-right\");
-		for(var i=0; i<popups.length; i++) {
-			popups[i].remove();
-		}
-	");
+                    var popups = document.querySelectorAll(\".a-popover.a-popover-no-header.a-arrow-right\");
+                    for(var i=0; i<popups.length; i++) {
+                        popups[i].remove();
+                    }
+                ");
                 }
             }
         } while ($this->exts->exists('.report-table-footer button[data-testid="next-button"]') && !$this->exts->exists('.report-table-footer button[data-testid="next-button"][disabled]') && $pageNum > 1);
