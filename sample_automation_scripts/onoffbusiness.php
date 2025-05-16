@@ -82,7 +82,6 @@ class PortalScriptCDP
      */
     private function initPortal($count)
     {
-
         $this->exts->log('Begin initPortal ' . $count);
         $this->exts->loadCookiesFromFile();
         $this->exts->openUrl($this->loginUrl);
@@ -216,10 +215,7 @@ class PortalScriptCDP
             $invoice['invoiceDate'] = $this->exts->parse_date($invoice['invoiceDate'], 'F d, Y', 'Y-m-d');
             $this->exts->log('Date parsed: ' . $invoice['invoiceDate']);
 
-            // $downloaded_file = $this->exts->direct_download($invoice['invoiceUrl'], 'pdf', $invoiceFileName);
             $downloaded_file = $this->exts->click_and_download($invoice['downloadBtn'], 'pdf', $invoiceFileName);
-
-
             if (trim($downloaded_file) != '' && file_exists($downloaded_file)) {
                 $this->exts->new_invoice($invoice['invoiceName'], $invoice['invoiceDate'], $invoice['invoiceAmount'], $invoiceFileName);
                 sleep(1);
