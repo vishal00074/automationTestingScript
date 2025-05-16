@@ -1814,6 +1814,34 @@ class PortalScriptCDP
         }
     }
 
+    private function changeSelectbox($select_box = '', $option_value = '')
+    {
+        $this->exts->waitTillPresent($select_box, 10);
+        if ($this->exts->exists($select_box)) {
+            $option = $option_value;
+            $this->exts->click_by_xdotool($select_box);
+            sleep(2);
+            $optionIndex = $this->exts->executeSafeScript('
+			const selectBox = document.querySelector("' . $select_box . '");
+			const targetValue = "' . $option_value . '";
+			const optionIndex = [...selectBox.options].findIndex(option => option.value === targetValue);
+			return optionIndex;
+		');
+            $this->exts->log($optionIndex);
+            sleep(1);
+            for ($i = 0; $i < $optionIndex; $i++) {
+                $this->exts->log('>>>>>>>>>>>>>>>>>> Down');
+                // Simulate pressing the down arrow key
+                $this->exts->type_key_by_xdotool('Down');
+                sleep(1);
+            }
+            $this->exts->type_key_by_xdotool('Return');
+        } else {
+            $this->exts->log('Select box does not exist');
+        }
+    }
+
+
     public function getTotalYearPages($reloadCount)
     {
         $pages = 0;

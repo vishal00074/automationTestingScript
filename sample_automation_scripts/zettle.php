@@ -58,7 +58,6 @@ class PortalScriptCDP
     }
 
     // Server-Portal-ID: 6095 - Last modified: 04.04.2025 14:21:37 UTC - User: 1
-
     public $baseUrl = 'https://my.izettle.com';
     public $loginUrl = 'https://my.izettle.com';
     public $invoicePageUrl = 'https://my.zettle.com/invoices/orders?status=PAID';
