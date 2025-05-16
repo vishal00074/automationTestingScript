@@ -149,13 +149,10 @@ class PortalScriptCDP
 
 
     /**
-
      * Method to Check where user is logged in or not
-
      * return boolean true/false
-
      */
-    function checkLogin()
+    public function checkLogin()
     {
         $this->exts->log("Begin checkLogin ");
         $isLoggedIn = false;
