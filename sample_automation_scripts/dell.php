@@ -1,4 +1,4 @@
-<?php //
+<?php // updated login code and 2fa code request again in case wrong 2fa entered for single time   added condition to handle empty invoice name
 
 /**
  * Chrome Remote via Chrome devtool protocol script, for specific process/portal
@@ -99,12 +99,31 @@ class PortalScriptCDP
         sleep(10);
         $this->fillForm(0);
         sleep(10);
-        if ($this->exts->exists('#frmSignIn #validationSummaryText')) {
+
+        $isCaptcha = strtolower($this->exts->extract('#frmSignIn #validationSummaryText'));
+
+        $this->exts->log('Captcha:: ' . $isCaptcha);
+
+        if (stripos($isCaptcha, strtolower('Bitte geben Sie die im Bild angezeigten Zeichen ein, um fortzufahren.')) !== false) {
+            sleep(10);
             $this->fillForm(0);
         }
 
         sleep(10);
         if ($this->exts->exists('input#OTP')) {
+            $this->checkFillTwoFactor();
+            sleep(10);
+        }
+
+        // request again in case wrong 2fa entered
+        $isTwoError = strtolower($this->exts->extract('div#validationSummaryContainer'));
+
+        $this->exts->log('isTwoError:: ' . $isTwoError);
+
+        if (stripos($isTwoError, strtolower('Der einmalige Bestätigungscode ist falsch')) !== false) {
+
+            $this->exts->moveToElementAndClick('a#send-verification-email-link');
+            sleep(7);
             $this->checkFillTwoFactor();
             sleep(10);
         }
@@ -123,13 +142,20 @@ class PortalScriptCDP
                 $this->exts->moveToElementAndClick('button#_evidon-accept-button');
                 sleep(10);
             }
-
             $this->downloadInvoice(0);
+
             $this->exts->success();
         } else {
             $this->exts->capture("LoginFailed");
+
+            $isTwoError = strtolower($this->exts->extract('div#validationSummaryContainer'));
+
+            $this->exts->log('isTwoError:: ' . $isTwoError);
+
             if ($this->isWrongCredential()) {
                 $this->exts->log($this->exts->extract($this->wrong_credential_selector, null));
+                $this->exts->loginFailure(1);
+            } else if (stripos($isTwoError, strtolower('Der einmalige Bestätigungscode ist falsch')) !== false) {
                 $this->exts->loginFailure(1);
             } else {
                 $this->exts->loginFailure();
@@ -180,8 +206,13 @@ class PortalScriptCDP
 
     public function isWrongCredential()
     {
-        $tag = $this->exts->querySelector($this->wrong_credential_selector);
-        return $tag != null;
+        $tag = false;
+        $error_text = strtolower($this->exts->extract($this->wrong_credential_selector));
+
+        if (stripos($error_text, strtolower('Passwort')) !== false) {
+            $tag = true;
+        }
+        return $tag;
     }
 
     public function checkFillRecaptcha($counter)
