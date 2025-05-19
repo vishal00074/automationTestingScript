@@ -13,11 +13,8 @@ public $download_daily_report = 0;
 public $restrictPages = 3;
 
 /**
-
     * Entry Method thats called for a portal
-
     * @param Integer $count Number of times portal is retried.  
-
     */
 private function initPortal($count)
 {
@@ -26,6 +23,11 @@ private function initPortal($count)
     $this->restrictPages = isset($this->exts->config_array["restrictPages"]) ? (int) @$this->exts->config_array["restrictPages"] : 3;
     $this->download_monthly_report = isset($this->exts->config_array["download_monthly_report"]) ? (int) @$this->exts->config_array["download_monthly_report"] : 0;
     $this->download_daily_report = isset($this->exts->config_array["download_daily_report"]) ? (int) @$this->exts->config_array["download_daily_report"] : 0;
+
+    $this->exts->log('download_monthly_report ' . $this->download_monthly_report);
+    $this->exts->log('download_daily_report ' . $this->download_daily_report);
+
+
     $this->exts->log('Begin initPortal ' . $count);
     $this->exts->loadCookiesFromFile();
     $this->exts->openUrl($this->loginUrl);
@@ -80,7 +82,7 @@ private function initPortal($count)
 
 
     if ($this->checkLogin()) {
-        $this->exts->log(">>>>>>>>>>>>>>>Login successful!!!!");
+        $this->exts->log(">>>>>>>>>>>>>>>Login successfufl!!!!");
         $this->exts->capture("LoginSuccess");
 
         if (!empty($this->exts->config_array['allow_login_success_request'])) {
@@ -412,26 +414,26 @@ private function checkFillRecaptcha($count = 1)
             $this->exts->capture('recaptcha-filled');
 
             $gcallbackFunction = $this->exts->execute_javascript('(function() { 
-    if(document.querySelector("[data-callback]") != null){
-        return document.querySelector("[data-callback]").getAttribute("data-callback");
-    }
-
-    var result = ""; var found = false;
-    function recurse (cur, prop, deep) {
-        if(deep > 5 || found){ return;}console.log(prop);
-        try {
-            if(cur == undefined || cur == null || cur instanceof Element || Object(cur) !== cur || Array.isArray(cur)){ return;}
-            if(prop.indexOf(".callback") > -1){result = prop; found = true; return;
-            } else { deep++;
-                for (var p in cur) { recurse(cur[p], prop ? prop + "." + p : p, deep);}
+            if(document.querySelector("[data-callback]") != null){
+                return document.querySelector("[data-callback]").getAttribute("data-callback");
             }
-        } catch(ex) { console.log("ERROR in function: " + ex); return; }
-    }
 
-    recurse(___grecaptcha_cfg.clients[0], "", 0);
-    return found ? "___grecaptcha_cfg.clients[0]." + result : null;
-})();
-');
+            var result = ""; var found = false;
+            function recurse (cur, prop, deep) {
+                if(deep > 5 || found){ return;}console.log(prop);
+                try {
+                    if(cur == undefined || cur == null || cur instanceof Element || Object(cur) !== cur || Array.isArray(cur)){ return;}
+                    if(prop.indexOf(".callback") > -1){result = prop; found = true; return;
+                    } else { deep++;
+                        for (var p in cur) { recurse(cur[p], prop ? prop + "." + p : p, deep);}
+                    }
+                } catch(ex) { console.log("ERROR in function: " + ex); return; }
+            }
+
+            recurse(___grecaptcha_cfg.clients[0], "", 0);
+            return found ? "___grecaptcha_cfg.clients[0]." + result : null;
+        })();
+        ');
             $this->exts->log('Callback function: ' . $gcallbackFunction);
             $this->exts->log('Callback function: ' . $this->exts->recaptcha_answer);
             if ($gcallbackFunction != null) {
@@ -484,6 +486,9 @@ private function checkFillTwoFactor()
     if ($this->exts->querySelector($two_factor_selector) != null && $this->exts->two_factor_attempts < 3) {
         $this->exts->log("Two factor page found.");
         $this->exts->capture("2.1-two-factor");
+
+        $this->exts->type_key_by_xdotool('Return');
+        sleep(5);
 
         if ($this->exts->querySelector($two_factor_message_selector) != null) {
             $this->exts->two_factor_notif_msg_en = "";

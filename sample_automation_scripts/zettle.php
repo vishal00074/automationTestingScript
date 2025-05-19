@@ -57,7 +57,6 @@ class PortalScriptCDP
         }
     }
 
-    // Server-Portal-ID: 6095 - Last modified: 04.04.2025 14:21:37 UTC - User: 1
     public $baseUrl = 'https://my.izettle.com';
     public $loginUrl = 'https://my.izettle.com';
     public $invoicePageUrl = 'https://my.zettle.com/invoices/orders?status=PAID';
@@ -73,11 +72,8 @@ class PortalScriptCDP
     public $restrictPages = 3;
 
     /**
-
      * Entry Method thats called for a portal
-
      * @param Integer $count Number of times portal is retried.  
-
      */
     private function initPortal($count)
     {
@@ -86,6 +82,11 @@ class PortalScriptCDP
         $this->restrictPages = isset($this->exts->config_array["restrictPages"]) ? (int) @$this->exts->config_array["restrictPages"] : 3;
         $this->download_monthly_report = isset($this->exts->config_array["download_monthly_report"]) ? (int) @$this->exts->config_array["download_monthly_report"] : 0;
         $this->download_daily_report = isset($this->exts->config_array["download_daily_report"]) ? (int) @$this->exts->config_array["download_daily_report"] : 0;
+
+        $this->exts->log('download_monthly_report ' . $this->download_monthly_report);
+        $this->exts->log('download_daily_report ' . $this->download_daily_report);
+
+
         $this->exts->log('Begin initPortal ' . $count);
         $this->exts->loadCookiesFromFile();
         $this->exts->openUrl($this->loginUrl);
@@ -140,7 +141,7 @@ class PortalScriptCDP
 
 
         if ($this->checkLogin()) {
-            $this->exts->log(">>>>>>>>>>>>>>>Login successful!!!!");
+            $this->exts->log(">>>>>>>>>>>>>>>Login successfufl!!!!");
             $this->exts->capture("LoginSuccess");
 
             // accecpt cookies
@@ -156,6 +157,17 @@ class PortalScriptCDP
                 sleep(10);
             }
             $this->processInvoices();
+
+
+            if ($this->download_monthly_report == 1) {
+                $this->exts->openUrl('https://my.zettle.com/reports/v2');
+                $this->processMonthlyReport();
+            }
+
+            if ($this->download_daily_report == 1) {
+                $this->exts->openUrl('https://my.zettle.com/reports/v2');
+                $this->processDailyReport();
+            }
 
             if ($this->isNoInvoice) {
                 $this->exts->no_invoice();
@@ -485,26 +497,26 @@ class PortalScriptCDP
                 $this->exts->capture('recaptcha-filled');
 
                 $gcallbackFunction = $this->exts->execute_javascript('(function() { 
-        if(document.querySelector("[data-callback]") != null){
-            return document.querySelector("[data-callback]").getAttribute("data-callback");
-        }
-
-        var result = ""; var found = false;
-        function recurse (cur, prop, deep) {
-            if(deep > 5 || found){ return;}console.log(prop);
-            try {
-                if(cur == undefined || cur == null || cur instanceof Element || Object(cur) !== cur || Array.isArray(cur)){ return;}
-                if(prop.indexOf(".callback") > -1){result = prop; found = true; return;
-                } else { deep++;
-                    for (var p in cur) { recurse(cur[p], prop ? prop + "." + p : p, deep);}
+                if(document.querySelector("[data-callback]") != null){
+                    return document.querySelector("[data-callback]").getAttribute("data-callback");
                 }
-            } catch(ex) { console.log("ERROR in function: " + ex); return; }
-        }
 
-        recurse(___grecaptcha_cfg.clients[0], "", 0);
-        return found ? "___grecaptcha_cfg.clients[0]." + result : null;
-    })();
-');
+                var result = ""; var found = false;
+                function recurse (cur, prop, deep) {
+                    if(deep > 5 || found){ return;}console.log(prop);
+                    try {
+                        if(cur == undefined || cur == null || cur instanceof Element || Object(cur) !== cur || Array.isArray(cur)){ return;}
+                        if(prop.indexOf(".callback") > -1){result = prop; found = true; return;
+                        } else { deep++;
+                            for (var p in cur) { recurse(cur[p], prop ? prop + "." + p : p, deep);}
+                        }
+                    } catch(ex) { console.log("ERROR in function: " + ex); return; }
+                }
+
+                recurse(___grecaptcha_cfg.clients[0], "", 0);
+                return found ? "___grecaptcha_cfg.clients[0]." + result : null;
+            })();
+            ');
                 $this->exts->log('Callback function: ' . $gcallbackFunction);
                 $this->exts->log('Callback function: ' . $this->exts->recaptcha_answer);
                 if ($gcallbackFunction != null) {
@@ -558,6 +570,9 @@ class PortalScriptCDP
             $this->exts->log("Two factor page found.");
             $this->exts->capture("2.1-two-factor");
 
+            $this->exts->type_key_by_xdotool('Return');
+            sleep(5);
+
             if ($this->exts->querySelector($two_factor_message_selector) != null) {
                 $this->exts->two_factor_notif_msg_en = "";
                 for ($i = 0; $i < count($this->exts->querySelectorAll($two_factor_message_selector)); $i++) {
@@ -606,6 +621,146 @@ class PortalScriptCDP
                 }
             } else {
                 $this->exts->log("Not received two factor code");
+            }
+        }
+    }
+
+
+    // download DailyReport
+    private function processDailyReport()
+    {
+        sleep(15);
+        if ($this->exts->querySelector('div[aria-describedby="general-datepicker-messages"]') != null) {
+            $this->exts->click_by_xdotool('div[aria-describedby="general-datepicker-messages"]');
+            sleep(10);
+        }
+
+        if ($this->exts->querySelector('div[class*="range-select-double-page-calendar"] > div > button:nth-child(1)') != null) {
+            $this->exts->click_by_xdotool('div[class*="range-select-double-page-calendar"] > div > button:nth-child(1)');
+            sleep(10);
+            $this->exts->type_key_by_xdotool('Escape');
+            sleep(2);
+        }
+
+        $this->exts->waitTillPresent('div[role="table"] a[href*="/invoices"]', 10);
+        $this->exts->capture("4-invoices-page");
+        $invoices = [];
+
+        $rows = $this->exts->getElements('div[role="table"] a[href*="/invoices"]');
+        foreach ($rows as $row) {
+            if ($row != null) {
+                $invoiceUrl = $row->getAttribute('href');
+                $invoiceName = $this->exts->extract('div[role="cell"]:nth-child(3)', $row);
+                $invoiceAmount = $this->exts->extract('div[role="cell"]:nth-child(4)', $row);
+                $invoiceDate = $this->exts->extract('div[role="cell"]:nth-child(1)', $row);
+
+                $downloadBtn = '';
+
+                array_push($invoices, array(
+                    'invoiceName' => $invoiceName,
+                    'invoiceDate' => $invoiceDate,
+                    'invoiceAmount' => $invoiceAmount,
+                    'invoiceUrl' => $invoiceUrl,
+                    'downloadBtn' => $downloadBtn
+                ));
+                $this->isNoInvoice = false;
+            }
+        }
+
+        // Download all invoices
+        $this->exts->log('Invoices found: ' . count($invoices));
+        foreach ($invoices as $invoice) {
+            $this->exts->log('--------------------------');
+            $this->exts->log('invoiceName: ' . $invoice['invoiceName']);
+            $this->exts->log('invoiceDate: ' . $invoice['invoiceDate']);
+            $this->exts->log('invoiceAmount: ' . $invoice['invoiceAmount']);
+            $this->exts->log('invoiceUrl: ' . $invoice['invoiceUrl']);
+
+            $invoiceFileName = !empty($invoice['invoiceName']) ? $invoice['invoiceName'] . '.pdf' : '';
+            $invoice['invoiceDate'] = $this->exts->parse_date($invoice['invoiceDate'], 'M d, Y', 'Y-m-d');
+            $this->exts->log('Date parsed: ' . $invoice['invoiceDate']);
+            $this->exts->openUrl($invoice['invoiceUrl']);
+            sleep(2);
+            $this->exts->waitTillPresent('div[class*="layout__Container-zettle"] button[type="button"]:nth-child(3)', 20);
+
+            $downloadBtn = $this->exts->querySelector('div[class*="layout__Container-zettle"] button[type="button"]:nth-child(3)');
+            $downloaded_file = $this->exts->click_and_download($downloadBtn, 'pdf', $invoiceFileName);
+
+            if (trim($downloaded_file) != '' && file_exists($downloaded_file)) {
+                $this->exts->new_invoice($invoice['invoiceName'], $invoice['invoiceDate'], $invoice['invoiceAmount'], $downloaded_file);
+                sleep(1);
+            } else {
+                $this->exts->log(__FUNCTION__ . '::No download ' . $invoiceFileName);
+            }
+        }
+    }
+
+
+    // download this month report
+    private function processMonthlyReport()
+    {
+        sleep(15);
+        if ($this->exts->querySelector('div[aria-describedby="general-datepicker-messages"]') != null) {
+            $this->exts->click_by_xdotool('div[aria-describedby="general-datepicker-messages"]');
+            sleep(10);
+        }
+
+        if ($this->exts->querySelector('div[class*="range-select-double-page-calendar"] > div > button:nth-child(3)') != null) {
+            $this->exts->click_by_xdotool('div[class*="range-select-double-page-calendar"] > div > button:nth-child(3)');
+            sleep(10);
+            $this->exts->type_key_by_xdotool('Escape');
+            sleep(2);
+        }
+
+        $this->exts->waitTillPresent('div[role="table"] a[href*="/invoices"]', 10);
+        $this->exts->capture("4-invoices-page");
+        $invoices = [];
+
+        $rows = $this->exts->getElements('div[role="table"] a[href*="/invoices"]');
+        foreach ($rows as $row) {
+            if ($row != null) {
+                $invoiceUrl = $row->getAttribute('href');
+                $invoiceName = $this->exts->extract('div[role="cell"]:nth-child(3)', $row);
+                $invoiceAmount = $this->exts->extract('div[role="cell"]:nth-child(4)', $row);
+                $invoiceDate = $this->exts->extract('div[role="cell"]:nth-child(1)', $row);
+
+                $downloadBtn = '';
+
+                array_push($invoices, array(
+                    'invoiceName' => $invoiceName,
+                    'invoiceDate' => $invoiceDate,
+                    'invoiceAmount' => $invoiceAmount,
+                    'invoiceUrl' => $invoiceUrl,
+                    'downloadBtn' => $downloadBtn
+                ));
+                $this->isNoInvoice = false;
+            }
+        }
+
+        // Download all invoices
+        $this->exts->log('Invoices found: ' . count($invoices));
+        foreach ($invoices as $invoice) {
+            $this->exts->log('--------------------------');
+            $this->exts->log('invoiceName: ' . $invoice['invoiceName']);
+            $this->exts->log('invoiceDate: ' . $invoice['invoiceDate']);
+            $this->exts->log('invoiceAmount: ' . $invoice['invoiceAmount']);
+            $this->exts->log('invoiceUrl: ' . $invoice['invoiceUrl']);
+
+            $invoiceFileName = !empty($invoice['invoiceName']) ? $invoice['invoiceName'] . '.pdf' : '';
+            $invoice['invoiceDate'] = $this->exts->parse_date($invoice['invoiceDate'], 'M d, Y', 'Y-m-d');
+            $this->exts->log('Date parsed: ' . $invoice['invoiceDate']);
+            $this->exts->openUrl($invoice['invoiceUrl']);
+            sleep(2);
+            $this->exts->waitTillPresent('div[class*="layout__Container-zettle"] button[type="button"]:nth-child(3)', 20);
+
+            $downloadBtn = $this->exts->querySelector('div[class*="layout__Container-zettle"] button[type="button"]:nth-child(3)');
+            $downloaded_file = $this->exts->click_and_download($downloadBtn, 'pdf', $invoiceFileName);
+
+            if (trim($downloaded_file) != '' && file_exists($downloaded_file)) {
+                $this->exts->new_invoice($invoice['invoiceName'], $invoice['invoiceDate'], $invoice['invoiceAmount'], $downloaded_file);
+                sleep(1);
+            } else {
+                $this->exts->log(__FUNCTION__ . '::No download ' . $invoiceFileName);
             }
         }
     }
