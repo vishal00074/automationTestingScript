@@ -61,7 +61,7 @@ class PortalScriptCDP
 
     public $baseUrl = 'https://plentymarkets-cloud-de.com';
     public $plenty_id = '';
-    public $check_login_success_selector = 'div#fullscreen-container terra-nav-bar nav ul  li a[href*="/personal-settings"]';
+    public $check_login_success_selector = 'a.dropdown-item[href*="uiAction=SETTINGS_USER_ACCOUNT"], img#userIcon';
     public $document_types = ['Rechnung', 'Gutschrift'];
     public $isNoInvoice = true;
     public $lang = "de";
@@ -75,7 +75,7 @@ class PortalScriptCDP
         $this->exts->log('Begin initPortal ' . $count);
         $this->plenty_id = trim($this->exts->config_array['plenty_id']);
         // Load cookies
-        // $this->exts->loadCookiesFromFile();
+        $this->exts->loadCookiesFromFile();
         sleep(1);
         $this->exts->openUrl($this->baseUrl);
         sleep(10);
@@ -83,21 +83,21 @@ class PortalScriptCDP
         //cookies
         if ($this->plenty_id != '' && $this->exts->exists('a[href*="' . $this->plenty_id . '"]')) {
             $this->exts->moveToElementAndClick('a[href*="' . $this->plenty_id . '"]');
-            sleep(20);
+            sleep(7);
             // $handles = $this->exts->webdriver->getWindowHandles();
             // if (count($handles) > 1) {
             //     $this->exts->webdriver->switchTo()->window(end($handles));
             // }
         }
         // If user hase not logged in from cookie, clear cookie, open the login url and do login
-        if ($this->exts->getElement($this->check_login_success_selector) == null) {
+        if ($this->checkLogin()) {
             $this->exts->log('NOT logged via cookie');
             $this->checkFillLogin();
-            sleep(15);
+            sleep(7);
         }
 
         // then check user logged in or not
-        if ($this->exts->getElement($this->check_login_success_selector) != null) {
+        if ($this->checkLogin()) {
             sleep(3);
             $this->exts->log(__FUNCTION__ . '::User logged in');
             $this->exts->capture("3-login-success");
@@ -139,7 +139,7 @@ class PortalScriptCDP
                 $this->exts->loginFailure(1);
             } else if (strpos(strtolower($this->exts->extract('span#error-message', null, 'innerText')), 'rong user name or password') !== false) {
                 $this->exts->loginFailure(1);
-            } else if (strpos($loginError, strtolower('Incorrect email address or password')) !== false || strpos($loginError, 'sign in failed. incorrect username, pid or password') ) {
+            } else if (strpos($loginError, strtolower('Incorrect email address or password')) !== false || strpos($loginError, 'sign in failed. incorrect username, pid or password')) {
                 $this->exts->loginFailure(1);
             } else {
                 $this->exts->loginFailure();
@@ -180,6 +180,29 @@ class PortalScriptCDP
             $this->exts->log(__FUNCTION__ . '::Login page not found');
             $this->exts->capture("2-login-page-not-found");
         }
+    }
+
+    public  function checkLogin()
+    {
+        $this->exts->log("Begin checkLogin ");
+        $isLoggedIn = false;
+        try {
+            for ($wait = 0; $wait < 2 && $this->exts->executeSafeScript("return !!document.querySelector('" . $this->check_login_success_selector . "');") != 1; $wait++) {
+                $this->exts->log('Waiting for login.....');
+                sleep(10);
+            }
+            if ($this->exts->exists($this->check_login_success_selector)) {
+                $this->exts->log(">>>>>>>>>>>>>>>Login successful!!!!");
+                $isLoggedIn = true;
+            } else if ($this->exts->urlContains('my-view-dashboard/dashboard#viewset-27')) {
+                $this->exts->log(">>>>>>>>>>>>>>>Login successful!!!!");
+                $isLoggedIn = true;
+            }
+        } catch (Exception $exception) {
+
+            $this->exts->log("Exception checking loggedin " . $exception);
+        }
+        return $isLoggedIn;
     }
 
     private function click_element($selector_or_object)

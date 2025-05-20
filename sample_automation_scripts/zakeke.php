@@ -1,4 +1,4 @@
-<?php //added  trigger loginfailedConfirmed after submitting the login form in case credential are not correct
+<?php // updated fill form function added triggerloginFailedConfirmed in case wrong credentials
 /**
  * Chrome Remote via Chrome devtool protocol script, for specific process/portal
  *
@@ -57,8 +57,6 @@ class PortalScriptCDP
     }
 
     // Server-Portal-ID: 221827 - Last modified: 20.03.2025 14:49:27 UTC - User: 1
-
-    /*Define constants used in script*/
 
     public $baseUrl = 'https://admin.zakeke.com/';
     public $loginUrl = 'https://admin.zakeke.com/';
@@ -156,6 +154,80 @@ class PortalScriptCDP
         }
     }
 
+    public function fillForm($count)
+    {
+        $this->exts->log("Begin fillForm " . $count);
+        $this->waitFor($this->username_selector, 10);
+
+        if ($this->exts->querySelector($this->username_selector) != null) {
+
+            $this->exts->capture("1-pre-login");
+            $this->exts->log("Enter Username");
+            $this->exts->moveToElementAndType($this->username_selector, $this->username);
+
+            sleep(2);
+
+            $this->exts->log("Enter Password");
+            $this->exts->moveToElementAndType($this->password_selector, $this->password);
+            sleep(1);
+
+            $this->exts->capture("1-login-page-filled");
+            sleep(5);
+            if ($this->isExists($this->submit_login_selector)) {
+                $this->exts->click_element($this->submit_login_selector);
+            }
+
+            $this->exts->waitTillPresent('div.rnc__notification-message', 10);
+            $error_text = strtolower($this->exts->extract('div.rnc__notification-message'));
+
+            $this->exts->log(__FUNCTION__ . '::Error text: ' . $error_text);
+            if (stripos($error_text, strtolower('Incorrect username or password.')) !== false) {
+                $this->exts->capture("LoginFailed-incorrect-cred-0");
+                $this->exts->loginFailure(1);
+            }
+
+
+            if ($this->exts->urlContains('Login?error=')) {
+                $this->exts->capture("LoginFailed-incorrect-cred-1");
+                $this->exts->log(__FUNCTION__ . '::Use login failed');
+                $this->exts->log(__FUNCTION__ . '::Last URL: ' . $this->exts->getUrl());
+                $this->exts->log("Wrong credential !!!!");
+                $this->exts->loginFailure(1);
+            }
+        } else {
+            $this->exts->log(__FUNCTION__ . '::Login page not found');
+            $this->exts->capture("2-login-page-not-found");
+        }
+    }
+
+    /**
+     * Method to Check where user is logged in or not
+     * return boolean true/false
+     */
+    function checkLogin()
+    {
+        $this->exts->log("Begin checkLogin ");
+        $isLoggedIn = false;
+        try {
+
+            $this->waitFor($this->check_login_failed_selector, 5);
+            if ($this->isExists($this->check_login_failed_selector)) {
+                $this->isFailedLogin = true;
+            }
+
+            $this->waitFor($this->check_login_success_selector, 15);
+            if ($this->isExists($this->check_login_success_selector)) {
+                $this->exts->log(">>>>>>>>>>>>>>>Login successful!!!!");
+                $isLoggedIn = true;
+            }
+        } catch (Exception $exception) {
+
+            $this->exts->log("Exception checking loggedin " . $exception);
+        }
+
+        return $isLoggedIn;
+    }
+
 
     private function processInvoices($paging_count = 1)
     {
@@ -202,73 +274,6 @@ class PortalScriptCDP
                 sleep(2);
             }
         }
-    }
-
-
-    public function fillForm($count)
-    {
-        $this->exts->log("Begin fillForm " . $count);
-        $this->waitFor($this->username_selector, 10);
-
-        if ($this->exts->querySelector($this->username_selector) != null) {
-
-            $this->exts->capture("1-pre-login");
-            $this->exts->log("Enter Username");
-            $this->exts->moveToElementAndType($this->username_selector, $this->username);
-
-            sleep(2);
-
-            $this->exts->log("Enter Password");
-            $this->exts->moveToElementAndType($this->password_selector, $this->password);
-            sleep(1);
-
-            $this->exts->capture("1-login-page-filled");
-            sleep(5);
-            if ($this->isExists($this->submit_login_selector)) {
-                $this->exts->click_element($this->submit_login_selector);
-                sleep(10);
-            }
-
-            if ($this->exts->urlContains('Login?error=')) {
-                $this->exts->capture("LoginFailed-incorrect-cred");
-                $this->exts->log(__FUNCTION__ . '::Use login failed');
-                $this->exts->log(__FUNCTION__ . '::Last URL: ' . $this->exts->getUrl());
-                $this->exts->log("Wrong credential !!!!");
-                $this->exts->loginFailure(1);
-            }
-        } else {
-            $this->exts->log(__FUNCTION__ . '::Login page not found');
-            $this->exts->capture("2-login-page-not-found");
-        }
-    }
-
-
-    /**
-     * Method to Check where user is logged in or not
-     * return boolean true/false
-     */
-    function checkLogin()
-    {
-        $this->exts->log("Begin checkLogin ");
-        $isLoggedIn = false;
-        try {
-
-            $this->waitFor($this->check_login_failed_selector, 5);
-            if ($this->isExists($this->check_login_failed_selector)) {
-                $this->isFailedLogin = true;
-            }
-
-            $this->waitFor($this->check_login_success_selector, 15);
-            if ($this->isExists($this->check_login_success_selector)) {
-                $this->exts->log(">>>>>>>>>>>>>>>Login successful!!!!");
-                $isLoggedIn = true;
-            }
-        } catch (Exception $exception) {
-
-            $this->exts->log("Exception checking loggedin " . $exception);
-        }
-
-        return $isLoggedIn;
     }
 }
 

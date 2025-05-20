@@ -54,7 +54,6 @@ private function initPortal($count) {
             $this->exts->capture("LoginSuccess");
 
             if (!empty($this->exts->config_array['allow_login_success_request'])) {
-
                 $this->exts->triggerLoginSuccess();
             }
         } elseif(strpos(strtolower($this->exts->extract('div#login-error-alert-container p')), 'Your username or password is invalid.') !== false){

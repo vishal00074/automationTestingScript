@@ -106,11 +106,20 @@ public function fillForm($count)
         sleep(5);
         if ($this->isExists($this->submit_login_selector)) {
             $this->exts->click_element($this->submit_login_selector);
-            sleep(10);
         }
 
+        $this->exts->waitTillPresent('div.rnc__notification-message', 10);
+        $error_text = strtolower($this->exts->extract('div.rnc__notification-message'));
+
+        $this->exts->log(__FUNCTION__ . '::Error text: ' . $error_text);
+        if (stripos($error_text, strtolower('Incorrect username or password.')) !== false) {
+            $this->exts->capture("LoginFailed-incorrect-cred-0");
+            $this->exts->loginFailure(1);
+        }
+
+
         if ($this->exts->urlContains('Login?error=')) {
-            $this->exts->capture("LoginFailed-incorrect-cred");
+            $this->exts->capture("LoginFailed-incorrect-cred-1");
             $this->exts->log(__FUNCTION__ . '::Use login failed');
             $this->exts->log(__FUNCTION__ . '::Last URL: ' . $this->exts->getUrl());
             $this->exts->log("Wrong credential !!!!");
@@ -122,13 +131,9 @@ public function fillForm($count)
     }
 }
 
-
 /**
-
     * Method to Check where user is logged in or not
-
     * return boolean true/false
-
     */
 function checkLogin()
 {
