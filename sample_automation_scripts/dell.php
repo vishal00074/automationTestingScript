@@ -1,5 +1,5 @@
-<?php // updated login code and 2fa code request again in case wrong 2fa entered for single time   added condition to handle empty invoice name
-
+<?php // updated login code and 2fa code request again in case wrong 2fa entered for single time updated login code   added condition to handle empty invoice name
+// used custom isExists
 /**
  * Chrome Remote via Chrome devtool protocol script, for specific process/portal
  *
@@ -107,10 +107,17 @@ class PortalScriptCDP
         if (stripos($isCaptcha, strtolower('Bitte geben Sie die im Bild angezeigten Zeichen ein, um fortzufahren.')) !== false) {
             sleep(10);
             $this->fillForm(0);
+        } else if (
+            stripos($isCaptcha, strtolower('do not match the image')) !== false ||
+            stripos($isCaptcha, strtolower('die eingegebenen zeichen entsprechen nicht der abbildung. bitte geben sie die unten angezeigten zeichen ein, um fortzufahren')) !== false
+        ) {
+            $this->exts->moveToElementAndClick('button.btn-dont-register-click-event');
+            sleep(5);
+            $this->fillForm(0);
         }
 
         sleep(10);
-        if ($this->exts->exists('input#OTP')) {
+        if ($this->isExists('input#OTP')) {
             $this->checkFillTwoFactor();
             sleep(10);
         }
@@ -138,7 +145,7 @@ class PortalScriptCDP
                 $this->changeSelectbox('#ddlPeriod', '4');
                 sleep(30);
             }
-            if ($this->exts->exists('button#_evidon-accept-button')) {
+            if ($this->isExists('button#_evidon-accept-button')) {
                 $this->exts->moveToElementAndClick('button#_evidon-accept-button');
                 sleep(10);
             }
@@ -149,13 +156,15 @@ class PortalScriptCDP
             $this->exts->capture("LoginFailed");
 
             $isTwoError = strtolower($this->exts->extract('div#validationSummaryContainer'));
-
             $this->exts->log('isTwoError:: ' . $isTwoError);
 
             if ($this->isWrongCredential()) {
                 $this->exts->log($this->exts->extract($this->wrong_credential_selector, null));
                 $this->exts->loginFailure(1);
-            } else if (stripos($isTwoError, strtolower('Der einmalige Bestätigungscode ist falsch')) !== false) {
+            } else if (
+                stripos($isTwoError, strtolower('Der einmalige Bestätigungscode ist falsch')) !== false ||
+                stripos($isTwoError, strtolower('we are unable to match the details you entered with our records')) !== false
+            ) {
                 $this->exts->loginFailure(1);
             } else {
                 $this->exts->loginFailure();
@@ -172,30 +181,30 @@ class PortalScriptCDP
         $this->exts->log("Begin fillForm " . $count);
         try {
 
-            if ($this->exts->exists($this->username_selector)) {
+            if ($this->isExists($this->username_selector)) {
                 sleep(2);
                 $this->exts->capture("1-pre-login");
 
-                sleep(10);
+                sleep(2);
                 $this->exts->log("Enter Username");
                 $this->exts->moveToElementAndType($this->username_selector, $this->username, 5);
 
-                sleep(10);
+                sleep(2);
                 $this->exts->log("Enter Password");
                 $this->exts->moveToElementAndType($this->password_selector, $this->password, 5);
 
                 $this->exts->capture("1-pre-login-1");
                 $this->checkFillRecaptcha(0);
 
-                sleep(10);
-                if ($this->exts->exists('[id*=captcha-image]')) {
+                sleep(5);
+                if ($this->isExists('[id*=captcha-image]')) {
                     $this->exts->processCaptcha('[id*=captcha-image]', '[name="ImageText"]');
                     sleep(2);
                 }
 
-                sleep(10);
-                $this->exts->click_by_xdotool($this->submit_btn, 10);
-            } else if ($this->exts->exists("iframe[src*=\"https://www.google.com/recaptcha/api2/anchor?\"]") && $this->exts->exists("textarea[name=\"g-recaptcha-response\"]")) {
+                sleep(2);
+                $this->exts->moveToElementAndClick($this->submit_btn);
+            } else if ($this->isExists("iframe[src*=\"https://www.google.com/recaptcha/api2/anchor?\"]") && $this->isExists("textarea[name=\"g-recaptcha-response\"]")) {
                 $this->checkFillRecaptcha(0);
                 $this->fillForm($count + 1);
             }
@@ -218,9 +227,9 @@ class PortalScriptCDP
     public function checkFillRecaptcha($counter)
     {
 
-        if ($this->exts->exists('iframe[src*="https://www.google.com/recaptcha/api2/anchor?"]') && $this->exts->exists('textarea[name="g-recaptcha-response"]')) {
+        if ($this->isExists('iframe[src*="https://www.google.com/recaptcha/api2/anchor?"]') && $this->isExists('textarea[name="g-recaptcha-response"]')) {
 
-            if ($this->exts->exists("div.g-recaptcha[data-sitekey]")) {
+            if ($this->isExists("div.g-recaptcha[data-sitekey]")) {
                 $data_siteKey = trim($this->exts->querySelector("div.g-recaptcha")->getAttribute("data-sitekey"));
             } else {
                 $iframeUrl = $this->exts->querySelector("iframe[src*=\"https://www.google.com/recaptcha/api2/anchor?\"]")->getAttribute("src");
@@ -286,8 +295,12 @@ class PortalScriptCDP
 
             $two_factor_code = trim($this->exts->fetchTwoFactorCode());
             if (!empty($two_factor_code) && trim($two_factor_code) != '') {
+
                 $this->exts->log("checkFillTwoFactor: Entering two_factor_code." . $two_factor_code);
-                $this->exts->moveToElementAndType($two_factor_selector, $two_factor_code);
+                sleep(4);
+
+                $this->exts->execute_javascript("document.getElementById('OTP').value = '" . $two_factor_code . "';");
+
                 $this->exts->log("checkFillTwoFactor: Clicking submit button.");
                 sleep(3);
                 $this->exts->capture("2.2-two-factor-filled-" . $this->exts->two_factor_attempts);
@@ -318,7 +331,7 @@ class PortalScriptCDP
         $this->exts->log("Begin checkLogin ");
         $isLoggedIn = false;
         try {
-            if ($this->exts->exists($this->logout_btn) && $this->exts->exists($this->username_selector) == false) {
+            if ($this->isExists($this->logout_btn) && $this->isExists($this->username_selector) == false) {
                 $this->exts->log(">>>>>>>>>>>>>>>Login successful!!!!");
                 $isLoggedIn = true;
             }
@@ -329,13 +342,26 @@ class PortalScriptCDP
         return $isLoggedIn;
     }
 
+    private function isExists($selector = '')
+    {
+        $safeSelector = addslashes($selector);
+        $this->exts->log('Element:: ' . $safeSelector);
+        $isElement = $this->exts->execute_javascript('!!document.querySelector("' . $safeSelector . '")');
+        if ($isElement) {
+            $this->exts->log('Element Found');
+            return true;
+        } else {
+            $this->exts->log('Element not Found');
+            return false;
+        }
+    }
 
 
     private function downloadInvoice($count)
     {
         $this->exts->log("Begin download invoice - " . $count);
         try {
-            if ($this->exts->exists('#tblDataDisplay > tbody > tr')) {
+            if ($this->isExists('#tblDataDisplay > tbody > tr')) {
                 $this->exts->capture("2-download-invoice");
 
                 $invoices = array();
@@ -393,7 +419,7 @@ class PortalScriptCDP
                         $this->exts->log("Exception downloading invoice - " . $exception->getMessage());
                     }
                 }
-            } else if ($this->exts->exists('order-collection-list')) {
+            } else if ($this->isExists('order-collection-list')) {
                 $this->exts->capture("2.1-download-invoice");
 
                 $invoices = array();
@@ -446,11 +472,11 @@ class PortalScriptCDP
     private function changeSelectbox($select_box = '', $option_value = '')
     {
         $this->exts->waitTillPresent($select_box, 10);
-        if ($this->exts->exists($select_box)) {
+        if ($this->isExists($select_box)) {
             $option = $select_box . ' option[value=' . $option_value . ']';
             $this->exts->click_element($select_box);
             sleep(1);
-            if ($this->exts->exists($option)) {
+            if ($this->isExists($option)) {
                 $this->exts->log('Select box Option exists');
                 $this->exts->click_by_xdotool($option);
                 sleep(3);

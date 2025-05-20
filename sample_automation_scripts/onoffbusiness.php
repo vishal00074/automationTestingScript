@@ -95,7 +95,6 @@ class PortalScriptCDP
         if ($this->checkLogin()) {
             $this->exts->log(">>>>>>>>>>>>>>>Login successful!!!!");
             $this->exts->capture("LoginSuccess");
-            $this->exts->success();
 
             $this->exts->openUrl($this->invoicePageUrl);
             $this->processInvoices();
@@ -139,7 +138,16 @@ class PortalScriptCDP
                 $this->exts->capture("1-login-page-filled");
                 sleep(2);
                 if ($this->exts->exists($this->submit_login_selector)) {
-                    $this->exts->click_by_xdotool($this->submit_login_selector);
+                    $this->exts->click_element($this->submit_login_selector);
+                    sleep(5);
+                }
+                for ($i = 0; $i < 15; $i++) {
+                    if ($this->exts->exists($this->submit_login_selector)) {
+                        $this->exts->click_element($this->submit_login_selector);
+                        sleep(5);
+                    } else {
+                        break;
+                    }
                 }
             }
         } catch (\Exception $exception) {
@@ -168,35 +176,35 @@ class PortalScriptCDP
                 $this->exts->log(__FUNCTION__ . "::filling reCaptcha response..");
                 $recaptcha_textareas =  $this->exts->getElements($recaptcha_textarea_selector);
                 for ($i = 0; $i < count($recaptcha_textareas); $i++) {
-                    $this->exts->execute_javascript("arguments[0].innerHTML = '" . $this->exts->recaptcha_answer . "';", [$recaptcha_textareas[$i]]);
+                    $this->exts->executeSafeScript("arguments[0].innerHTML = '" . $this->exts->recaptcha_answer . "';", [$recaptcha_textareas[$i]]);
                 }
                 sleep(2);
                 $this->exts->capture('recaptcha-filled');
 
                 // Step 2, check if callback function need executed
-                $gcallbackFunction = $this->exts->execute_javascript('
-                    if(document.querySelector("[data-callback]") != null){
-                        return document.querySelector("[data-callback]").getAttribute("data-callback");
-                    }
+                $gcallbackFunction = $this->exts->executeSafeScript('
+					if(document.querySelector("[data-callback]") != null){
+						return document.querySelector("[data-callback]").getAttribute("data-callback");
+					}
 
-                    var result = ""; var found = false;
-                    function recurse (cur, prop, deep) {
-                        if(deep > 5 || found){ return;}console.log(prop);
-                        try {
-                            if(cur == undefined || cur == null || cur instanceof Element || Object(cur) !== cur || Array.isArray(cur)){ return;}
-                            if(prop.indexOf(".callback") > -1){result = prop; found = true; return;
-                            } else { deep++;
-                                for (var p in cur) { recurse(cur[p], prop ? prop + "." + p : p, deep);}
-                            }
-                        } catch(ex) { console.log("ERROR in function: " + ex); return; }
-                    }
+					var result = ""; var found = false;
+					function recurse (cur, prop, deep) {
+					    if(deep > 5 || found){ return;}console.log(prop);
+					    try {
+					        if(cur == undefined || cur == null || cur instanceof Element || Object(cur) !== cur || Array.isArray(cur)){ return;}
+					        if(prop.indexOf(".callback") > -1){result = prop; found = true; return;
+					        } else { deep++;
+					            for (var p in cur) { recurse(cur[p], prop ? prop + "." + p : p, deep);}
+					        }
+					    } catch(ex) { console.log("ERROR in function: " + ex); return; }
+					}
 
-                    recurse(___grecaptcha_cfg.clients[0], "", 0);
-                    return found ? "___grecaptcha_cfg.clients[0]." + result : null;
-                ');
+					recurse(___grecaptcha_cfg.clients[0], "", 0);
+					return found ? "___grecaptcha_cfg.clients[0]." + result : null;
+				');
                 $this->exts->log('Callback function: ' . $gcallbackFunction);
                 if ($gcallbackFunction != null) {
-                    $this->exts->execute_javascript($gcallbackFunction . '("' . $this->exts->recaptcha_answer . '");');
+                    $this->exts->executeSafeScript($gcallbackFunction . '("' . $this->exts->recaptcha_answer . '");');
                     sleep(10);
                 }
             } else {
