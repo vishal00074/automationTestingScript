@@ -32,6 +32,7 @@ public $last_state = array();
 public $current_state = array();
 public $isNoInvoice = true;
 public $invalid_filename_keywords = array('agb', 'terms', 'datenschutz', 'privacy', 'rechnungsbeilage', 'informationsblatt', 'gesetzliche', 'retouren', 'widerruf', 'allgemeine gesch', 'mfb-buchung', 'informationen zu zahlung', 'nachvertragliche', 'retourenschein', 'allgemeine_gesch', 'rcklieferschein');
+public $check_login_failed_selector = 'div#auth-error-message-box div.a-alert-content';
 
 /**
     * Entry Method thats called for a portal
@@ -86,7 +87,8 @@ private function initPortal($count)
     $isCookieLoginSuccess = false;
     if ($this->exts->loadCookiesFromFile()) {
         sleep(2);
-
+        $this->disable_extensions();
+        sleep(5);
         $this->exts->openUrl($this->baseUrl);
         sleep(5);
         $this->exts->capture("Home-page-with-cookie");
@@ -130,12 +132,14 @@ private function initPortal($count)
 
     if (!$isCookieLoginSuccess) {
         if ($this->checkLogin()) {
+            $this->exts->openUrl($this->orderPageUrl);
+            sleep(5);
+
             $this->exts->capture("LoginSuccess");
 
             if (!empty($this->exts->config_array['allow_login_success_request'])) {
                 $this->exts->triggerLoginSuccess();
             }
-
             $this->exts->success();
         } else {
             // Captcha and Two Factor Check
@@ -145,6 +149,8 @@ private function initPortal($count)
 
             sleep(5);
             if ($this->checkLogin()) {
+                $this->exts->openUrl($this->orderPageUrl);
+                sleep(5);
                 $this->exts->capture("LoginSuccess");
 
                 if (!empty($this->exts->config_array['allow_login_success_request'])) {
@@ -166,6 +172,7 @@ private function initPortal($count)
                     stripos($emailFailed, strtolower('La dirección de correo electrónico o el número de teléfono móvil faltan o son inválidos. Corríjalo e inténtelo de nuevo.')) !== false ||
                     stripos($emailFailed, strtolower('The email address or mobile phone number is missing or invalid. Please correct it and try again.')) !== false
                 ) {
+                    $this->exts->capture('invalid-credentails');
                     $this->exts->loginFailure(1);
                 } elseif (
                     stripos($error_text, strtolower('La contraseña no es correcta')) !== false ||
@@ -180,14 +187,35 @@ private function initPortal($count)
             }
         }
     } else {
+        $this->exts->openUrl($this->orderPageUrl);
+        sleep(5);
         $this->exts->capture("LoginSuccess");
 
         if (!empty($this->exts->config_array['allow_login_success_request'])) {
-            $this->exts->triggerLoginSuccess();
-        }
+			$this->exts->triggerLoginSuccess();
+		}
 
         $this->exts->success();
     }
+}
+
+private function disable_extensions()
+{
+    $this->exts->openUrl('chrome://extensions/');
+    sleep(2);
+    $this->exts->execute_javascript("
+        let manager = document.querySelector('extensions-manager');
+        if (manager && manager.shadowRoot) {
+            let itemList = manager.shadowRoot.querySelector('extensions-item-list');
+            if (itemList && itemList.shadowRoot) {
+                let items = itemList.shadowRoot.querySelectorAll('extensions-item');
+                items.forEach(item => {
+                    let toggle = item.shadowRoot.querySelector('#enableToggle[checked]');
+                    if (toggle) toggle.click();
+                });
+            }
+        }
+    ");
 }
 
 /**
@@ -692,5 +720,3 @@ public function processImageCaptcha()
     $this->exts->click_element($this->submit_button_selector);
     sleep(2);
 }
-
-

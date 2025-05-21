@@ -1,4 +1,5 @@
-<?php // updated  fill form function optimize script performance migrated script on remote chrome
+<?php
+
 /**
  * Chrome Remote via Chrome devtool protocol script, for specific process/portal
  *
@@ -55,9 +56,7 @@ class PortalScriptCDP
             echo 'Script execution failed.. ' . "\n";
         }
     }
-    // Server-Portal-ID: 20302 - Last modified: 22.08.2024 14:46:43 UTC - User: 1
 
-    /*Define constants used in script*/
     public $baseUrl = "https://www.amazon.nl";
     public $orderPageUrl = "https://www.amazon.nl/gp/css/order-history/ref=nav_youraccount_orders";
     public $messagePageUrl = "https://www.amazon.nl/gp/message?ie=UTF8&cl=1&ref_=ya_mc_bsm&#!/inbox";
@@ -92,6 +91,7 @@ class PortalScriptCDP
     public $current_state = array();
     public $isNoInvoice = true;
     public $invalid_filename_keywords = array('agb', 'terms', 'datenschutz', 'privacy', 'rechnungsbeilage', 'informationsblatt', 'gesetzliche', 'retouren', 'widerruf', 'allgemeine gesch', 'mfb-buchung', 'informationen zu zahlung', 'nachvertragliche', 'retourenschein', 'allgemeine_gesch', 'rcklieferschein');
+    public $check_login_failed_selector = 'div#auth-error-message-box div.a-alert-content';
 
     /**
      * Entry Method thats called for a portal
@@ -146,7 +146,8 @@ class PortalScriptCDP
         $isCookieLoginSuccess = false;
         if ($this->exts->loadCookiesFromFile()) {
             sleep(2);
-
+            $this->disable_extensions();
+            sleep(5);
             $this->exts->openUrl($this->baseUrl);
             sleep(5);
             $this->exts->capture("Home-page-with-cookie");
@@ -225,6 +226,7 @@ class PortalScriptCDP
                         stripos($emailFailed, strtolower('La dirección de correo electrónico o el número de teléfono móvil faltan o son inválidos. Corríjalo e inténtelo de nuevo.')) !== false ||
                         stripos($emailFailed, strtolower('The email address or mobile phone number is missing or invalid. Please correct it and try again.')) !== false
                     ) {
+                        $this->exts->capture('invalid-credentails');
                         $this->exts->loginFailure(1);
                     } elseif (
                         stripos($error_text, strtolower('La contraseña no es correcta')) !== false ||
@@ -246,6 +248,25 @@ class PortalScriptCDP
             $this->processAfterLogin(0);
             $this->exts->success();
         }
+    }
+
+    private function disable_extensions()
+    {
+        $this->exts->openUrl('chrome://extensions/');
+        sleep(2);
+        $this->exts->execute_javascript("
+            let manager = document.querySelector('extensions-manager');
+            if (manager && manager.shadowRoot) {
+                let itemList = manager.shadowRoot.querySelector('extensions-item-list');
+                if (itemList && itemList.shadowRoot) {
+                    let items = itemList.shadowRoot.querySelectorAll('extensions-item');
+                    items.forEach(item => {
+                        let toggle = item.shadowRoot.querySelector('#enableToggle[checked]');
+                        if (toggle) toggle.click();
+                    });
+                }
+            }
+        ");
     }
 
     /**
@@ -1140,16 +1161,16 @@ class PortalScriptCDP
 
                                         //Stop Downloading invoice if invoice is older than 90 days. 45*24 = 1080
                                         /*if($this->last_invoice_date != "" && !empty($this->last_invoice_date)) {
-                              $last_date_timestamp = strtotime($this->last_invoice_date);
-                              $last_date_timestamp = $last_date_timestamp-(1080*60*60);
-                              $parsed_date = $this->exts->parse_date($invoice_date);
-                              if(trim($parsed_date) != "") $invoice_date = $parsed_date;
-                              if($last_date_timestamp > strtotime($invoice_date) && trim($parsed_date) != "") {
-                                  $this->exts->log("Skip invoice download as it is not newer than " . $this->last_invoice_date . " - " . $invoice_date);
-                                  $this->dateLimitReached = 1;
-                                  break;
-                              }
-                          }*/
+                          $last_date_timestamp = strtotime($this->last_invoice_date);
+                          $last_date_timestamp = $last_date_timestamp-(1080*60*60);
+                          $parsed_date = $this->exts->parse_date($invoice_date);
+                          if(trim($parsed_date) != "") $invoice_date = $parsed_date;
+                          if($last_date_timestamp > strtotime($invoice_date) && trim($parsed_date) != "") {
+                              $this->exts->log("Skip invoice download as it is not newer than " . $this->last_invoice_date . " - " . $invoice_date);
+                              $this->dateLimitReached = 1;
+                              break;
+                          }
+                      }*/
 
                                         if (trim($detailPageUrl) != "" && $this->dateLimitReached == 0) {
                                             if ($this->last_invoice_date != "" && !empty($this->last_invoice_date)) {
@@ -1822,11 +1843,11 @@ class PortalScriptCDP
             $this->exts->click_by_xdotool($select_box);
             sleep(2);
             $optionIndex = $this->exts->executeSafeScript('
-			const selectBox = document.querySelector("' . $select_box . '");
-			const targetValue = "' . $option_value . '";
-			const optionIndex = [...selectBox.options].findIndex(option => option.value === targetValue);
-			return optionIndex;
-		');
+		const selectBox = document.querySelector("' . $select_box . '");
+		const targetValue = "' . $option_value . '";
+		const optionIndex = [...selectBox.options].findIndex(option => option.value === targetValue);
+		return optionIndex;
+	');
             $this->exts->log($optionIndex);
             sleep(1);
             for ($i = 0; $i < $optionIndex; $i++) {

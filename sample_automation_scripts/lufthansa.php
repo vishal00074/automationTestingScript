@@ -81,6 +81,7 @@ class PortalScriptCDP
      */
     private function initPortal($count)
     {
+        $this->disable_unexpected_extensions();
 
         $this->exts->temp_keep_useragent = $this->exts->send_websocket_event(
             $this->exts->current_context->webSocketDebuggerUrl,
@@ -115,8 +116,9 @@ class PortalScriptCDP
         }
 
         if (!$this->checkLogin()) {
-            $this->exts->log('Not Logged in : : ');
+            $this->exts->log('Not Logged in ::');
             $this->exts->clearCookies();
+            $this->clearChrome();
 
             if ($this->isExists('div.one-id-login a')) {
                 $this->exts->click_by_xdotool('div.one-id-login a');
@@ -178,6 +180,62 @@ class PortalScriptCDP
         return array($first_name, $last_name);
     }
 
+    /**
+     * Clears Chrome browser history, cookies, and cache.
+     * This method automates navigating to Chrome's "Clear Browsing Data" settings page 
+     * and selecting the necessary options using keyboard inputs.
+     */
+    private function clearChrome()
+    {
+        // Log the clearing process
+        $this->exts->log("Clearing browser history, cookies, and cache");
+
+        // Open Chrome's Clear Browsing Data settings page
+        $this->exts->openUrl('chrome://settings/clearBrowserData');
+        sleep(10); // Wait for the page to load
+
+        // Capture screenshot of the clear browsing data page
+        $this->exts->capture("clear-page");
+
+        // Navigate using tab key (moving through UI elements)
+        for ($i = 0; $i < 2; $i++) {
+            $this->exts->type_key_by_xdotool('Tab');
+            sleep(1);
+        }
+
+        // Press Tab again to focus on the dropdown menu (Time range)
+        $this->exts->type_key_by_xdotool('Tab');
+        sleep(1);
+
+        // Press Enter to open the dropdown
+        $this->exts->type_key_by_xdotool('Return');
+        sleep(1);
+
+        // Select "All time" option by pressing 'a' (assuming shortcut selection)
+        $this->exts->type_key_by_xdotool('a');
+        sleep(1);
+
+        // Confirm selection by pressing Enter
+        $this->exts->type_key_by_xdotool('Return');
+        sleep(3);
+
+        // Capture screenshot after selection
+        $this->exts->capture("clear-page");
+
+        // Navigate further using Tab to reach the "Clear Data" button
+        for ($i = 0; $i < 5; $i++) {
+            $this->exts->type_key_by_xdotool('Tab');
+            sleep(1);
+        }
+
+        // Press Enter to confirm and clear the browsing data
+        $this->exts->type_key_by_xdotool('Return');
+        sleep(10); // Wait for the clearing process to complete
+
+        // Capture screenshot after clearing
+        $this->exts->capture("after-clear");
+    }
+
     private function fillForm($count)
     {
         $this->exts->log("Begin fillForm " . $count);
@@ -209,8 +267,16 @@ class PortalScriptCDP
 
                 if ($this->exts->exists($this->continue_btn)) {
                     $this->exts->click_by_xdotool($this->submit_btn);
+                    $this->exts->click_by_xdotool($this->submit_btn);
+                    $this->exts->click_by_xdotool($this->submit_btn);
+                    $this->exts->click_by_xdotool($this->submit_btn);
+                    $this->exts->click_by_xdotool($this->submit_btn);
                 }
                 sleep(10);
+                if ($this->exts->exists($this->continue_btn)) {
+                    $this->exts->click_by_xdotool($this->submit_btn);
+                    sleep(10);
+                }
             } else {
                 $this->exts->log(__FUNCTION__ . '::Login page not found');
                 $this->exts->capture("2-login-page-not-found");
@@ -258,6 +324,29 @@ class PortalScriptCDP
         } catch (\Exception $exception) {
             $this->exts->log("Exception filling loginform " . $exception->getMessage());
         }
+    }
+
+    public function disable_unexpected_extensions()
+    {
+        $this->exts->openUrl('chrome://extensions/?id=cjpalhdlnbpafiamejdnhcphjbkeiagm'); // disable Block origin extension
+        sleep(2);
+        $this->exts->execute_javascript("
+        if(document.querySelector('extensions-manager') != null) {
+            if(document.querySelector('extensions-manager').shadowRoot.querySelector('extensions-detail-view')  != null){
+                var disable_button = document.querySelector('extensions-manager').shadowRoot.querySelector('extensions-detail-view').shadowRoot.querySelector('#enableToggle[checked]');
+                if(disable_button != null){
+                    disable_button.click();
+                }
+            }
+        }
+    ");
+        sleep(1);
+        $this->exts->openUrl('chrome://extensions/?id=ifibfemgeogfhoebkmokieepdoobkbpo');
+        sleep(1);
+        $this->exts->execute_javascript("if (document.querySelector('extensions-manager').shadowRoot.querySelector('extensions-detail-view').shadowRoot.querySelector('#enableToggle[checked]') != null) {
+            document.querySelector('extensions-manager').shadowRoot.querySelector('extensions-detail-view').shadowRoot.querySelector('#enableToggle[checked]').click();
+        }");
+        sleep(2);
     }
 
     private function checkFillLoginSecondary($count)
@@ -555,7 +644,8 @@ class PortalScriptCDP
         $rows = $this->exts->execute_javascript('document.querySelector("my-trips").shadowRoot.querySelectorAll("section div ol li [data-testid=\'manage-my-booking-button\']").length');
         for ($i = 0; $i < $rows; $i++) {
             $this->exts->execute_javascript('document.querySelector("my-trips").shadowRoot.querySelectorAll("section div ol li [data-testid=\'manage-my-booking-button\']")[' . $i . '].click()');
-            sleep(20);
+            sleep(10);
+            $this->exts->waitTillPresent('button.passenger-receipt-label');
             $this->isNoInvoice = false;
             $download_modal_button = $this->exts->getElement('button.passenger-receipt-label');
             try {

@@ -57,8 +57,6 @@ class PortalScriptCDP
         }
     }
 
-    // Server-Portal-ID: 779710 - Last modified: 28.02.2025 05:54:18 UTC - User: 1
-
     public $baseUrl = 'https://admin.onoffbusiness.com/';
     public $loginUrl = 'https://admin.onoffbusiness.com/login';
     public $invoicePageUrl = 'https://admin.onoffbusiness.com/settings/plan-and-billing';
@@ -74,11 +72,8 @@ class PortalScriptCDP
     public $isNoInvoice = true;
 
     /**
-
      * Entry Method thats called for a portal
-
      * @param Integer $count Number of times portal is retried.
-
      */
     private function initPortal($count)
     {
@@ -123,11 +118,15 @@ class PortalScriptCDP
 
                 $this->exts->capture("1-pre-login");
                 $this->exts->log("Enter Username");
-                $this->exts->moveToElementAndType($this->username_selector, $this->username);
+                $this->exts->click_by_xdotool($this->username_selector);
+                sleep(2);
+                $this->exts->type_text_by_xdotool($this->username);
                 sleep(2);
 
                 $this->exts->log("Enter Password");
-                $this->exts->moveToElementAndType($this->password_selector, $this->password);
+                $this->exts->click_by_xdotool($this->password_selector);
+                sleep(2);
+                $this->exts->type_text_by_xdotool($this->password);
                 sleep(2);
 
                 if ($this->exts->exists($this->remember_me_selector)) {
@@ -139,6 +138,10 @@ class PortalScriptCDP
                 sleep(2);
                 if ($this->exts->exists($this->submit_login_selector)) {
                     $this->exts->click_by_xdotool($this->submit_login_selector);
+                    sleep(5);
+                }
+
+                if ($this->exts->exists($this->submit_login_selector)) {
                     $this->exts->click_by_xdotool($this->submit_login_selector);
                     $this->exts->click_by_xdotool($this->submit_login_selector);
                     sleep(1);

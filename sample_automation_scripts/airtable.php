@@ -800,7 +800,7 @@ class PortalScriptCDP
             sleep(3);
             $this->exts->capture("2.0-cancel-security-usb");
             $this->exts->click_by_xdotool('[data-view-id] [data-secondary-action-label] > div > div:nth-child(2) [role="button"], [data-view-id] [data-secondary-action-label] > div > div:nth-child(2) button');
-            sleep(5);
+            sleep(10);
             $this->exts->capture("2.0-backed-methods-list");
         } else if ($this->isExists('[data-view-id*="authzenView"] form, form [data-illustration*="authzen"]') || $this->exts->urlContains('/challenge/dp?')) {
             // (updated special case 09-May-2020): If Notification method showed immediately, This method often make user confused
@@ -836,6 +836,12 @@ class PortalScriptCDP
             }
             sleep(5);
             $this->exts->capture("2.0-backed-methods-list");
+        }
+
+        if ($this->isExists('[data-view-id] [data-secondary-action-label] > div > div:nth-child(2) [role="button"], [data-view-id] [data-secondary-action-label] > div > div:nth-child(2) button')) {
+            $this->exts->click_by_xdotool('[data-view-id] [data-secondary-action-label] > div > div:nth-child(2) [role="button"], [data-view-id] [data-secondary-action-label] > div > div:nth-child(2) button');
+            sleep(10);
+            $this->exts->capture("try-another-way-0");
         }
 
         // STEP 1: Check if list of two factor methods showed, select first
