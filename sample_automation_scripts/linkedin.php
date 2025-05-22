@@ -6,6 +6,9 @@
  * I have also replaced the exists and waitTillPresent functions 
  * with custom JavaScript functions. The script has been successfully
  *  tested on the test engine.
+ * 
+ * 
+ * test with this hassmannitforensikgmbh
  */
 
 /**
@@ -137,8 +140,6 @@ class PortalScriptCDP
                     $this->checkFillLogin();
                     sleep(10);
                 }
-
-
                 $this->checkTwoFactorAuth(1);
 
                 // Some time this site showed a form to confirm email and phone number, just simple click DONE
