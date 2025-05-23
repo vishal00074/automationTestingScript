@@ -110,20 +110,24 @@ class PortalScriptCDP
 
             $this->exts->capture("1-pre-login");
             $this->exts->log("Enter Username");
-            $this->exts->moveToElementAndType($this->username_selector, $this->username);
+            $this->exts->click_by_xdotool($this->username_selector);
             sleep(2);
+            $this->exts->type_text_by_xdotool($this->username);
+            sleep(2);
+            $this->exts->capture("login-filled-username");
             $this->exts->log("Enter Password");
-            $this->exts->moveToElementAndType($this->password_selector, $this->password);
+            $this->exts->click_by_xdotool($this->password_selector);
             sleep(2);
+            $this->exts->type_text_by_xdotool($this->password);
+            sleep(2);
+            $this->exts->capture("login-filled-password");
             if ($this->exts->exists('button[class*="TopBrand__CloseWidgetButton"]')) {
                 $this->exts->moveToElementAndClick('button[class*="TopBrand__CloseWidgetButton"]');
                 sleep(5);
             }
 
-            if ($this->exts->exists($this->remember_me_selector)) {
-                $this->exts->click_by_xdotool($this->remember_me_selector);
-                sleep(2);
-            }
+            $this->exts->type_key_by_xdotool("Return");
+            sleep(5);
 
             $this->exts->capture("1-login-page-filled");
             if ($this->exts->exists($this->submit_login_selector)) {
@@ -202,7 +206,7 @@ class PortalScriptCDP
             $this->exts->log('invoiceDate: ' . $invoice['invoiceDate']);
             $this->exts->log('invoiceAmount: ' . $invoice['invoiceAmount']);
             $this->exts->log('invoiceUrl: ' . $invoice['invoiceUrl']);
-            $invoiceFileName = $invoice['invoiceName'] . '.pdf';
+            $invoiceFileName = !empty($invoice['invoiceName']) ? $invoice['invoiceName'] . '.pdf' : '';
             $invoice['invoiceDate'] = $this->exts->parse_date($invoice['invoiceDate'], 'd.m.Y', 'Y-m-d');
             $this->exts->log('Date parsed: ' . $invoice['invoiceDate']);
 
