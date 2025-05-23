@@ -85,6 +85,7 @@ class PortalScriptCDP
             $this->exts->clearCookies();
             $this->exts->openUrl($this->loginUrl);
             $this->fillForm(0);
+            sleep(10);
         }
 
         if ($this->checkLogin()) {
@@ -133,56 +134,28 @@ class PortalScriptCDP
                     $this->exts->click_element($this->remember_me_selector);
                     sleep(2);
                 }
-                // $this->checkFillRecaptcha();
+                
                 $this->exts->capture("1-login-page-filled");
                 sleep(2);
-                if ($this->exts->exists($this->submit_login_selector)) {
-                    $this->exts->click_by_xdotool($this->submit_login_selector);
-                    sleep(5);
-                }
+                $this->exts->type_key_by_xdotool("Return");
+                sleep(5);
 
                 if ($this->exts->exists($this->submit_login_selector)) {
-                    $this->exts->click_by_xdotool($this->submit_login_selector);
-                    $this->exts->click_by_xdotool($this->submit_login_selector);
+                    $this->exts->type_key_by_xdotool("Return");
                     sleep(1);
-                    $this->exts->click_by_xdotool($this->submit_login_selector);
+                    $this->exts->type_key_by_xdotool("Return");
                     sleep(1);
-                    $this->exts->click_by_xdotool($this->submit_login_selector);
-                    sleep(5);
+                    $this->exts->type_key_by_xdotool("Return");
+                    sleep(1);
+                    $this->exts->type_key_by_xdotool("Return");
+                    sleep(1);
+                    $this->exts->type_key_by_xdotool("Return");
+                    sleep(1);
                 }
             }
         } catch (\Exception $exception) {
 
             $this->exts->log("Exception filling loginform " . $exception->getMessage());
-        }
-    }
-
-    private function checkFillRecaptcha($count = 1)
-    {
-        $this->exts->log(__FUNCTION__);
-        $recaptcha_iframe_selector = 'iframe[src*="recaptcha/enterprise/anchor"]';
-        $recaptcha_textarea_selector = 'textarea[name="g-recaptcha-response"]';
-        $this->exts->waitTillPresent($recaptcha_iframe_selector, 20);
-        if ($this->exts->exists($recaptcha_iframe_selector)) {
-            $iframeUrl = $this->exts->extract($recaptcha_iframe_selector, null, 'src');
-            $data_siteKey = explode('&', end(explode("&k=", $iframeUrl)))[0];
-            $this->exts->log("iframe url  - " . $iframeUrl);
-            $this->exts->log("SiteKey - " . $data_siteKey);
-
-            $isCaptchaSolved = $this->exts->processRecaptcha($this->exts->getUrl(), $data_siteKey, false);
-            $this->exts->log("isCaptchaSolved - " . $isCaptchaSolved);
-
-            if ($isCaptchaSolved) {
-                $this->exts->moveToElementAndClick($this->submit_login_selector);
-                sleep(5);
-            } else {
-                if ($count < 3) {
-                    $count++;
-                    $this->checkFillRecaptcha($count);
-                }
-            }
-        } else {
-            $this->exts->log(__FUNCTION__ . '::Not found reCaptcha');
         }
     }
 

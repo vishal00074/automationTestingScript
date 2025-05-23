@@ -302,7 +302,9 @@ class PortalScriptCDP
             $this->exts->switchToDefault();
             sleep(1);
         }
-        
+
+        $this->exts->log('>>>>>>>>>>>>>>>>>>>>> Start Solving Captcha <<<<<<<<<<<<');
+
         if ($this->exts->querySelector('iframe#captcha-internal') != null) {
             $this->switchToFrame('iframe#captcha-internal');
             sleep(3);
@@ -315,13 +317,13 @@ class PortalScriptCDP
                 sleep(1);
             }
 
-            if ($this->exts->querySelector('iframe[id="game-core-frame"]') != null) {
-                $this->switchToFrame('iframe[id="game-core-frame"]');
-                sleep(1);
-            }
+            // if ($this->exts->querySelector('iframe[id="game-core-frame"]') != null) {
+            //     $this->switchToFrame('iframe[id="game-core-frame"]');
+            //     sleep(1);
+            // }
 
             sleep(3);
-            if ($this->exts->exists($input)) {
+            if ($this->exts->querySelector($input) != null) {
                 $value = $this->exts->getElement($input)->getAttribute("value");
                 $this->exts->log("value " . $value);
                 $params = explode("|", $value);
@@ -377,8 +379,8 @@ class PortalScriptCDP
                 $this->switchToFrame("iframe#arkoseframe");
                 sleep(1);
             }
-            if ($this->exts->exists('iframe[data-e2e="enforcement-frame"]')) {
-                $this->switchToFrame('iframe[data-e2e="enforcement-frame"]');
+            if ($this->exts->exists("iframe[data-e2e='enforcement-frame'].show.active")) {
+                $this->switchToFrame("iframe[data-e2e='enforcement-frame'].show.active");
                 sleep(1);
             } else {
                 $this->exts->log("funcaptcha without content - reload iframe");
@@ -545,85 +547,6 @@ class PortalScriptCDP
             $this->exts->log("Can not get result from API");
         }
         return $response;
-    }
-
-    private function checkFillRecaptcha($count = 1)
-    {
-        $this->exts->log(__FUNCTION__);
-        $this->switchToFrame('iframe#captcha-internal');
-        $recaptcha_iframe_selector = 'iframe[src*="/recaptcha/api2/anchor?"]';
-        $recaptcha_textarea_selector = 'textarea[name="g-recaptcha-response"]';
-        if ($this->exts->exists($recaptcha_iframe_selector)) {
-            $iframeUrl = $this->exts->extract($recaptcha_iframe_selector, null, 'src');
-            $data_siteKey = explode('&', end(explode("&k=", $iframeUrl)))[0];
-            $this->exts->log("iframe url  - " . $iframeUrl);
-            $this->exts->log("SiteKey - " . $data_siteKey);
-
-            $isCaptchaSolved = $this->exts->processRecaptcha($this->exts->getUrl(), $data_siteKey, false);
-            $this->exts->log("isCaptchaSolved - " . $isCaptchaSolved);
-
-            if ($isCaptchaSolved) {
-                // Step 1 fill answer to textarea
-                $this->exts->log(__FUNCTION__ . "::filling reCaptcha response..");
-                $recaptcha_textareas = $this->exts->getElements($recaptcha_textarea_selector);
-                for ($i = 0; $i < count($recaptcha_textareas); $i++) {
-                    $this->exts->execute_javascript("arguments[0].innerHTML = '" . $this->exts->recaptcha_answer . "';", [$recaptcha_textareas[$i]]);
-                }
-                sleep(2);
-                $this->exts->capture('recaptcha-filled');
-
-                // Step 2, check if callback function need executed
-                $gcallbackFunction = $this->exts->execute_javascript('
-		        if(document.querySelector("[data-callback]") != null){
-				    document.querySelector("[data-callback]").getAttribute("data-callback");
-			    } else {
-				    var result = ""; var found = false;
-				    function recurse (cur, prop, deep) {
-				        if(deep > 5 || found){ 
-                            return;
-                        }
-                        console.log(prop);
-				        try {
-				            if(prop.indexOf(".callback") > -1){
-                                result = prop; 
-                                found = true; 
-                                return;
-				            } else { 
-                                if(cur == undefined || cur == null || cur instanceof Element || Object(cur) !== cur || Array.isArray(cur)){ 
-                                    return;
-                                }
-                                deep++;
-				                for (var p in cur) { 
-                                    recurse(cur[p], prop ? prop + "." + p : p, deep);
-                                }
-				            }
-				        } catch(ex) { 
-                            console.log("ERROR in function: " + ex); 
-                            return; 
-                        }
-				    }
-
-				    recurse(___grecaptcha_cfg.clients[0], "", 0);
-				    found ? "___grecaptcha_cfg.clients[0]." + result : null;
-			    }
-		    ');
-                $this->exts->log('Callback function: ' . $gcallbackFunction);
-                if ($gcallbackFunction != null) {
-                    $this->exts->execute_javascript($gcallbackFunction . '("' . $this->exts->recaptcha_answer . '");');
-                    sleep(10);
-                }
-            } else {
-                // Only call this if recaptcha service expired.
-                if ($count < 5) {
-                    $count++;
-                    $this->checkFillRecaptcha($count);
-                }
-            }
-            return true;
-        } else {
-            $this->exts->log(__FUNCTION__ . '::Not found reCaptcha');
-            return false;
-        }
     }
 
     public function switchToFrame($query_string)
