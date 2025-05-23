@@ -1,4 +1,4 @@
-<?php
+<?php // updated login code added escape and updated dowload code remove waitTillPresentAny and increase sleep
 
 /**
  * Chrome Remote via Chrome devtool protocol script, for specific process/portal
@@ -799,6 +799,9 @@ class PortalScriptCDP
             exec("sudo docker exec " . $node_name . " bash -c 'xdotool key Return'");
             sleep(3);
             $this->exts->capture("2.0-cancel-security-usb");
+            sleep(5);
+            $this->exts->type_key_by_xdotool('Escape');
+            sleep(5);
             $this->exts->click_by_xdotool('[data-view-id] [data-secondary-action-label] > div > div:nth-child(2) [role="button"], [data-view-id] [data-secondary-action-label] > div > div:nth-child(2) button');
             sleep(10);
             $this->exts->capture("2.0-backed-methods-list");
@@ -1516,8 +1519,8 @@ class PortalScriptCDP
                 continue;
             }
             $this->exts->openUrl($invoice['invoiceUrl']);
-            sleep(3);
-            $this->exts->waitTillAnyPresent(['.printableDocument [role="button"], div[class="aboveSheet"] > div[role="button"]', '//button//*[contains(text(), "Download invoice")]'], 60);
+            sleep(15);
+            // $this->exts->waitTillAnyPresent(['.printableDocument [role="button"], div[class="aboveSheet"] > div[role="button"]', '//button//*[contains(text(), "Download invoice")]'], 60);
 
             if ($this->exts->urlContains('airtable.com/') && $this->exts->exists('.printableDocument [role="button"], div[class="aboveSheet"] > div[role="button"]')) {
                 // airtable self invoice, Click print
