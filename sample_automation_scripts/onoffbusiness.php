@@ -134,23 +134,26 @@ class PortalScriptCDP
                     $this->exts->click_element($this->remember_me_selector);
                     sleep(2);
                 }
-                
+
                 $this->exts->capture("1-login-page-filled");
                 sleep(2);
-                $this->exts->type_key_by_xdotool("Return");
+                $this->exts->execute_javascript('document.getElementById("login-button").click();');
                 sleep(5);
 
-                if ($this->exts->exists($this->submit_login_selector)) {
-                    $this->exts->type_key_by_xdotool("Return");
+                if ($this->exts->querySelector($this->submit_login_selector) != null) {
+                    $this->exts->type_key_by_xdotool('Return');
                     sleep(1);
-                    $this->exts->type_key_by_xdotool("Return");
+                    $this->exts->type_key_by_xdotool('Return');
                     sleep(1);
-                    $this->exts->type_key_by_xdotool("Return");
+                    $this->exts->type_key_by_xdotool('Return');
                     sleep(1);
-                    $this->exts->type_key_by_xdotool("Return");
-                    sleep(1);
-                    $this->exts->type_key_by_xdotool("Return");
-                    sleep(1);
+                    $this->exts->type_key_by_xdotool('Return');
+                    sleep(5);
+                }
+
+                if ($this->exts->querySelector($this->submit_login_selector) != null) {
+                    $this->exts->click_by_xdotool($this->submit_login_selector);
+                    sleep(5);
                 }
             }
         } catch (\Exception $exception) {

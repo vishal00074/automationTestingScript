@@ -13,9 +13,9 @@ public $check_login_success_selector = 'button[id="my-account-menu"]';
 public $isNoInvoice = true;
 
 /**
- * Entry Method thats called for a portal
- * @param Integer $count Number of times portal is retried.
- */
+    * Entry Method thats called for a portal
+    * @param Integer $count Number of times portal is retried.
+    */
 private function initPortal($count)
 {
     $this->exts->log('Begin initPortal ' . $count);
@@ -26,6 +26,7 @@ private function initPortal($count)
         $this->exts->clearCookies();
         $this->exts->openUrl($this->loginUrl);
         $this->fillForm(0);
+        sleep(10);
     }
 
     if ($this->checkLogin()) {
@@ -67,25 +68,29 @@ public function fillForm($count)
             sleep(2);
             $this->exts->type_text_by_xdotool($this->password);
             sleep(2);
-            
+
             if ($this->exts->exists($this->remember_me_selector)) {
                 $this->exts->click_element($this->remember_me_selector);
                 sleep(2);
             }
-            // $this->checkFillRecaptcha();
+
             $this->exts->capture("1-login-page-filled");
             sleep(2);
-            if ($this->exts->exists($this->submit_login_selector)) {
-                $this->exts->click_by_xdotool($this->submit_login_selector);
+            $this->exts->execute_javascript('document.getElementById("login-button").click();');
+            sleep(5);
+
+            if ($this->exts->querySelector($this->submit_login_selector) != null) {
+                $this->exts->type_key_by_xdotool('Return');
+                sleep(1);
+                $this->exts->type_key_by_xdotool('Return');
+                sleep(1);
+                $this->exts->type_key_by_xdotool('Return');
+                sleep(1);
+                $this->exts->type_key_by_xdotool('Return');
                 sleep(5);
             }
 
-            if ($this->exts->exists($this->submit_login_selector)) {
-                $this->exts->click_by_xdotool($this->submit_login_selector);
-                $this->exts->click_by_xdotool($this->submit_login_selector);
-                sleep(1);
-                $this->exts->click_by_xdotool($this->submit_login_selector);
-                sleep(1);
+            if ($this->exts->querySelector($this->submit_login_selector) != null) {
                 $this->exts->click_by_xdotool($this->submit_login_selector);
                 sleep(5);
             }
@@ -96,40 +101,11 @@ public function fillForm($count)
     }
 }
 
-private function checkFillRecaptcha($count = 1)
-{
-    $this->exts->log(__FUNCTION__);
-    $recaptcha_iframe_selector = 'iframe[src*="recaptcha/enterprise/anchor"]';
-    $recaptcha_textarea_selector = 'textarea[name="g-recaptcha-response"]';
-    $this->exts->waitTillPresent($recaptcha_iframe_selector, 20);
-    if ($this->exts->exists($recaptcha_iframe_selector)) {
-        $iframeUrl = $this->exts->extract($recaptcha_iframe_selector, null, 'src');
-        $data_siteKey = explode('&', end(explode("&k=", $iframeUrl)))[0];
-        $this->exts->log("iframe url  - " . $iframeUrl);
-        $this->exts->log("SiteKey - " . $data_siteKey);
-
-        $isCaptchaSolved = $this->exts->processRecaptcha($this->exts->getUrl(), $data_siteKey, false);
-        $this->exts->log("isCaptchaSolved - " . $isCaptchaSolved);
-
-        if ($isCaptchaSolved) {
-            $this->exts->moveToElementAndClick($this->submit_login_selector);
-            sleep(5);
-        } else {
-            if ($count < 3) {
-                $count++;
-                $this->checkFillRecaptcha($count);
-            }
-        }
-    } else {
-        $this->exts->log(__FUNCTION__ . '::Not found reCaptcha');
-    }
-}
-
 
 /**
- * Method to Check where user is logged in or not
- * return boolean true/false
- */
+    * Method to Check where user is logged in or not
+    * return boolean true/false
+    */
 public function checkLogin()
 {
     $this->exts->log("Begin checkLogin ");
