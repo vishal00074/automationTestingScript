@@ -83,12 +83,12 @@ class PortalScriptCDP
     {
         $this->disable_unexpected_extensions();
 
-        $this->exts->temp_keep_useragent = $this->exts->send_websocket_event(
-            $this->exts->current_context->webSocketDebuggerUrl,
-            "Network.setUserAgentOverride",
-            '',
-            ["userAgent" => "Mozilla/5.0 (Linux; Android 15; SM-S931B Build/AP3A.240905.015.A2; wv) AppleWebKit/537.36"]
-        );
+        // $this->exts->temp_keep_useragent = $this->exts->send_websocket_event(
+        //     $this->exts->current_context->webSocketDebuggerUrl,
+        //     "Network.setUserAgentOverride",
+        //     '',
+        //     ["userAgent" => "Mozilla/5.0 (Linux; Android 15; SM-S931B Build/AP3A.240905.015.A2; wv) AppleWebKit/537.36"]
+        // );
 
         $isCookieLoaded = false;
         if ($this->exts->loadCookiesFromFile()) {
@@ -97,31 +97,20 @@ class PortalScriptCDP
         }
 
         $this->exts->openUrl($this->baseUrl);
+        sleep(12);
+        $this->acceptCookies();
 
-        sleep(10);
-
-        if ($this->isExists('maui-link-button[variant="close"]')) {
-            $this->exts->click_by_xdotool('maui-link-button[variant="close"]');
-            sleep(5);
-        }
-
-        if ($this->isExists('button#cm-acceptAll')) {
-            $this->exts->click_by_xdotool('button#cm-acceptAll');
-            sleep(5);
-        }
-
-        if ($this->isExists('.consent-manager-inner button#cm-selectSpecific')) {
-            $this->exts->click_by_xdotool('.consent-manager-inner button#cm-selectSpecific');
-            sleep(10);
-        }
 
         if (!$this->checkLogin()) {
             $this->exts->log('Not Logged in ::');
             $this->exts->clearCookies();
             $this->clearChrome();
+            $this->exts->openUrl($this->baseUrl);
+            sleep(12);
+            $this->acceptCookies();
 
             if ($this->isExists('div.one-id-login a')) {
-                $this->exts->click_by_xdotool('div.one-id-login a');
+                $this->exts->moveToElementAndClick('div.one-id-login a');
             }
 
             sleep(10);
@@ -130,7 +119,7 @@ class PortalScriptCDP
             $this->waitForSelectors("a[name='welcome_skipMigration']", 10, 2);
 
             if ($this->isExists('a[name="welcome_skipMigration"]')) {
-                $this->exts->click_by_xdotool('a[name="welcome_skipMigration"]');
+                $this->exts->moveToElementAndClick('a[name="welcome_skipMigration"]');
                 sleep(20);
             }
         }
@@ -155,6 +144,24 @@ class PortalScriptCDP
             } else {
                 $this->exts->loginFailure();
             }
+        }
+    }
+
+    private function acceptCookies()
+    {
+        if ($this->isExists('maui-link-button[variant="close"]')) {
+            $this->exts->click_by_xdotool('maui-link-button[variant="close"]');
+            sleep(5);
+        }
+
+        if ($this->isExists('button#cm-acceptAll')) {
+            $this->exts->click_by_xdotool('button#cm-acceptAll');
+            sleep(5);
+        }
+
+        if ($this->isExists('.consent-manager-inner button#cm-selectSpecific')) {
+            $this->exts->click_by_xdotool('.consent-manager-inner button#cm-selectSpecific');
+            sleep(10);
         }
     }
 
@@ -268,8 +275,11 @@ class PortalScriptCDP
                 if ($this->exts->exists($this->continue_btn)) {
                     $this->exts->click_by_xdotool($this->submit_btn);
                     $this->exts->click_by_xdotool($this->submit_btn);
+                    sleep(1);
                     $this->exts->click_by_xdotool($this->submit_btn);
+                    sleep(1);
                     $this->exts->click_by_xdotool($this->submit_btn);
+                    sleep(1);
                     $this->exts->click_by_xdotool($this->submit_btn);
                 }
                 sleep(10);
