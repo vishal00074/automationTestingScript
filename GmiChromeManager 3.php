@@ -4633,12 +4633,8 @@ class GmiChromeManager
         // Clean javascript arguments after executed
         if (count($arguments) > 0) {
             // $this->evaluate('var test = window.arguments; window.arguments = undefined;');
-            $this->evaluate(
-                '
-                window.arguments = undefined;
-                gmicmenv = undefined;
-            '
-            );
+            $this->evaluate('window.arguments = undefined;
+                gmicmenv = undefined;');
         }
 
         // Analyze returned text for checking error, null, or value

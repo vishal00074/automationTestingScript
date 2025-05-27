@@ -74,6 +74,7 @@ class PortalScriptCDP
 
     public $lufthansa_id = 0;
     public $isNoInvoice = true;
+    
 
     /**
      * Entry Method thats called for a portal
@@ -83,12 +84,12 @@ class PortalScriptCDP
     {
         $this->disable_unexpected_extensions();
 
-        // $this->exts->temp_keep_useragent = $this->exts->send_websocket_event(
-        //     $this->exts->current_context->webSocketDebuggerUrl,
-        //     "Network.setUserAgentOverride",
-        //     '',
-        //     ["userAgent" => "Mozilla/5.0 (Linux; Android 15; SM-S931B Build/AP3A.240905.015.A2; wv) AppleWebKit/537.36"]
-        // );
+        $this->exts->temp_keep_useragent = $this->exts->send_websocket_event(
+			$this->exts->current_context->webSocketDebuggerUrl,
+			"Network.setUserAgentOverride",
+			'',
+			["userAgent"=> "Mozilla/5.0 (Windows NT 11.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/134.0.6998.166 Safari/537.36"]
+		);
 
         $isCookieLoaded = false;
         if ($this->exts->loadCookiesFromFile()) {
@@ -99,7 +100,6 @@ class PortalScriptCDP
         $this->exts->openUrl($this->baseUrl);
         sleep(12);
         $this->acceptCookies();
-
 
         if (!$this->checkLogin()) {
             $this->exts->log('Not Logged in ::');
