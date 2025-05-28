@@ -74,7 +74,7 @@ class PortalScriptCDP
 
     public $lufthansa_id = 0;
     public $isNoInvoice = true;
-    
+
 
     /**
      * Entry Method thats called for a portal
@@ -85,11 +85,11 @@ class PortalScriptCDP
         $this->disable_unexpected_extensions();
 
         $this->exts->temp_keep_useragent = $this->exts->send_websocket_event(
-			$this->exts->current_context->webSocketDebuggerUrl,
-			"Network.setUserAgentOverride",
-			'',
-			["userAgent"=> "Mozilla/5.0 (Windows NT 11.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/134.0.6998.166 Safari/537.36"]
-		);
+            $this->exts->current_context->webSocketDebuggerUrl,
+            "Network.setUserAgentOverride",
+            '',
+            ["userAgent" => "Mozilla/5.0 (Windows NT 11.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/134.0.6998.166 Safari/537.36"]
+        );
 
         $isCookieLoaded = false;
         if ($this->exts->loadCookiesFromFile()) {
@@ -104,7 +104,6 @@ class PortalScriptCDP
         if (!$this->checkLogin()) {
             $this->exts->log('Not Logged in ::');
             $this->exts->clearCookies();
-            $this->clearChrome();
             $this->exts->openUrl($this->baseUrl);
             sleep(12);
             $this->acceptCookies();
@@ -272,19 +271,8 @@ class PortalScriptCDP
                 $this->exts->type_text_by_xdotool($this->password);
                 sleep(2);
 
-                if ($this->exts->exists($this->continue_btn)) {
-                    $this->exts->click_by_xdotool($this->submit_btn);
-                    $this->exts->click_by_xdotool($this->submit_btn);
-                    sleep(1);
-                    $this->exts->click_by_xdotool($this->submit_btn);
-                    sleep(1);
-                    $this->exts->click_by_xdotool($this->submit_btn);
-                    sleep(1);
-                    $this->exts->click_by_xdotool($this->submit_btn);
-                }
-                sleep(10);
-                if ($this->exts->exists($this->continue_btn)) {
-                    $this->exts->click_by_xdotool($this->submit_btn);
+                if ($this->exts->querySelector($this->submit_btn) != null) {
+                    $this->exts->execute_javascript("document.querySelector('.travelid-login__loginButton')?.click();");
                     sleep(10);
                 }
             } else {
