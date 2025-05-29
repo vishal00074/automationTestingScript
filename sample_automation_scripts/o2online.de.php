@@ -1,4 +1,4 @@
-<?php // add loginfailedConfirmed in case incorrect cred add empty invoice case 
+<?php // updated 2fa code 
 
 /**
  * Chrome Remote via Chrome devtool protocol script, for specific process/portal
@@ -57,10 +57,9 @@ class PortalScriptCDP
         }
     }
 
-    // Server-Portal-ID: 332 - Last modified: 30.04.2025 14:03:44 UTC - User: 1
+    // Server-Portal-ID: 332 - Last modified: 23.05.2025 15:16:19 UTC - User: 1
 
-    // start script
-
+    // Script here
     public $baseUrl = 'https://o2online.de';
     public $dslLoginUrl = 'https://dsl.o2online.de/selfcare/content/segment/kundencenter/';
     public $mobileLoginUrl = 'https://www.o2online.de/ecare/';
@@ -143,11 +142,17 @@ class PortalScriptCDP
             }
 
             if ($this->exts->exists('button[data-test-id="mfa-send-otp"]')) {
-                $this->exts->moveToElementAndClick('button[data-test-id="mfa-send-otp"]');
+                $this->exts->moveToElementAndClick('button[data-test-id="mfa-send-otp"], one-button[onclick*="sendEmailNow"]');
                 sleep(10);
             }
 
             $this->checkFillTwoFactor();
+
+            if ($this->exts->exists('one-button[onclick*="sendEmailNow"]')) {
+                $this->exts->moveToElementAndClick('one-button[onclick*="sendEmailNow"]');
+                sleep(10);
+            }
+            $this->checkFillTwoFactorEmail();
 
             if ($this->exts->getElement('form[name="enterMsisdnForm"]') != null) {
                 $this->exts->moveToElementAndClick('a[href="#/verwalten/uebersicht"]');
@@ -227,10 +232,10 @@ class PortalScriptCDP
         } else {
             $this->exts->log(__FUNCTION__ . '::Use login failed');
 
-            $isErrorMessage = $this->exts->execute_javascript('document.body.innerHTML.includes("Benutzername und/oder Kennwort falsch");');
-            $this->exts->log('isErrorMessage:: ' . $isErrorMessage);
-            if ($isErrorMessage) {
-                $this->exts->capture('incorrect-user-pass');
+            $isTwoFAFailed = $this->exts->execute_javascript('document.body.innerHTML.includes("Beachte, dass du die Eingaben nur 3 mal falsch tätigen darfst")');
+            $this->exts->log('isErrorMessage:: ' . $isTwoFAFailed);
+            if ($isTwoFAFailed) {
+                $this->exts->capture('incorrect-twoFA-code');
                 $this->exts->loginFailure(1);
             }
 
@@ -271,12 +276,10 @@ class PortalScriptCDP
             $this->exts->capture('2-login-page');
 
             $this->exts->log('Enter Username');
-            $this->exts->log($this->username);
             $this->exts->moveToElementAndType($this->dsl_username_selector, $this->username);
             sleep(1);
 
             $this->exts->log('Enter Password');
-            $this->exts->log($this->password);
             $this->exts->moveToElementAndType($this->dsl_password_selector, $this->password);
             sleep(1);
 
@@ -291,75 +294,80 @@ class PortalScriptCDP
     {
         sleep(3);
         $this->exts->execute_javascript('
-        var cookie_popup = document.querySelector("#usercentrics-root");
-        if (cookie_popup != null) {
-            cookie_popup.shadowRoot.querySelector("[data-testid=\"uc-accept-all-button\"]").click();
-        }
-    ');
+	var cookie_popup = document.querySelector("#usercentrics-root");
+	if (cookie_popup != null) {
+	cookie_popup.shadowRoot.querySelector("[data-testid=\"uc-accept-all-button\"]").click();
+	}
+	');
 
         sleep(3);
     }
 
     private function checkFillMobileLogin()
     {
+        $this->exts->log(__FUNCTION__);
         $this->exts->capture('2-login-page');
         if ($this->exts->getElement($this->mobile_username_selector) != null) {
             sleep(3);
-            $this->exts->log('Enter Username');
+            $this->exts->log('Enter MobUsername');
             $this->exts->log($this->username);
-            $this->exts->execute_javascript("
-            (function() {
-                var host1 = document.querySelector('#idToken4_od');
-                if (host1 && host1.shadowRoot) {
-                    var input = host1.shadowRoot.querySelector('input#input-2');
-                    if (input) {
-                        input.value = " . $this->username . ";
-                        input.dispatchEvent(new Event('input', { bubbles: true }));
-                        input.dispatchEvent(new Event('change', { bubbles: true }));
-                    }
-                }
-            })();
-        ");
+            // $this->exts->execute_javascript("
+            //     (function() {
+            //         var host1 = document.querySelector('#idToken4_od');
+            //         if (host1 && host1.shadowRoot) {
+            //             var input = host1.shadowRoot.querySelector('input#input-2');
+            //             if (input) {
+            //                 input.value = " . $this->username . ";
+            //                 input.dispatchEvent(new Event('input', { bubbles: true }));
+            //                 input.dispatchEvent(new Event('change', { bubbles: true }));
+            //             }
+            //         }
+            //     })();
+            // ");
+            $this->exts->click_by_xdotool('one-input#idToken4_od');
+            sleep(3);
+            $this->exts->type_text_by_xdotool($this->username);
 
             sleep(2);
             $this->exts->execute_javascript('
-            var shadow = document.querySelector("one-button.loginLegacySubmitBtn");
-            if(shadow){
-                shadow.shadowRoot.querySelector(\'button[role="button"]\').click();
-            }
-        ');
+	            var shadow = document.querySelector("one-button.loginLegacySubmitBtn");
+	            if(shadow){
+	                shadow.shadowRoot.querySelector(\'button[role="button"]\').click();
+	            }
+	        ');
             sleep(5);
         }
 
         if ($this->exts->getElement($this->password_selector) != null) {
             $this->exts->log('Enter Password 2');
 
-            $this->exts->log($this->password);
-            $this->exts->execute_javascript("
-            (function() {
-                var host1 = document.querySelector('one-input[type=\"password\"]');
-                if (host1 && host1.shadowRoot) {
-                    var input = host1.shadowRoot.querySelector('input[type=\"password\"]');
-                    if (input) {
-                        input.value = '" . $this->password . "';
-                        input.dispatchEvent(new Event('input', { bubbles: true }));
-                        input.dispatchEvent(new Event('change', { bubbles: true }));
-                    }
-                }
-            })();
-        ");
-            sleep(2);
+            // $this->exts->execute_javascript("
+            //     (function() {
+            //         var host1 = document.querySelector('one-input[type=\"password\"]');
+            //         if (host1 && host1.shadowRoot) {
+            //             var input = host1.shadowRoot.querySelector('input[type=\"password\"]');
+            //             if (input) {
+            //                 input.value = '" . $this->password . "';
+            //                 input.dispatchEvent(new Event('input', { bubbles: true }));
+            //                 input.dispatchEvent(new Event('change', { bubbles: true }));
+            //             }
+            //         }
+            //     })();
+            // ");
+            $this->exts->click_by_xdotool('one-input[type="password"]');
+            sleep(3);
+            $this->exts->type_text_by_xdotool($this->password);
 
             $this->exts->capture('2-login-page-filled');
             $this->exts->execute_javascript('
-            var shadow = document.querySelector("one-button[data-type=\'main-action\']");
-            if (shadow && shadow.shadowRoot) {
-                var button = shadow.shadowRoot.querySelector("button[role=\'button\']");
-                if (button) {
-                    button.click();
-                }
-            }
-        ');
+	            var shadow = document.querySelector("one-button[data-type=\'main-action\']");
+	            if (shadow && shadow.shadowRoot) {
+	                var button = shadow.shadowRoot.querySelector("button[role=\'button\']");
+	                if (button) {
+	                    button.click();
+	                }
+	            }
+	        ');
 
             sleep(5);
 
@@ -369,31 +377,31 @@ class PortalScriptCDP
                 $this->exts->log($this->user_mobile_number);
                 $this->exts->log('this is working -------------------->');
                 $this->exts->execute_javascript('
-                var shadowHost = document.querySelector("#select-group one-select");
-                if (shadowHost && shadowHost.shadowRoot) {
-                    var select = shadowHost.shadowRoot.querySelector("select");
-                    if (select) {
-                        select.value = "1";
-                        select.dispatchEvent(new Event("change", { bubbles: true }));
-                    }
-                }
+	                var shadowHost = document.querySelector("#select-group one-select");
+	                if (shadowHost && shadowHost.shadowRoot) {
+	                    var select = shadowHost.shadowRoot.querySelector("select");
+	                    if (select) {
+	                        select.value = "1";
+	                        select.dispatchEvent(new Event("change", { bubbles: true }));
+	                    }
+	                }
 
-                var buttonElement = document.querySelector("one-button[data-type=\'main-action\']");
-                if (buttonElement) {
-                    buttonElement.removeAttribute("disabled");
+	                var buttonElement = document.querySelector("one-button[data-type=\'main-action\']");
+	                if (buttonElement) {
+	                    buttonElement.removeAttribute("disabled");
 
-                    if (buttonElement.shadowRoot) {
-                        var innerButton = buttonElement.shadowRoot.querySelector("button");
-                        if (innerButton) {
-                            innerButton.disabled = false;
-                            innerButton.removeAttribute("disabled");
-                            innerButton.click();
-                        }
-                    } else {
-                        buttonElement.click();
-                    }
-                }
-            ');
+	                    if (buttonElement.shadowRoot) {
+	                        var innerButton = buttonElement.shadowRoot.querySelector("button");
+	                        if (innerButton) {
+	                            innerButton.disabled = false;
+	                            innerButton.removeAttribute("disabled");
+	                            innerButton.click();
+	                        }
+	                    } else {
+	                        buttonElement.click();
+	                    }
+	                }
+	            ');
 
                 $this->exts->capture('2-login-page-number');
                 sleep(5);
@@ -418,7 +426,7 @@ class PortalScriptCDP
         if ((!empty($errMsg) && trim($errMsg) != '') && ($errMsg == $invalidUsernameMsg_gm || $errMsg == $invalidUsernameMsg_en || stripos($errMsg, 'Ihr Kennwort ist ungültig') !== false) || stripos($this->exts->extract('div#login h1'), 'Neues Kennwort anfordern') !== false) {
             $this->exts->loginFailure(1);
         }
-
+        sleep(5);
         if ($this->exts->getElement($two_factor_selector) != null && $this->exts->two_factor_attempts < 3) {
             $this->exts->log("Two factor page found.");
             $this->exts->capture("2.1-two-factor");
@@ -442,28 +450,29 @@ class PortalScriptCDP
                 $this->exts->log("checkFillTwoFactor: Entering two_factor_code." . $two_factor_code);
                 $this->exts->moveToElementAndType($two_factor_selector, $two_factor_code);
                 $this->exts->execute_javascript("
-                const host = document.querySelector('$two_factor_selector');
-                if (!host || !host.shadowRoot) return 'NO_SHADOW';
-                const inputs = host.shadowRoot.querySelectorAll('fieldset div[class*=\"pin-input\"] input');
-                const code = arguments[0];
-                if (inputs.length !== code.length) return 'OTP_LENGTH_MISMATCH';
-                code.split('').forEach((digit, idx) => {
-                    inputs[idx].value = digit;
-                    inputs[idx].dispatchEvent(new Event('input', { bubbles: true }));
-                    inputs[idx].dispatchEvent(new Event('change', { bubbles: true }));
-                });
-                return 'SUCCESS';
-            ", [$two_factor_code]);
+					const host = document.querySelector('$two_factor_selector');
+					if (!host || !host.shadowRoot) return 'NO_SHADOW';
+					const inputs = host.shadowRoot.querySelectorAll('fieldset div[class*=\"pin-input\"] input');
+					const code = arguments[0];
+					if (inputs.length !== code.length) return 'OTP_LENGTH_MISMATCH';
+					code.split('').forEach((digit, idx) => {
+						inputs[idx].value = digit;
+						inputs[idx].dispatchEvent(new Event('input', { bubbles: true }));
+						inputs[idx].dispatchEvent(new Event('change', { bubbles: true }));
+					});
+					return 'SUCCESS';
+				", [$two_factor_code]);
                 $this->exts->log("checkFillTwoFactor: Clicking submit button.");
-                sleep(3);
+                sleep(5);
                 $this->exts->capture("2.2-two-factor-filled-" . $this->exts->two_factor_attempts);
                 $this->exts->execute_javascript("
-                const host = document.querySelector('$two_factor_submit_selector');
-                if (host && host.shadowRoot) {
-                    const btn = host.shadowRoot.querySelector('button[role=\"button\"]');
-                    if (btn) btn.click();
-                }
-            ");
+					const host = document.querySelector('$two_factor_submit_selector');
+					if (host && host.shadowRoot) {
+						const btn = host.shadowRoot.querySelector('button[role=\"button\"]');
+						if (btn) btn.click();
+					}
+				");
+                $this->exts->click_element('one-button[data-type="main-action"]');
                 sleep(15);
 
                 if ($this->exts->getElement($two_factor_selector) == null) {
@@ -477,6 +486,63 @@ class PortalScriptCDP
             } else {
                 $this->exts->log("Not received two factor code");
             }
+        }
+    }
+
+    private function checkFillTwoFactorEmail(): void
+    {
+        $selector = 'one-pin-input[id*="idToken"]';
+        $message_selector = 'one-text[id*="callback"]';
+        $submit_selector = 'one-button[data-type="main-action"]';
+
+        while ($this->exts->getElement($selector) !== null && $this->exts->two_factor_attempts < 3) {
+            $this->exts->log("Two factor page found.");
+            $this->exts->capture("2.1-two-factor");
+
+            // Collect and log the 2FA instruction messages
+            $this->exts->two_factor_notif_msg_en = "";
+            $messages = $this->exts->getElements($message_selector);
+            foreach ($messages as $msg) {
+                $this->exts->two_factor_notif_msg_en .= $msg->getAttribute('innerText') . "\n";
+            }
+
+            $this->exts->two_factor_notif_msg_en = trim($this->exts->two_factor_notif_msg_en);
+            $this->exts->two_factor_notif_msg_de = $this->exts->two_factor_notif_msg_en;
+            $this->exts->log("Message:\n" . $this->exts->two_factor_notif_msg_en);
+
+            // Add retry message if this is the final attempt
+            if ($this->exts->two_factor_attempts === 2) {
+                $this->exts->two_factor_notif_msg_en .= ' ' . $this->exts->two_factor_notif_msg_retry_en;
+                $this->exts->two_factor_notif_msg_de .= ' ' . $this->exts->two_factor_notif_msg_retry_de;
+            }
+
+            $code = trim($this->exts->fetchTwoFactorCode());
+            if ($code === '') {
+                $this->exts->log("2FA code not received");
+                break;
+            }
+
+            $this->exts->log("checkFillTwoFactor: Entering 2FA code: " . $two_factor_code);
+            $this->exts->click_by_xdotool($selector);
+            sleep(1);
+            $this->exts->type_key_by_xdotool("Tab");
+            sleep(1);
+            $this->exts->type_text_by_xdotool($code);
+            $this->exts->capture("2.2-two-factor-filled-" . $this->exts->two_factor_attempts);
+
+            $this->exts->moveToElementAndClick($submit_selector);
+            sleep(5); // Added: Ensure time for 2FA processing
+
+            if ($this->exts->getElement($selector) === null) {
+                $this->exts->log("Two factor solved");
+                break;
+            }
+
+            $this->exts->two_factor_attempts++;
+        }
+
+        if ($this->exts->two_factor_attempts >= 3) {
+            $this->exts->log("Two factor could not be solved after 3 attempts");
         }
     }
 
