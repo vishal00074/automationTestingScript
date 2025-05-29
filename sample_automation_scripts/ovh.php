@@ -1,4 +1,4 @@
-<?php // handle emapty invoice name case 
+<?php // handle emapty invoice name case updated two fa code added and updated download code
 
 /**
  * Chrome Remote via Chrome devtool protocol script, for specific process/portal
@@ -118,36 +118,34 @@ class PortalScriptCDP
                 sleep(15);
             }
 
-            // if ($this->exts->exists('div[data-mfa-type*="sms"]')) {
-            //     $this->exts->moveToElementAndClick('div[data-mfa-type*="sms"]');
-            //     sleep(5);
-            //     $this->fillTwoFactor($this->twoFactorInputSelector, $this->submit_twofactor_btn_selector);
-            //     sleep(15);
-            // } 
-
-            if ($this->exts->exists('div[data-mfa-type**="staticOTP"]')) {
-                $this->exts->moveToElementAndClick('div[data-mfa-type**="staticOTP"]');
-                sleep(7);
-                $this->fillTwoFactor($this->twoFactorInputSelector, $this->submit_twofactor_btn_selector);
-                sleep(15);
-            } else if ($this->exts->exists('div[data-mfa-type*="mail"]')) {
-                $this->exts->moveToElementAndClick('div[data-mfa-type*="mail"]');
-                sleep(6);
-                $this->fillTwoFactor($this->twoFactorInputSelector, $this->submit_twofactor_btn_selector);
-                sleep(15);
-            } else if ($this->exts->exists('div[data-mfa-type*="totp"]')) {
+            if ($this->exts->exists('div[data-mfa-type*="totp"]')) {
                 $this->exts->moveToElementAndClick('div[data-mfa-type*="totp"]');
+                sleep(7);
+                $this->fillTwoFactor($this->twoFactorInputSelector, $this->submit_twofactor_btn_selector);
+                sleep(15);
+            } else if ($this->exts->exists('div[data-mfa-type*="sms"]')) {
+                $this->exts->moveToElementAndClick('div[data-mfa-type*="sms"]');
                 sleep(6);
                 $this->fillTwoFactor($this->twoFactorInputSelector, $this->submit_twofactor_btn_selector);
                 sleep(15);
-            } else if ($this->exts->exists('div[data-mfa-type**="staticOTP"]')) {
-                $this->exts->moveToElementAndClick('div[data-mfa-type**="staticOTP"]');
-                sleep(7);
+            } else if ($this->exts->exists('div[data-mfa-type*="staticOTP"]')) {
+                $this->exts->moveToElementAndClick('div[data-mfa-type*="staticOTP"]');
+                sleep(6);
                 $this->fillTwoFactor($this->twoFactorInputSelector, $this->submit_twofactor_btn_selector);
                 sleep(15);
             } else if ($this->exts->exists($this->twoFactorInputSelector)) {
                 $this->fillTwoFactor($this->twoFactorInputSelector, $this->submit_twofactor_btn_selector);
                 sleep(15);
+            }
+
+            if ($this->exts->querySelector('osds-modal') != null) {
+                $this->switchToFrame('osds-modal');
+                sleep(2);
+            }
+
+            if ($this->exts->querySelector('osds-button[data-navi-id="cookie-accept"]') != null) {
+                $this->exts->click_by_xdotool('osds-button[data-navi-id="cookie-accept"]');
+                sleep(5);
             }
 
             $this->waitForLogin();
@@ -189,6 +187,7 @@ class PortalScriptCDP
 
             // Open invoices url
             $this->exts->openUrl($this->invoicePageUrl);
+            sleep(10);
             $this->processInvoices();
 
             // Final, check no invoice
@@ -205,6 +204,28 @@ class PortalScriptCDP
                 $this->exts->loginFailure();
             }
         }
+    }
+
+
+    public function switchToFrame($query_string)
+    {
+        $this->exts->log(__FUNCTION__ . " Begin with " . $query_string);
+        $frame = null;
+        if (is_string($query_string)) {
+            $frame = $this->exts->queryElement($query_string);
+        }
+
+        if ($frame != null) {
+            $frame_context = $this->exts->get_frame_excutable_context($frame);
+            if ($frame_context != null) {
+                $this->exts->current_context = $frame_context;
+                return true;
+            }
+        } else {
+            $this->exts->log(__FUNCTION__ . " Frame not found " . $query_string);
+        }
+
+        return false;
     }
 
     private function fillTwoFactor($twoFactorInputSelector, $submit_twofactor_btn_selector)
@@ -262,13 +283,13 @@ class PortalScriptCDP
 
     private function processInvoices($paging_count = 1)
     {
-        sleep(10);
+        sleep(15);
         $this->exts->log('Invoices found');
         $this->exts->capture("4-page-opened");
         $limit = 25;
         if ((int)@$this->exts->config_array["restrictPages"] == 0)
             $limit = 500;
-        $this->exts->switchToFrame('iframe[role="document"]');
+        $this->switchToFrame('iframe[role="document"]');
         $invoices = [];
         $rows = $this->exts->getElements('table > tbody > tr');
         foreach ($rows as $row) {
@@ -314,7 +335,7 @@ class PortalScriptCDP
             }
         }
 
-        $this->exts->switchToFrame('iframe[role="document"]');
+        $this->switchToFrame('iframe[role="document"]');
         $restrictPages = isset($this->exts->config_array["restrictPages"]) ? (int)@$this->exts->config_array["restrictPages"] : 3;
         if (
             $restrictPages == 0 &&
