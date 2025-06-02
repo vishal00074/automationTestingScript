@@ -56,6 +56,7 @@ class PortalScriptCDP
             echo 'Script execution failed.. ' . "\n";
         }
     }
+
     public $baseUrl = 'https://secure.business.bt.com/Account/LoginRedirect.aspx?tabId=1';
     public $username_selector = 'form[name="Login"] input#USER, input#signInName';
     public $password_selector = 'form[name="Login"] input#PASSWORD, input[name="Password"]';
@@ -79,7 +80,7 @@ class PortalScriptCDP
             $this->exts->log('NOT logged via cookie');
             $this->exts->clearCookies();
             $this->exts->openUrl($this->baseUrl);
-            $this->exts->waitTillPresent('.truste_popframe', 20);
+            $this->waitFor('.truste_popframe', 10);
             if ($this->exts->exists('.truste_popframe')) {
                 $this->switchToFrame('.truste_popframe');
                 sleep(2);
@@ -90,7 +91,7 @@ class PortalScriptCDP
                 $this->exts->switchToDefault();
             }
             $this->checkFillLogin();
-            $this->exts->waitTillPresent('button[id="MFAVerifyPrimaryPhoneOrBackupEmailDisplayControl_but_send_code"], button.sendCode', 10);
+            $this->waitFor('button[id="MFAVerifyPrimaryPhoneOrBackupEmailDisplayControl_but_send_code"], button.sendCode', 5);
             if ($this->exts->exists('button[id="MFAVerifyPrimaryPhoneOrBackupEmailDisplayControl_but_send_code"], button.sendCode')) {
                 $this->exts->click_element('button[id="MFAVerifyPrimaryPhoneOrBackupEmailDisplayControl_but_send_code"], button.sendCode');
             }
@@ -99,7 +100,7 @@ class PortalScriptCDP
             if (stripos($this->exts->extract('div.error-code'), 'ERR_TOO_MANY_REDIRECTS') !== false) {
                 $this->clearChrome();
                 $this->exts->openUrl($this->baseUrl);
-                $this->exts->waitTillPresent('.truste_popframe', 20);
+                $this->waitFor('.truste_popframe', 10);
                 if ($this->exts->exists('.truste_popframe')) {
                     $this->switchToFrame('.truste_popframe');
                     sleep(2);
@@ -110,7 +111,7 @@ class PortalScriptCDP
                     $this->exts->switchToDefault();
                 }
                 $this->checkFillLogin();
-                $this->exts->waitTillPresent('button[id="MFAVerifyPrimaryPhoneOrBackupEmailDisplayControl_but_send_code"], button.sendCode', 10);
+                $this->waitFor('button[id="MFAVerifyPrimaryPhoneOrBackupEmailDisplayControl_but_send_code"], button.sendCode', 5);
                 if ($this->exts->exists('button[id="MFAVerifyPrimaryPhoneOrBackupEmailDisplayControl_but_send_code"], button.sendCode')) {
                     $this->exts->click_element('button[id="MFAVerifyPrimaryPhoneOrBackupEmailDisplayControl_but_send_code"], button.sendCode');
                 }
@@ -124,7 +125,7 @@ class PortalScriptCDP
                     $this->exts->restart();
                     sleep(20);
                     $this->exts->openUrl($this->baseUrl);
-                    $this->exts->waitTillPresent('.truste_popframe', 20);
+                    $this->waitFor('.truste_popframe', 20);
                     if ($this->exts->exists('.truste_popframe')) {
                         $this->switchToFrame('.truste_popframe');
                         sleep(2);
@@ -135,7 +136,7 @@ class PortalScriptCDP
                         $this->exts->switchToDefault();
                     }
                     $this->checkFillLogin();
-                    $this->exts->waitTillPresent('button[id="MFAVerifyPrimaryPhoneOrBackupEmailDisplayControl_but_send_code"], button.sendCode', 10);
+                    $this->waitFor('button[id="MFAVerifyPrimaryPhoneOrBackupEmailDisplayControl_but_send_code"], button.sendCode', 10);
                     if ($this->exts->exists('button[id="MFAVerifyPrimaryPhoneOrBackupEmailDisplayControl_but_send_code"], button.sendCode')) {
                         $this->exts->click_element('button[id="MFAVerifyPrimaryPhoneOrBackupEmailDisplayControl_but_send_code"], button.sendCode');
                     }
@@ -177,8 +178,14 @@ class PortalScriptCDP
                 $this->exts->click_element('//button//*[contains(text(), "Update later")]');
                 sleep(5);
                 $this->exts->click_element('//div[contains(@class, "contact-details-modal")]//button//*[contains(text(), "Update Later")]');
-                sleep(30);
+                sleep(20);
             }
+
+            if ($this->exts->querySelector('div[class*="contact-details-modal"] > div[class*="contact-details-modal"]:nth-child(3) button[class="arc-Button"]') != null) {
+                $this->exts->moveToElementAndClick('div[class*="contact-details-modal"] > div[class*="contact-details-modal"]:nth-child(3) button[class="arc-Button"]');
+                sleep(10);
+            }
+
             if (stripos($this->exts->extract('div[class*="security-popup__StyledHeader"]'), 'Set your security number') !== false && $this->exts->exists('input[name="pin-field-0"]')) {
                 $this->exts->account_not_ready();
             }
@@ -215,6 +222,8 @@ class PortalScriptCDP
             } elseif ($this->exts->exists('a[href="https://secure.business.bt.com/ForgotUsernameandPassword"]') && $this->exts->exists('p#CompromisedAccountResponseMsg')) {
                 $this->exts->account_not_ready();
             } elseif ($this->exts->exists('p#ConditionalAccessResponseMsg[aria-label*="blocked"]')) {
+                $this->exts->account_not_ready();
+            } elseif (stripos(strtolower($this->exts->extract('p.textInParagraph')), strtolower('no longer secure')) !== false) {
                 $this->exts->account_not_ready();
             } else {
                 $this->exts->loginFailure();
@@ -317,6 +326,15 @@ class PortalScriptCDP
         sleep(15);
         $this->exts->capture("after-clear");
     }
+
+    public function waitFor($selector, $seconds = 10)
+    {
+        for ($wait = 0; $wait < 2 && $this->exts->executeSafeScript("return !!document.querySelector('" . $selector . "');") != 1; $wait++) {
+            $this->exts->log('Waiting for Selectors.....');
+            sleep($seconds);
+        }
+    }
+
     private function checkFillLogin()
     {
         $this->exts->capture("2-login-page");
@@ -342,68 +360,14 @@ class PortalScriptCDP
             $this->exts->capture("2-login-page-not-found");
         }
     }
-    // private function checkFillRecaptcha()
-    // {
-    //     $this->exts->log(__FUNCTION__);
-    //     $recaptcha_iframe_selector = 'iframe[src*="/recaptcha/api2/anchor?"]';
-    //     $recaptcha_textarea_selector = 'textarea[name="g-recaptcha-response"]';
-    //     if ($this->exts->exists($recaptcha_iframe_selector)) {
-    //         $iframeUrl = $this->exts->extract($recaptcha_iframe_selector, null, 'src');
-    //         $data_siteKey = explode('&', end(explode("&k=", $iframeUrl)))[0];
-    //         $this->exts->log("iframe url  - " . $iframeUrl);
-    //         $this->exts->log("SiteKey - " . $data_siteKey);
 
-    //         $isCaptchaSolved = $this->exts->processRecaptcha($this->exts->getUrl(), $data_siteKey, false);
-    //         $this->exts->log("isCaptchaSolved - " . $isCaptchaSolved);
-
-    //         if ($isCaptchaSolved) {
-    //             // Step 1 fill answer to textarea
-    //             $this->exts->log(__FUNCTION__ . "::filling reCaptcha response..");
-    //             $recaptcha_textareas =  $this->exts->getElements($recaptcha_textarea_selector);
-    //             for ($i = 0; $i < count($recaptcha_textareas); $i++) {
-    //                 $this->exts->executeSafeScript("arguments[0].innerHTML = '" . $this->exts->recaptcha_answer . "';", [$recaptcha_textareas[$i]]);
-    //             }
-    //             sleep(2);
-    //             $this->exts->capture('recaptcha-filled');
-
-    //             // Step 2, check if callback function need executed
-    //             $gcallbackFunction = $this->exts->executeSafeScript('
-    //     if(document.querySelector("[data-callback]") != null){
-    //         return document.querySelector("[data-callback]").getAttribute("data-callback");
-    //     }
-
-    //     var result = ""; var found = false;
-    //     function recurse (cur, prop, deep) {
-    //         if(deep > 5 || found){ return;}console.log(prop);
-    //         try {
-    //             if(cur == undefined || cur == null || cur instanceof Element || Object(cur) !== cur || Array.isArray(cur)){ return;}
-    //             if(prop.indexOf(".callback") > -1){result = prop; found = true; return;
-    //             } else { deep++;
-    //                 for (var p in cur) { recurse(cur[p], prop ? prop + "." + p : p, deep);}
-    //             }
-    //         } catch(ex) { console.log("ERROR in function: " + ex); return; }
-    //     }
-
-    //     recurse(___grecaptcha_cfg.clients[0], "", 0);
-    //     return found ? "___grecaptcha_cfg.clients[0]." + result : null;
-    // ');
-    //             $this->exts->log('Callback function: ' . $gcallbackFunction);
-    //             if ($gcallbackFunction != null) {
-    //                 $this->exts->executeSafeScript($gcallbackFunction . '("' . $this->exts->recaptcha_answer . '");');
-    //                 sleep(3);
-    //             }
-    //         }
-    //     } else {
-    //         $this->exts->log(__FUNCTION__ . '::Not found reCaptcha');
-    //     }
-    // }
 
     private function checkFillRecaptcha($count = 1)
     {
         $this->exts->log(__FUNCTION__);
         $recaptcha_iframe_selector = 'iframe[src*="/recaptcha/enterprise"], iframe[src*="/recaptcha/api2/anchor?"]';
         $recaptcha_textarea_selector = 'textarea[name="g-recaptcha-response"]';
-        $this->exts->waitTillPresent($recaptcha_iframe_selector, 20);
+        $this->waitFor($recaptcha_iframe_selector, 10);
         if ($this->exts->exists($recaptcha_iframe_selector)) {
             $iframeUrl = $this->exts->extract($recaptcha_iframe_selector, null, 'src');
             $data_siteKey = explode('&', end(explode("&k=", $iframeUrl)))[0];
@@ -472,7 +436,7 @@ class PortalScriptCDP
         $this->exts->moveToElementAndClick('.nav-itm-bill a, li[data-testid="navItem"] a[href*="LoginRedirect"], li[data-testid="navItem-Billing"] a');
         sleep(10);
         $this->checkFillLogin();
-        $this->exts->waitTillPresent('button[id="MFAVerifyPrimaryPhoneOrBackupEmailDisplayControl_but_send_code"], button.sendCode', 10);
+        $this->waitFor('button[id="MFAVerifyPrimaryPhoneOrBackupEmailDisplayControl_but_send_code"], button.sendCode', 5);
         if ($this->exts->exists('button[id="MFAVerifyPrimaryPhoneOrBackupEmailDisplayControl_but_send_code"], button.sendCode')) {
             $this->exts->click_element('button[id="MFAVerifyPrimaryPhoneOrBackupEmailDisplayControl_but_send_code"], button.sendCode');
         }

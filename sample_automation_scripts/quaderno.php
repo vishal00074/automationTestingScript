@@ -205,29 +205,34 @@ class PortalScriptCDP
     private function checkFillLoginUndetected()
     {
         $this->exts->waitTillPresent($this->username_selector);
-        $this->exts->log(__FUNCTION__);
-        if ($this->exts->exists($this->username_selector)) {
-            sleep(2);
 
-            $this->exts->log("Enter Username");
+        $this->exts->type_key_by_xdotool("Ctrl+t");
+        sleep(13);
 
-            $this->exts->click_by_xdotool($this->username_selector);
-            sleep(2);
-            $this->exts->type_text_by_xdotool($this->username);
-            sleep(2);
+        $this->exts->type_key_by_xdotool("F5");
 
-            $this->exts->log("Enter Password");
+        sleep(5);
 
-            $this->exts->click_by_xdotool($this->password_selector);
-            sleep(2);
-            $this->exts->type_text_by_xdotool($this->password);
-            sleep(2);
-
-            if ($this->exts->querySelector($this->submit_login_selector) != null) {
-                $this->exts->execute_javascript("document.querySelector(\"input[type='submit']\")?.click();");
-                sleep(10);
-            }
+        $this->exts->type_text_by_xdotool($this->loginUrl);
+        $this->exts->type_key_by_xdotool("Return");
+        sleep(15);
+        for ($i = 0; $i < 11; $i++) {
+            $this->exts->type_key_by_xdotool("Tab");
+            sleep(1);
         }
+        $this->exts->log("Enter Username");
+        $this->exts->click_by_xdotool($this->username_selector);
+        sleep(2);
+        $this->exts->type_text_by_xdotool($this->username);
+        $this->exts->type_key_by_xdotool("Tab");
+        sleep(1);
+        $this->exts->log("Enter Password");
+        $this->exts->click_by_xdotool($this->password_selector);
+        sleep(2);
+        $this->exts->type_text_by_xdotool($this->password);
+        sleep(1);
+        $this->exts->type_key_by_xdotool("Return");
+        sleep(20);
     }
 
     private function dateRange()
