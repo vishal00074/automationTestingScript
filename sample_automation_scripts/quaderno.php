@@ -83,6 +83,7 @@ class PortalScriptCDP
      */
     private function initPortal($count)
     {
+        $this->disable_extensions();
         $this->exts->log('Begin initPortal ' . $count);
         sleep(1);
         $this->only_sales_invoice = isset($this->exts->config_array["only_sales_invoice"]) ? (int)$this->exts->config_array["only_sales_invoice"] : $this->only_sales_invoice;
@@ -96,8 +97,8 @@ class PortalScriptCDP
 
         // Load cookies
         // $this->exts->loadCookiesFromFile();
-        if ($this->exts->exists('#onetrust-accept-btn-handler')) {
-            $this->exts->moveToElementAndClick('#onetrust-accept-btn-handler');
+        if ($this->exts->exists('button#onetrust-accept-btn-handler')) {
+            $this->exts->moveToElementAndClick('button#onetrust-accept-btn-handler');
         }
         sleep(2);
         $this->exts->capture('1-init-page');
@@ -145,10 +146,17 @@ class PortalScriptCDP
             $this->exts->success();
         } else {
             $this->exts->log(__FUNCTION__ . '::Use login failed');
+
+            $error_text = strtolower($this->exts->extract('div.banner p.text-body'));
+            $this->exts->log(__FUNCTION__ . '::Error text: ' . $error_text);
+
             if (strpos(strtolower($this->exts->extract('div.alert-message')), 'an error processing the form') !== false) {
                 $this->exts->loginFailure(1);
             } else if (!filter_var($this->username, FILTER_VALIDATE_EMAIL)) {
                 $this->exts->log("Username is not a valid email address");
+                $this->exts->loginFailure(1);
+            } else if (stripos($error_text, strtolower('Invalid email or password')) !== false) {
+                $this->exts->capture('login-failed-confirmed');
                 $this->exts->loginFailure(1);
             } else {
                 $this->exts->loginFailure();
@@ -159,43 +167,33 @@ class PortalScriptCDP
     private function checkFillLogin()
     {
         $this->exts->waitTillPresent($this->username_selector);
-        if ($this->exts->getElement($this->password_selector) != null) {
-
+        if ($this->exts->getElement($this->username_selector) != null) {
             $this->exts->capture("2-login-page");
-
             $this->exts->log("Enter Username");
-            //$this->exts->moveToElementAndType($this->username_selector, $this->username);
-            $this->exts->click_by_xdotool($this->username_selector);
-            $this->exts->type_key_by_xdotool("ctrl+a");
-            $this->exts->type_key_by_xdotool("Delete");
-            $this->exts->type_text_by_xdotool($this->username);
-            //sleep(1);
+            $this->exts->moveToElementAndType($this->username_selector, $this->username);
             sleep(2);
-
             $this->exts->log("Enter Password");
-            //$this->exts->moveToElementAndType($this->password_selector, $this->password);
-            $this->exts->click_by_xdotool($this->password_selector);
-            $this->exts->type_key_by_xdotool("ctrl+a");
-            $this->exts->type_key_by_xdotool("Delete");
-            $this->exts->type_text_by_xdotool($this->password);
+            $this->exts->moveToElementAndType($this->password_selector, $this->password);
             sleep(2);
-
-            $this->checkFillRecaptcha();
-
-            // if($this->remember_me_selector != ''){
-            //  $this->exts->moveToElementAndClick($this->remember_me_selector);
-            //  sleep(2);
-            // }
-
             $this->exts->capture("2-login-page-filled");
             sleep(5);
-            $this->exts->click_by_xdotool($this->submit_login_selector);
-            //$this->exts->moveToElementAndClick($this->submit_login_selector);
+            $this->exts->moveToElementAndClick($this->submit_login_selector);
             sleep(10);
             if ($this->exts->getElement($this->password_selector) != null) {
                 $this->exts->openUrl($this->loginUrl);
                 sleep(5);
+                if ($this->exts->exists('button#onetrust-accept-btn-handler')) {
+                    $this->exts->moveToElementAndClick('button#onetrust-accept-btn-handler');
+                }
                 $this->checkFillLoginUndetected();
+            }
+            // try with js
+            if ($this->exts->getElement($this->password_selector) != null) {
+                sleep(5);
+                if ($this->exts->exists('button#onetrust-accept-btn-handler')) {
+                    $this->exts->moveToElementAndClick('button#onetrust-accept-btn-handler');
+                }
+                $this->checkFillLoginJs();
             }
         } else {
             $this->exts->log(__FUNCTION__ . '::Login page not found');
@@ -203,70 +201,18 @@ class PortalScriptCDP
         }
     }
 
-
-
-    private function checkFillRecaptcha($count = 1)
+    private function checkFillLoginJs()
     {
         $this->exts->log(__FUNCTION__);
-        $recaptcha_iframe_selector = 'iframe[src*="recaptcha/api2/anchor?ar"]';
-        $recaptcha_textarea_selector = 'textarea[name="g-recaptcha-response"]';
-        $this->exts->waitTillPresent($recaptcha_iframe_selector, 20);
-        if ($this->exts->exists($recaptcha_iframe_selector)) {
-            $iframeUrl = $this->exts->extract($recaptcha_iframe_selector, null, 'src');
-            $data_siteKey = explode('&', end(explode("&k=", $iframeUrl)))[0];
-            $this->exts->log("iframe url  - " . $iframeUrl);
-            $this->exts->log("SiteKey - " . $data_siteKey);
-
-            $isCaptchaSolved = $this->exts->processRecaptcha($this->exts->getUrl(), $data_siteKey, false);
-            $this->exts->log("isCaptchaSolved - " . $isCaptchaSolved);
-
-            if ($isCaptchaSolved) {
-                // Step 1 fill answer to textarea
-                $this->exts->log(__FUNCTION__ . "::filling reCaptcha response..");
-                $recaptcha_textareas =  $this->exts->getElements($recaptcha_textarea_selector);
-                for ($i = 0; $i < count($recaptcha_textareas); $i++) {
-                    $this->exts->execute_javascript("arguments[0].innerHTML = '" . $this->exts->recaptcha_answer . "';", [$recaptcha_textareas[$i]]);
-                }
-                sleep(2);
-                $this->exts->capture('recaptcha-filled');
-
-                // Step 2, check if callback function need executed
-                $gcallbackFunction = $this->exts->execute_javascript('
-				if(document.querySelector("[data-callback]") != null){
-					return document.querySelector("[data-callback]").getAttribute("data-callback");
-				}
-
-				var result = ""; var found = false;
-				function recurse (cur, prop, deep) {
-					if(deep > 5 || found){ return;}console.log(prop);
-					try {
-						if(cur == undefined || cur == null || cur instanceof Element || Object(cur) !== cur || Array.isArray(cur)){ return;}
-						if(prop.indexOf(".callback") > -1){result = prop; found = true; return;
-						} else { deep++;
-							for (var p in cur) { recurse(cur[p], prop ? prop + "." + p : p, deep);}
-						}
-					} catch(ex) { console.log("ERROR in function: " + ex); return; }
-				}
-
-				recurse(___grecaptcha_cfg.clients[0], "", 0);
-				return found ? "___grecaptcha_cfg.clients[0]." + result : null;
-			');
-                $this->exts->log('Callback function: ' . $gcallbackFunction);
-                if ($gcallbackFunction != null) {
-                    $this->exts->execute_javascript($gcallbackFunction . '("' . $this->exts->recaptcha_answer . '");');
-                    sleep(10);
-                }
-            } else {
-                if ($count < 3) {
-                    $count++;
-                    $this->checkFillRecaptcha($count);
-                }
-            }
-        } else {
-            $this->exts->log(__FUNCTION__ . '::Not found reCaptcha');
-        }
+        $this->exts->log("Enter Username");
+        $this->exts->execute_javascript("document.querySelector('input#user_email').value = " . json_encode($this->username) . ";");
+        sleep(2);
+        $this->exts->log("Enter Password");
+        $this->exts->execute_javascript("document.querySelector('input#user_password').value =" . json_encode($this->username) . ";");
+        sleep(2);
+        $this->exts->execute_javascript("document.querySelector('button[name=\"commit\"], input[name=\"commit\"]').click();");
+        sleep(10);
     }
-
 
     private function checkFillLoginUndetected()
     {
@@ -282,23 +228,45 @@ class PortalScriptCDP
         $this->exts->type_text_by_xdotool($this->loginUrl);
         $this->exts->type_key_by_xdotool("Return");
         sleep(15);
-        for ($i = 0; $i < 11; $i++) {
-            $this->exts->type_key_by_xdotool("Tab");
+        for ($i = 0; $i < 13; $i++) {
+            $this->exts->type_key_by_xdotool('Tab');
             sleep(1);
         }
         $this->exts->log("Enter Username");
-        $this->exts->click_by_xdotool($this->username_selector);
-        sleep(2);
         $this->exts->type_text_by_xdotool($this->username);
-        $this->exts->type_key_by_xdotool("Tab");
+        sleep(2);
+        $this->exts->type_key_by_xdotool('Tab');
         sleep(1);
         $this->exts->log("Enter Password");
-        $this->exts->click_by_xdotool($this->password_selector);
-        sleep(2);
         $this->exts->type_text_by_xdotool($this->password);
         sleep(1);
+        $this->exts->type_key_by_xdotool('Tab');
+        sleep(1);
+        $this->exts->type_key_by_xdotool('Tab');
+        sleep(1);
+        $this->exts->type_key_by_xdotool('Tab');
+        sleep(1);
         $this->exts->type_key_by_xdotool("Return");
-        sleep(20);
+        sleep(15);
+    }
+
+    private function disable_extensions()
+    {
+        $this->exts->openUrl('chrome://extensions/');
+        sleep(2);
+        $this->exts->execute_javascript("
+        let manager = document.querySelector('extensions-manager');
+        if (manager && manager.shadowRoot) {
+            let itemList = manager.shadowRoot.querySelector('extensions-item-list');
+            if (itemList && itemList.shadowRoot) {
+                let items = itemList.shadowRoot.querySelectorAll('extensions-item');
+                items.forEach(item => {
+                    let toggle = item.shadowRoot.querySelector('#enableToggle[checked]');
+                    if (toggle) toggle.click();
+                });
+            }
+        }
+    ");
     }
 
     private function dateRange()

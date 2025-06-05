@@ -1000,7 +1000,6 @@ Class Code {
      */
     private function changeSelectbox()
     {
-       // $this->exts->changeSelectbox('select#customDateOption-purchaseHistoryForm', 'custom');
         $this->exts->execute_javascript('let selectBox = document.querySelector("select#customDateOption-purchaseHistoryForm");
         selectBox.value = "custom";
         selectBox.dispatchEvent(new Event("change"));');
