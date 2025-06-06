@@ -1,5 +1,4 @@
-<?php // added condition to handle empty cases
-
+<?php /// updated filllform function 
 
 /**
  * Chrome Remote via Chrome devtool protocol script, for specific process/portal
@@ -57,8 +56,7 @@ class PortalScriptCDP
             echo 'Script execution failed.. ' . "\n";
         }
     }
-
-    // Server-Portal-ID: 19864 - Last modified: 01.04.2025 14:54:59 UTC - User: 1
+    // Server-Portal-ID: 19864 - Last modified: 05.05.2025 13:17:41 UTC - User: 1
 
     public $baseUrl = "https://www.mollie.com";
     public $loginUrl = "https://www.mollie.com/dashboard/login?lang=en";
@@ -110,6 +108,11 @@ class PortalScriptCDP
             if ($this->exts->urlContains("challengePage=true")) {
                 $this->exts->capture("challengePage");
                 sleep(5);
+                $this->solve_captcha_by_clicking();
+                $this->solve_captcha_by_clicking();
+                $this->solve_captcha_by_clicking();
+                $this->solve_captcha_by_clicking();
+                $this->solve_captcha_by_clicking();
                 if ($this->exts->exists($this->submit_btn)) {
                     $this->fillForm(0);
                     sleep(5);
@@ -159,24 +162,164 @@ class PortalScriptCDP
     function fillForm($count)
     {
         if ($this->exts->exists($this->password_selector)) {
-            $this->exts->capture("2-login-page");
 
+            $this->exts->capture("1-pre-login");
             $this->exts->log("Enter Username");
             $this->exts->moveToElementAndType($this->username_selector, $this->username);
-            sleep(1);
+            sleep(2);
 
             $this->exts->log("Enter Password");
             $this->exts->moveToElementAndType($this->password_selector, $this->password);
-            sleep(1);
-            $this->exts->moveToElementAndClick($this->remember_me_selector);
-            sleep(1);
-            $this->exts->capture("2-login-page-filled");
-            sleep(5);
-            $this->exts->click_element($this->submit_btn);
+            sleep(2);
+
+            if ($this->exts->exists($this->remember_me_selector)) {
+                $this->exts->click_element($this->remember_me_selector);
+                sleep(2);
+            }
+
+            if ($this->exts->querySelector($this->submit_btn) != null) {
+                $this->exts->click_by_xdotool($this->submit_btn);
+                sleep(7);
+            }
+
+            if ($this->exts->querySelector('div.errorbox button') != null) {
+                $this->exts->click_by_xdotool('div.errorbox button');
+                sleep(7);
+            }
         } else {
             $this->exts->log(__FUNCTION__ . '::Login page not found');
             $this->exts->capture("2-login-page-not-found");
         }
+    }
+
+    private function solve_captcha_by_clicking($count = 1)
+    {
+        $this->exts->log("Checking captcha");
+        $language_code = '';
+        $hcaptcha_challenger_wraper_selector = 'div[style*="visibility: visible;"]  iframe[title="recaptcha challenge expires in two minutes"]';
+        $this->exts->waitTillPresent($hcaptcha_challenger_wraper_selector, 20);
+        if ($this->exts->exists($hcaptcha_challenger_wraper_selector)) {
+
+            $this->exts->capture("re-captcha");
+
+            $captcha_instruction = '';
+
+            //$captcha_instruction = $this->exts->extract($iframeElement_instartion,null, 'innerText');
+            $this->exts->log('language_code: ' . $language_code . ' Instruction: ' . $captcha_instruction);
+            sleep(5);
+            $captcha_wraper_selector = 'div[style*="visibility: visible;"]  iframe[title="recaptcha challenge expires in two minutes"]';
+
+            if ($this->exts->exists($captcha_wraper_selector)) {
+                $coordinates = $this->getCoordinates($captcha_wraper_selector, $captcha_instruction, '', $json_result = false);
+
+                // if($coordinates == '' || count($coordinates) < 2){
+                //  $coordinates = $this->exts->processClickCaptcha($captcha_wraper_selector, $captcha_instruction, '', $json_result=false);
+                // }
+                if ($coordinates != '') {
+                    // $challenge_wraper = $this->exts->querySelector($captcha_wraper_selector);
+
+                    foreach ($coordinates as $coordinate) {
+                        $this->click_captcha_point($captcha_wraper_selector, (int)$coordinate['x'], (int)$coordinate['y']);
+                    }
+
+                    $this->exts->capture("re-captcha-selected " . $count);
+                    $this->exts->makeFrameExecutable('div[style*="visibility: visible;"]  iframe[title="recaptcha challenge expires in two minutes"]')->click_element('button[id="recaptcha-verify-button"]');
+                    sleep(10);
+                    return true;
+                }
+            }
+
+            return false;
+        }
+    }
+
+    private function click_captcha_point($selector = '', $x_on_element = 0, $y_on_element = 0)
+    {
+        $this->exts->log(__FUNCTION__ . " $selector $x_on_element $y_on_element");
+        $selector = base64_encode($selector);
+        $element_coo = $this->exts->execute_javascript('
+            var x_on_element = ' . $x_on_element . ';
+            var y_on_element = ' . $y_on_element . ';
+            var coo = document.querySelector(atob("' . $selector . '")).getBoundingClientRect();
+            // Default get center point in element, if offset inputted, out put them
+            if(x_on_element > 0 || y_on_element > 0) {
+                Math.round(coo.x + x_on_element) + "|" + Math.round(coo.y + y_on_element);
+            } else {
+                Math.round(coo.x + coo.width/2) + "|" + Math.round(coo.y + coo.height/2);
+            }
+           
+        ');
+        // sleep(1);
+        $this->exts->log("Browser clicking position: $element_coo");
+        $element_coo = explode('|', $element_coo);
+
+        $root_position = $this->exts->get_brower_root_position();
+        $this->exts->log("Browser root position");
+        $this->exts->log(print_r($root_position, true));
+
+        $clicking_x = (int)$element_coo[0] + (int)$root_position['root_x'];
+        $clicking_y = (int)$element_coo[1] + (int)$root_position['root_y'];
+        $this->exts->log("Screen clicking position: $clicking_x $clicking_y");
+        $node_name = !empty($this->exts->config_array['node_name']) ? $this->exts->config_array['node_name'] : "selenium-node-" . $this->exts->process_uid;
+        // move randomly
+        exec("sudo docker exec " . $node_name . " bash -c 'xdotool mousemove " . rand($clicking_x - 60, $clicking_x + 60) . " " . rand($clicking_y - 50, $clicking_y + 50) . "'");
+        exec("sudo docker exec " . $node_name . " bash -c 'xdotool mousemove " . rand($clicking_x - 50, $clicking_x + 50) . " " . rand($clicking_y - 50, $clicking_y + 50) . "'");
+        exec("sudo docker exec " . $node_name . " bash -c 'xdotool mousemove " . rand($clicking_x - 40, $clicking_x + 40) . " " . rand($clicking_y - 41, $clicking_y + 40) . "'");
+        exec("sudo docker exec " . $node_name . " bash -c 'xdotool mousemove " . rand($clicking_x - 30, $clicking_x + 30) . " " . rand($clicking_y - 35, $clicking_y + 30) . "'");
+        exec("sudo docker exec " . $node_name . " bash -c 'xdotool mousemove " . rand($clicking_x - 20, $clicking_x + 20) . " " . rand($clicking_y - 25, $clicking_y + 25) . "'");
+        exec("sudo docker exec " . $node_name . " bash -c 'xdotool mousemove " . rand($clicking_x - 10, $clicking_x + 10) . " " . rand($clicking_y - 10, $clicking_y + 10) . "'");
+
+        exec("sudo docker exec " . $node_name . " bash -c 'xdotool mousemove " . $clicking_x . " " . $clicking_y . " click 1;'");
+    }
+
+    private function getCoordinates(
+        $captcha_image_selector,
+        $instruction = '',
+        $lang_code = '',
+        $json_result = false,
+        $image_dpi = 75
+    ) {
+        $this->exts->log("--GET Coordinates By 2CAPTCHA--");
+        $response = '';
+        $image_path = $this->exts->captureElement($this->exts->process_uid, $captcha_image_selector);
+        $source_image = imagecreatefrompng($image_path);
+        imagejpeg($source_image, $this->exts->screen_capture_location . $this->exts->process_uid . '.jpg', $image_dpi);
+
+        $cmd = $this->exts->config_array['click_captcha_shell_script'] . " --PROCESS_UID::" . $this->exts->process_uid . " --CAPTCHA_INSTRUCTION::" . urlencode($instruction) . " --LANG_CODE::" . urlencode($lang_code) . " --JSON_RESULT::" . urlencode($json_result);
+        $this->exts->log('Executing command : ' . $cmd);
+        exec($cmd, $output, $return_var);
+        $this->exts->log('Command Result : ' . print_r($output, true));
+
+        if (!empty($output)) {
+            $output = trim($output[0]);
+            if ($json_result) {
+                if (strpos($output, '"status":1') !== false) {
+                    $response = json_decode($output, true);
+                    $response = $response['request'];
+                }
+            } else {
+                if (strpos($output, 'coordinates:') !== false) {
+                    $array = explode("coordinates:", $output);
+                    $response = trim(end($array));
+                    $coordinates = [];
+                    $pairs = explode(';', $response);
+                    foreach ($pairs as $pair) {
+                        preg_match('/x=(\d+),y=(\d+)/', $pair, $matches);
+                        if (!empty($matches)) {
+                            $coordinates[] = ['x' => (int)$matches[1], 'y' => (int)$matches[2]];
+                        }
+                    }
+                    $this->exts->log('>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>');
+                    $this->exts->log(print_r($coordinates, true));
+                    return $coordinates;
+                }
+            }
+        }
+
+        if ($response == '') {
+            $this->exts->log("Can not get result from API");
+        }
+        return $response;
     }
 
     private function chooseMethodTwoFactor()
@@ -489,9 +632,9 @@ class PortalScriptCDP
                             $this->exts->log("processDownloadInvoices:: Now processing " . $key);
                             $lis = $this->exts->querySelectorAll("div.administration-invoices-table__cell", $rowItem);
                             if (count($lis) > 4) {
-                                $invoice_date = trim($lis[0]->getText());
-                                $invoice_amount = preg_replace('/[^\d.,]/', "", trim($lis[4]->getText())) . " EUR";
-                                $invoice_number = preg_replace('/[^\d]/', '', trim($lis[1]->getText()));
+                                $invoice_date = trim($lis[0]->getAttribute('innerText'));
+                                $invoice_amount = preg_replace('/[^\d.,]/', "", trim($lis[4]->getAttribute('innerText'))) . " EUR";
+                                $invoice_number = preg_replace('/[^\d]/', '', trim($lis[1]->getAttribute('innerText')));
 
                                 $download_button = $this->exts->querySelector("button", $lis[1]);
                                 if ($download_button != null) {
@@ -507,7 +650,7 @@ class PortalScriptCDP
                                     $this->exts->log("processDownloadInvoices::Invoice Amount - " . $invoice_amount);
                                     $this->exts->log("processDownloadInvoices::Invoice Name - " . $invoice_number);
                                     sleep(2);
-                                    $filename = !empty($invoice_number) ? $invoice_number . ".pdf": '';
+                                    $filename = !empty($invoice_number) ? $invoice_number . ".pdf" : '';
 
                                     $downloaded_file = $this->exts->click_and_download('button#invoice_download_btn_' . $key, "pdf", $filename);
                                     if (trim($downloaded_file) != "" && file_exists($downloaded_file)) {
@@ -571,9 +714,9 @@ class PortalScriptCDP
                             $this->exts->log("processDownloadInvoices:: Now processing " . $key);
                             $lis = $this->exts->querySelectorAll(".cell", $rowItem);
                             if (count($lis) > 4) {
-                                $invoice_date = trim($lis[0]->getText());
-                                $invoice_amount = preg_replace('/[^\d.,]/', "", trim($lis[4]->getText())) . " EUR";
-                                $invoice_number = preg_replace('/[^\d]/', '', trim($lis[1]->getText()));
+                                $invoice_date = trim($lis[0]->getAttribute('innerText'));
+                                $invoice_amount = preg_replace('/[^\d.,]/', "", trim($lis[4]->getAttribute('innerText'))) . " EUR";
+                                $invoice_number = preg_replace('/[^\d]/', '', trim($lis[1]->getAttribute('innerText')));
 
                                 $download_button = $this->exts->querySelector("button", $lis[1]);
                                 if ($download_button != null) {
@@ -589,7 +732,7 @@ class PortalScriptCDP
                                     $this->exts->log("processDownloadInvoices::Invoice Amount - " . $invoice_amount);
                                     $this->exts->log("processDownloadInvoices::Invoice Name - " . $invoice_number);
                                     sleep(2);
-                                    $filename = !empty($invoice_number) ? $invoice_number . ".pdf": '';
+                                    $filename = !empty($invoice_number) ? $invoice_number . ".pdf" : '';
 
                                     try {
                                         $download_button->click();
@@ -652,9 +795,9 @@ class PortalScriptCDP
                             if (count($lis) > 4) {
 
 
-                                $invoice_date = trim($lis[2]->getText());
-                                $invoice_amount = preg_replace('/[^\d.,]/', "", trim($lis[5]->getText())) . " EUR";
-                                $invoice_number = trim($lis[1]->getText());
+                                $invoice_date = trim($this->exts->extract('p', $lis[2], 'innerText'));
+                                $invoice_amount = preg_replace('/[^\d.,]/', "", trim($lis[5]->getAttribute('innerText'))) . " EUR";
+                                $invoice_number = trim($this->exts->extract('a', $lis[1], 'innerText'));
                                 $invoice_date = $this->exts->parse_date($invoice_date, 'M d, Y', 'Y-m-d');
 
                                 $this->exts->log("processDownloadInvoices::Invoice Date - " . $invoice_date);
@@ -674,7 +817,7 @@ class PortalScriptCDP
                                     $this->exts->log("processDownloadInvoices::Invoice Amount - " . $invoice_amount);
                                     $this->exts->log("processDownloadInvoices::Invoice Name - " . $invoice_number);
                                     sleep(2);
-                                    $filename = !empty($invoice_number) ? $invoice_number . ".pdf": '';
+                                    $filename = !empty($invoice_number) ? $invoice_number . ".pdf" : '';
 
                                     try {
                                         $download_button->click();
@@ -735,9 +878,9 @@ class PortalScriptCDP
                             $this->exts->log("processDownloadSettlement:: Now processing " . $key);
                             $lis = $this->exts->querySelectorAll(".cell", $rowItem);
                             if (count($lis) >= 7) {
-                                $invoice_date = trim($lis[1]->getText());
-                                $invoice_amount = preg_replace('/[^\d.,]/', "", trim($lis[6]->getText())) . " EUR";
-                                $invoice_number = preg_replace('/[^\d]/', '', trim($lis[2]->getText()));
+                                $invoice_date = trim($lis[1]->getAttribute('innerText'));
+                                $invoice_amount = preg_replace('/[^\d.,]/', "", trim($lis[6]->getAttribute('innerText'))) . " EUR";
+                                $invoice_number = preg_replace('/[^\d]/', '', trim($lis[2]->getAttribute('innerText')));
 
                                 $download_button = $this->exts->querySelector("button", $lis[2]);
                                 if ($download_button != null) {
@@ -752,7 +895,7 @@ class PortalScriptCDP
                                     $this->exts->log("processDownloadInvoices::Invoice Amount - " . $invoice_amount);
                                     $this->exts->log("processDownloadInvoices::Invoice Name - " . $invoice_number);
                                     sleep(2);
-                                    $filename = !empty($invoice_number) ? $invoice_number . ".pdf": '';
+                                    $filename =  !empty($invoice_number) ? $invoice_number . ".pdf" : '';
 
                                     try {
                                         $download_button->click();

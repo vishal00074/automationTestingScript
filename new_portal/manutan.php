@@ -57,7 +57,7 @@ class PortalScriptCDP
     {
         $this->exts->log('Begin initPortal ' . $count);
         $this->restrictPages = isset($this->exts->config_array["restrictPages"]) ? (int)@$this->exts->config_array["restrictPages"] : 3;
-
+        
         $this->exts->openUrl($this->baseUrl);
         sleep(10);
         if ($this->exts->exists('button#onetrust-accept-btn-handler')) {
@@ -189,13 +189,13 @@ class PortalScriptCDP
     }
 
 
-
     private function downloadInvoices($count = 1)
     {
         $this->exts->log(__FUNCTION__);
 
-        $this->exts->waitTillPresent('div#orderList div.list-item');
-        $this->exts->capture("4-invoices-classic- ".$count);
+        $this->exts->waitTillPresent('div#orderList div.list-item', 30);
+        $this->exts->capture("4-invoices-classic- " . $count);
+        $this->exts->log('restrictPages ' .  $this->restrictPages);
 
         $invoices = [];
         $rows = $this->exts->getElements('div#orderList div.list-item');
@@ -244,7 +244,7 @@ class PortalScriptCDP
             $button = 'div.documentList:nth-child(' . $num . ') a';
             $downloaded_file = $this->exts->click_and_download($button, 'pdf', $invoiceFileName);
             if (trim($downloaded_file) != '' && file_exists($downloaded_file)) {
-                $this->exts->new_invoice($invoice['insvoiceName'], $invoice['invoiceDate'], $invoice['invoiceAmount'], $invoiceFileName);
+                $this->exts->new_invoice($invoice['invoiceName'], $invoice['invoiceDate'], $invoice['invoiceAmount'], $invoiceFileName);
                 sleep(1);
                 $this->totalInvoices++;
             } else {
@@ -260,7 +260,9 @@ class PortalScriptCDP
         if ($this->restrictPages == 0) {
             $selectDate = new DateTime();
             $year = null;
-            if ($count == 2) {
+            if ($count == 1) {
+                $year = $selectDate->format('Y');
+            } else if ($count == 2) {
                 $selectDate->modify('-1 years');
                 $year = $selectDate->format('Y');
             } else if ($count == 3) {
@@ -270,7 +272,7 @@ class PortalScriptCDP
                 $selectDate->modify('-3 years');
                 $year = $selectDate->format('Y');
             }
-            $this->exts->capture("4-invoices-years- ".$year);
+            $this->exts->capture("4-invoices-years- " . $year);
             $this->exts->log('<-----Invoice Year ' . $year . ' ---->');
             if ($year != null) {
                 $this->changeSelectbox($year);

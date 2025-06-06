@@ -1,4 +1,4 @@
-<?php // 
+<?php
 
 /**
  * Chrome Remote via Chrome devtool protocol script, for specific process/portal
@@ -56,6 +56,7 @@ class PortalScriptCDP
             echo 'Script execution failed.. ' . "\n";
         }
     }
+    // Server-Portal-ID: 779710 - Last modified: 26.05.2025 14:40:48 UTC - User: 1
 
     public $baseUrl = 'https://admin.onoffbusiness.com/';
     public $loginUrl = 'https://admin.onoffbusiness.com/login';
