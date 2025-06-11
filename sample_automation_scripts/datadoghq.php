@@ -61,7 +61,7 @@ class PortalScriptCDP
 
     /*Define constants used in script*/
     public $baseUrl = 'https://app.datadoghq.com/account/billing_history';
-    public $loginUrl = 'https://app.datadoghq.com/account/login';
+    public $loginUrl = 'https://app.datadoghq.com/account/billing_history';
     // public $invoicePageUrl = 'https://flagbit.datadoghq.com/billing/history';
     public $invoicePageUrl = 'https://app.datadoghq.com/account/billing_history';
 
@@ -76,6 +76,7 @@ class PortalScriptCDP
 
     public $isNoInvoice = true;
     public $google_login_selector = 'button.authentication_login_google-login-button';
+    public $google_login = 0;
     /**
      * Entry Method thats called for a portal
      * @param Integer $count Number of times portal is retried.
@@ -97,7 +98,7 @@ class PortalScriptCDP
         $this->exts->capture('1-init-page');
 
         // If user hase not logged in from cookie, clear cookie, open the login url and do login
-        if ($this->exts->getElement($this->check_login_success_selector) == null) {
+        if (!$this->checkLogin()) {
             $this->exts->log('NOT logged via cookie');
             // $this->exts->clearCookies();
             $this->exts->openUrl($this->loginUrl);
@@ -118,7 +119,7 @@ class PortalScriptCDP
             $this->checkFillTwoFactor();
         }
 
-        if ($this->exts->getElement($this->check_login_success_selector) != null) {
+        if ($this->checkLogin()) {
             sleep(3);
             $this->exts->log(__FUNCTION__ . '::User logged in');
             $this->exts->capture("3-login-success");
@@ -317,6 +318,26 @@ class PortalScriptCDP
                 $this->exts->log("Not received two factor code");
             }
         }
+    }
+
+    public  function checkLogin()
+    {
+        $this->exts->log("Begin checkLogin ");
+        $isLoggedIn = false;
+        try {
+            for ($wait = 0; $wait < 2 && $this->exts->executeSafeScript("return !!document.querySelector('" . $this->check_login_success_selector . "');") != 1; $wait++) {
+                $this->exts->log('Waiting for login.....');
+                sleep(10);
+            }
+            if ($this->exts->exists($this->check_login_success_selector)) {
+                $this->exts->log(">>>>>>>>>>>>>>>Login successful!!!!");
+                $isLoggedIn = true;
+            }
+        } catch (Exception $exception) {
+
+            $this->exts->log("Exception checking loggedin " . $exception);
+        }
+        return $isLoggedIn;
     }
 
     // -------------------- GOOGLE login
@@ -1090,16 +1111,17 @@ class PortalScriptCDP
         $this->exts->capture("4-invoices-classic");
 
         $invoices = [];
-        $rows = $this->exts->getElements('table.druids_table_table__table tbody tr');
-        foreach ($rows as $key => $row) {
-            $invoiceDate = $this->exts->extract('td:nth-child(3) div > div span', $row);
-            $invoiceAmount = $this->exts->extract('td:nth-child(4)  a span', $row);
-            // try {
-            //     $row->click();
-            // } catch (\Exception $e) {
-                $this->exts->executeSafeScript("arguments[0].click()", [$row]);
-            // }
-            sleep(7);
+        $rows = count($this->exts->getElements('table.druids_table_table__table tbody tr'));
+        for ($i = 0; $i < count($rows); $i++) {
+            $invoiceDate = '';
+            $invoiceAmount = '';
+
+            $clickableselector = 'div.billing_billing-history_billing-history-table table.druids_table_table__table tbody tr:nth-child(' . $i . ')';
+
+            if ($this->exts->querySelector($clickableselector) != null) {
+                $this->exts->click_and_download($clickableselector);
+                sleep(5);
+            }
             $this->waitFor('a[href*="billing"]');
 
             $invoiceLink = $this->exts->getElement('a[href*="billing"]');

@@ -214,6 +214,7 @@ class PortalScriptCDP
                 $invoiceFileName = !empty($invoiceName) ? $invoiceName . '.pdf': '';
                 $invoiceDate = $this->exts->parse_date($invoiceDate, 'd.m.Y', 'Y-m-d');
                 $this->exts->log('Date parsed: ' .  $invoiceDate);
+                
 
                 $downloaded_file = $this->exts->click_and_download($invoiceBtn, 'pdf', $invoiceFileName);
                 sleep(2);
