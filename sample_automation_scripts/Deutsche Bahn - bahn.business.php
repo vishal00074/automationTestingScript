@@ -79,6 +79,7 @@ class PortalScriptCDP
      */
     private function initPortal($count)
     {
+
         $this->exts->log('Begin initPortal ' . $count);
 
         $this->restrictPages = isset($this->exts->config_array["restrictPages"]) ? (int)@$this->exts->config_array["restrictPages"] : 3;

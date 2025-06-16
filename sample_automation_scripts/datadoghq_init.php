@@ -1,5 +1,5 @@
 public $baseUrl = 'https://app.datadoghq.com/account/billing_history';
-public $loginUrl = 'https://app.datadoghq.com/account/login';
+public $loginUrl = 'https://app.datadoghq.com/account/billing_history';
 // public $invoicePageUrl = 'https://flagbit.datadoghq.com/billing/history';
 public $invoicePageUrl = 'https://app.datadoghq.com/account/billing_history';
 
@@ -14,10 +14,11 @@ public $check_login_success_selector = 'li[class*="item-account"], a[href*="/log
 
 public $isNoInvoice = true;
 public $google_login_selector = 'button.authentication_login_google-login-button';
+public $google_login = 0;
 /**
-    * Entry Method thats called for a portal
-    * @param Integer $count Number of times portal is retried.
-    */
+ * Entry Method thats called for a portal
+ * @param Integer $count Number of times portal is retried.
+ */
 private function initPortal($count)
 {
     $this->exts->log('Begin initPortal ' . $count);
@@ -35,7 +36,7 @@ private function initPortal($count)
     $this->exts->capture('1-init-page');
 
     // If user hase not logged in from cookie, clear cookie, open the login url and do login
-    if ($this->exts->getElement($this->check_login_success_selector) == null) {
+    if (!$this->checkLogin()) {
         $this->exts->log('NOT logged via cookie');
         // $this->exts->clearCookies();
         $this->exts->openUrl($this->loginUrl);
@@ -56,7 +57,7 @@ private function initPortal($count)
         $this->checkFillTwoFactor();
     }
 
-    if ($this->exts->getElement($this->check_login_success_selector) != null) {
+    if ($this->checkLogin()) {
         sleep(3);
         $this->exts->log(__FUNCTION__ . '::User logged in');
         $this->exts->capture("3-login-success");
@@ -229,7 +230,7 @@ private function checkFillTwoFactor()
         $two_factor_code = trim($this->exts->fetchTwoFactorCode());
         if (!empty($two_factor_code) && trim($two_factor_code) != '') {
             $this->exts->log("checkFillTwoFactor: Entering two_factor_code." . $two_factor_code);
-            $this->exts->getElement($two_factor_selector)->sendKeys($two_factor_code);
+            $this->exts->moveToElementAndType($two_factor_selector, $two_factor_code);
 
             $this->exts->log("checkFillTwoFactor: Clicking submit button.");
             sleep(3);
@@ -250,6 +251,26 @@ private function checkFillTwoFactor()
             $this->exts->log("Not received two factor code");
         }
     }
+}
+
+public  function checkLogin()
+{
+    $this->exts->log("Begin checkLogin ");
+    $isLoggedIn = false;
+    try {
+        for ($wait = 0; $wait < 2 && $this->exts->executeSafeScript("return !!document.querySelector('" . $this->check_login_success_selector . "');") != 1; $wait++) {
+            $this->exts->log('Waiting for login.....');
+            sleep(10);
+        }
+        if ($this->exts->exists($this->check_login_success_selector)) {
+            $this->exts->log(">>>>>>>>>>>>>>>Login successful!!!!");
+            $isLoggedIn = true;
+        }
+    } catch (Exception $exception) {
+
+        $this->exts->log("Exception checking loggedin " . $exception);
+    }
+    return $isLoggedIn;
 }
 
 // -------------------- GOOGLE login
@@ -1005,5 +1026,3 @@ private function fillGoogleTwoFactor($input_selector, $message_selector, $submit
     }
 }
 // End GOOGLE login
-
-

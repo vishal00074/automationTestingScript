@@ -33,17 +33,17 @@ class PortalScriptCDP
     }
 
     /*Define constants used in script*/
-    public $baseUrl = 'https://kundencenter.energieversorgung-sylt.de/';
-    public $loginUrl = 'https://kundencenter.energieversorgung-sylt.de/';
-    public $invoicePageUrl = '';
+    public $baseUrl = 'https://kundenportal-beg.de/login?redirectUrl=%2Forders';
+    public $loginUrl = 'https://kundenportal-beg.de/login?redirectUrl=%2Forders';
+    public $invoicePageUrl = 'https://kundenportal-beg.de/login?redirectUrl=%2Forders';
 
-    public $username_selector = 'input[name="login"]';
-    public $password_selector = 'input[name="password"]';
+    public $username_selector = 'input[id="login_email"]';
+    public $password_selector = 'input[id="login_password"]';
     public $remember_me_selector = '';
-    public $submit_login_selector = 'button#loginButton';
+    public $submit_login_selector = 'button[type="submit"].js-login';
 
-    public $check_login_failed_selector = 'div#loginMessage p';
-    public $check_login_success_selector = 'a[href="#tabs:logout"]';
+    public $check_login_failed_selector = 'form[name="login"] div[class="berner-validation error berner-validation-badCredentials"]';
+    public $check_login_success_selector = 'form#invoiceDownloadFilterForm';
 
     public $isNoInvoice = true;
     public $restrictPages = 3;
@@ -56,14 +56,17 @@ class PortalScriptCDP
     {
         $this->exts->log('Begin initPortal ' . $count);
         $this->exts->openUrl($this->baseUrl);
-        sleep(5);
+        sleep(10);
 
-        $this->exts->waitTillPresent('a#CybotCookiebotDialogBodyLevelButtonLevelOptinAllowAll');
+        $this->exts->waitTillPresent('aside#usercentrics-cmp-ui');
 
-        if ($this->exts->exists('a#CybotCookiebotDialogBodyLevelButtonLevelOptinAllowAll')) {
-            $this->exts->click_by_xdotool('a#CybotCookiebotDialogBodyLevelButtonLevelOptinAllowAll');
-            sleep(7);
-        }
+
+        $this->exts->execute_javascript('
+                var shadow = document.querySelector("#usercentrics-cmp-ui");
+                if(shadow){
+                    shadow.shadowRoot.querySelector(\'button#accept\').click();
+                }
+            ');
 
         $this->restrictPages = isset($this->exts->config_array["restrictPages"]) ? (int)@$this->exts->config_array["restrictPages"] : 3;
 
@@ -82,12 +85,6 @@ class PortalScriptCDP
             $this->exts->log(">>>>>>>>>>>>>>>Login successful!!!!");
             $this->exts->capture("LoginSuccess");
 
-
-            if ($this->exts->querySelector('a[href="invoice"][id="tabs:startForm:invoice"]') != null) {
-                $this->exts->click_by_xdotool('a[href="invoice"][id="tabs:startForm:invoice"]');
-                sleep(10);
-            }
-
             $this->dateRange();
 
             // Final, check no invoice
@@ -103,7 +100,7 @@ class PortalScriptCDP
             $error_text = strtolower($this->exts->extract($this->check_login_failed_selector));
 
             $this->exts->log(__FUNCTION__ . '::Error text: ' . $error_text);
-            if (stripos($error_text, strtolower('Bitte überprüfen Sie Ihre Zugangsdaten')) !== false) {
+            if (stripos($error_text, strtolower('Invalid username/email or password. Please try again.')) !== false) {
                 $this->exts->loginFailure(1);
             } else {
                 $this->exts->loginFailure();
@@ -122,7 +119,6 @@ class PortalScriptCDP
             $this->exts->log("Enter Username");
             $this->exts->moveToElementAndType($this->username_selector, $this->username);
             sleep(2);
-            
             $this->exts->log("Enter Password");
             $this->exts->moveToElementAndType($this->password_selector, $this->password);
             sleep(2);
@@ -133,7 +129,6 @@ class PortalScriptCDP
             }
 
             $this->exts->capture("1-login-page-filled");
-
             if ($this->exts->exists($this->submit_login_selector)) {
                 $this->exts->moveToElementAndClick($this->submit_login_selector);
                 sleep(2);
@@ -170,100 +165,84 @@ class PortalScriptCDP
     public function dateRange()
     {
         $selectDate = new DateTime();
-        $currentDate = $selectDate->format('d.m.Y');
+        $currentDate = $selectDate->format('d.m.y');
 
-        $restrictPages = isset($this->exts->config_array["restrictPages"]) ? (int)@$this->exts->config_array["restrictPages"] : 3;
-
-        if ($restrictPages == 0) {
+        if ($this->restrictPages == 0) {
             $selectDate->modify('-3 years');
-            $formattedDate = $selectDate->format('d.m.Y');
+            $formattedDate = $selectDate->format('d.m.y');
             $this->exts->capture('date-range-3-years');
         } else {
             $selectDate->modify('-3 months');
-            $formattedDate = $selectDate->format('d.m.Y');
+            $formattedDate = $selectDate->format('d.m.y');
             $this->exts->capture('date-range-3-months');
         }
         $this->exts->log('formattedDate::  ' . $formattedDate);
         $this->exts->log('currentDate::  ' . $currentDate);
 
-        $this->exts->moveToElementAndType('input[name="tabs:invoiceForm:invoiceDateFrom_input"]', $formattedDate);
+        $this->exts->moveToElementAndType('input[name="orderDateFrom"]', $formattedDate);
         sleep(2);
-        $this->exts->moveToElementAndType('input[name="tabs:invoiceForm:invoiceDateTo_input"]', $currentDate);
-        sleep(2);
-        $this->exts->click_by_xdotool('button[id="tabs:invoiceForm:filterSubmit"]');
-        sleep(7);
+
+        $this->exts->click_by_xdotool("button#searchInvoice");
+        sleep(10);
 
         $this->downloadInvoices();
     }
-
-    public function waitFor($selector, $seconds = 7)
-    {
-        for ($wait = 0; $wait < 2 && $this->exts->executeSafeScript("return !!document.querySelector('" . $selector . "');") != 1; $wait++) {
-            $this->exts->log('Waiting for Selectors.....');
-            sleep($seconds);
-        }
-    }
-
-    public $totalInvoices = 0;
 
     private function downloadInvoices($count = 1)
     {
         $this->exts->log(__FUNCTION__);
 
-        $this->exts->waitTillPresent('table tbody tr');
+        $this->exts->waitTillPresent('div.SSP-flInvoiceDownload div[class="SSP-flInvoiceDownload-item"]');
+        if (count($this->exts->getElements('div.SSP-flInvoiceDownload div[class="SSP-flInvoiceDownload-item"]')) == 0) {
+            $this->exts->type_key_by_xdotool('Return');
+            sleep(7);
+            $this->exts->type_key_by_xdotool('Return');
+            sleep(7);
+            $this->exts->type_key_by_xdotool('Return');
+            sleep(7);
+            $this->exts->waitTillPresent('div.SSP-flInvoiceDownload div[class="SSP-flInvoiceDownload-item"]');
+        }
         $this->exts->capture("4-invoices-classic");
 
-        $rows = count($this->exts->getElements('table tbody tr'));
-        for ($i = 0; $i < $rows; $i++) {
-            $j = $i + 1;
-            $invoiceBtn = $this->exts->getElement('table tbody tr:nth-child(' . $j . ') a');
-            if ($invoiceBtn != null) {
-                if ($this->totalInvoices >= 100) {
-                    return;
-                }
-                sleep(2);
-                $invoiceUrl = '';
-                $invoiceName =  $this->exts->extract('table tbody tr:nth-child(' . $j . ') td:nth-child(3)');
-                $invoiceDate = $this->exts->extract('table tbody tr:nth-child(' . $j . ') td:nth-child(7)');
-                $invoiceAmount = $this->exts->extract('table tbody tr:nth-child(' . $j . ') td:nth-child(6)');
+        $invoices = [];
+        $rows = $this->exts->getElements('div.SSP-flInvoiceDownload div[class="SSP-flInvoiceDownload-item"]');
+        foreach ($rows as $key => $row) {
+            $invoiceLink = $this->exts->getElement('a', $row);
+            if ($invoiceLink != null) {
+                $invoiceUrl = $invoiceLink->getAttribute("href");
+                $invoiceName = $this->exts->extract('div.SSP-flInvoiceDownload-info-value_orderNumber', $row);
+                $invoiceDate = $this->exts->extract('div.SSP-flInvoiceDownload-info-item:nth-child(1)', $row);
+                $invoiceAmount = $this->exts->extract('div.SSP-flInvoiceDownload-info-item:nth-child(3)', $row);
 
+                array_push($invoices, array(
+                    'invoiceName' => $invoiceName,
+                    'invoiceDate' => $invoiceDate,
+                    'invoiceAmount' => $invoiceAmount,
+                    'invoiceUrl' => $invoiceUrl,
+                ));
                 $this->isNoInvoice = false;
-
-                $this->exts->log('--------------------------');
-                $this->exts->log('invoiceName: ' .  $invoiceName);
-                $this->exts->log('invoiceDate: ' . $invoiceDate);
-                $this->exts->log('invoiceAmount: ' . $invoiceAmount);
-                $this->exts->log('invoiceUrl: ' .  $invoiceUrl);
-                $invoiceFileName = !empty($invoiceName) ? $invoiceName . '.pdf' : '';
-                $invoiceDate = $this->exts->parse_date($invoiceDate, 'd.m.Y', 'Y-m-d');
-                $this->exts->log('Date parsed: ' .  $invoiceDate);
-
-                try {
-                    $invoiceBtn->click();
-                } catch (\Exception $e) {
-                    $this->exts->execute_javascript("arguments[0].click();", [$invoiceBtn]);
-                }
-                sleep(10);
-                $this->exts->wait_and_check_download('pdf');
-                $downloaded_file = $this->exts->find_saved_file('pdf', $invoiceFileName);
-                if (trim($downloaded_file) != '' && file_exists($downloaded_file)) {
-                    $invoiceName = basename($downloaded_file, '.pdf');
-
-                    $this->exts->log('invoiceName: ' . $invoiceName);
-                    $this->exts->new_invoice($invoiceName, $invoiceDate, $invoiceAmount, $downloaded_file);
-                    sleep(5);
-                } else {
-                    $this->exts->log('Timeout when download ');
-                }
             }
         }
-        $pagiantionSelector = 'span[class="ui-paginator-next ui-state-default ui-corner-all"]';
 
-        if ($this->exts->querySelector($pagiantionSelector) != null) {
-            $this->exts->click_by_xdotool($pagiantionSelector);
-            sleep(7);
-            $count++;
-            $this->downloadInvoices($count);
+        $this->exts->log('Invoices found: ' . count($invoices));
+        foreach ($invoices as $invoice) {
+            $this->exts->log('--------------------------');
+            $this->exts->log('invoiceName: ' . $invoice['invoiceName']);
+            $this->exts->log('invoiceDate: ' . $invoice['invoiceDate']);
+            $this->exts->log('invoiceAmount: ' . $invoice['invoiceAmount']);
+            $this->exts->log('invoiceUrl: ' . $invoice['invoiceUrl']);
+
+            $invoiceFileName = !empty($invoice['invoiceName']) ?  $invoice['invoiceName'] . '.pdf' : '';
+            $invoice['invoiceDate'] = $this->exts->parse_date($invoice['invoiceDate'], 'd.m.Y', 'Y-m-d');
+            $this->exts->log('Date parsed: ' . $invoice['invoiceDate']);
+
+            $downloaded_file = $this->exts->direct_download($invoice['invoiceUrl'], 'pdf', $invoiceFileName);
+            if (trim($downloaded_file) != '' && file_exists($downloaded_file)) {
+                $this->exts->new_invoice($invoice['invoiceName'], $invoice['invoiceDate'], $invoice['invoiceAmount'], $invoiceFileName);
+                sleep(1);
+            } else {
+                $this->exts->log(__FUNCTION__ . '::No download ' . $invoiceFileName);
+            }
         }
     }
 }

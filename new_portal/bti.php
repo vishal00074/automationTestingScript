@@ -183,7 +183,7 @@ class PortalScriptCDP
         sleep(2);
 
         $this->exts->click_by_xdotool("button#searchInvoice");
-        sleep(7);
+        sleep(10);
 
         $this->downloadInvoices();
     }
