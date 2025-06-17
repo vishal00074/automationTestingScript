@@ -201,7 +201,6 @@ class PortalScriptCDP
 
         $restrictPages = isset($this->exts->config_array["restrictPages"]) ? (int)@$this->exts->config_array["restrictPages"] : 3;
 
-
         $pagiantionSelector = 'div.paginator-box-footer a i.ff-chevron-right';
         if ($restrictPages == 0) {
             if ($count < 50 && $this->exts->querySelector($pagiantionSelector) != null) {

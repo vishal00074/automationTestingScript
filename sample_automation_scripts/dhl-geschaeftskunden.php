@@ -1,4 +1,4 @@
-<?php// updated download code
+<?php  // updated before login code replace click_by_xdotool with moveToElementandClick
 
 /**
  * Chrome Remote via Chrome devtool protocol script, for specific process/portal
@@ -57,7 +57,7 @@ class PortalScriptCDP
         }
     }
 
-    // Server-Portal-ID: 6096 - Last modified: 25.04.2025 13:10:19 UTC - User: 1
+    // Server-Portal-ID: 6096 - Last modified: 13.05.2025 13:41:44 UTC - User: 1
 
     public $baseUrl = 'https://geschaeftskunden.dhl.de';
     public $username_selector = 'input[name*="username"]';
@@ -84,11 +84,11 @@ class PortalScriptCDP
         $this->shipment_tracking = isset($this->exts->config_array["shipment_tracking"]) ? (int) @$this->exts->config_array["shipment_tracking"] : $this->shipment_tracking;
         $this->only_download_report = isset($this->exts->config_array["only_download_report"]) ? (int) @$this->exts->config_array["only_download_report"] : $this->only_download_report;
 
-        $this->exts->log('restrictPages '. $this->restrictPages);
-        $this->exts->log('daily_closing_list '. $this->daily_closing_list);
-        $this->exts->log('download_report '. $this->download_report);
-        $this->exts->log('shipment_tracking '. $this->shipment_tracking);
-        $this->exts->log('only_download_report '. $this->only_download_report);
+        $this->exts->log('restrictPages ' . $this->restrictPages);
+        $this->exts->log('daily_closing_list ' . $this->daily_closing_list);
+        $this->exts->log('download_report ' . $this->download_report);
+        $this->exts->log('shipment_tracking ' . $this->shipment_tracking);
+        $this->exts->log('only_download_report ' . $this->only_download_report);
 
         // Load cookies
         $this->exts->loadCookiesFromFile();
@@ -122,17 +122,17 @@ class PortalScriptCDP
                 }
             }
             if ($this->exts->exists('button#accept-recommended-btn-handler')) {
-                $this->exts->click_by_xdotool('button#accept-recommended-btn-handler');
+                $this->exts->moveToElementAndClick('button#accept-recommended-btn-handler');
                 sleep(3);
             }
 
             if ($this->exts->exists('button#onetrust-accept-btn-handler')) {
-                $this->exts->click_by_xdotool('button#onetrust-accept-btn-handler');
+                $this->exts->moveToElementAndClick('button#onetrust-accept-btn-handler');
                 sleep(3);
             }
 
             if ($this->exts->exists('div.login-module-container button[data-testid="noName"]')) {
-                $this->exts->click_by_xdotool('div.login-module-container button[data-testid="noName"]');
+                $this->exts->moveToElementAndClick('div.login-module-container button[data-testid="noName"]');
                 sleep(10);
             }
 
@@ -147,7 +147,7 @@ class PortalScriptCDP
                     $this->exts->refresh();
                     sleep(10);
                     if ($this->exts->exists('div.login-module-container button[data-testid="noName"]')) {
-                        $this->exts->click_by_xdotool('div.login-module-container button[data-testid="noName"]');
+                        $this->exts->moveToElementAndClick('div.login-module-container button[data-testid="noName"]');
                         sleep(10);
                     }
                 } else {
@@ -179,11 +179,11 @@ class PortalScriptCDP
             $this->exts->capture("3-login-success");
 
             if ($this->exts->exists('button#accept-recommended-btn-handler')) {
-                $this->exts->click_by_xdotool('button#accept-recommended-btn-handler');
+                $this->exts->moveToElementAndClick('button#accept-recommended-btn-handler');
                 sleep(1);
             }
             if ($this->exts->exists('button.abort.af_commandButton')) {
-                $this->exts->click_by_xdotool('button.abort.af_commandButton');
+                $this->exts->moveToElementAndClick('button.abort.af_commandButton');
                 sleep(1);
             }
 
@@ -218,20 +218,20 @@ class PortalScriptCDP
                     //Three months
                     //$this->exts->changeSelectbox('[id*="BillingPeriodForm"] select[name*="socPeriod"]', '2');
                     $this->exts->execute_javascript("
-                var selectBox = document.querySelector('[id*=\"BillingPeriodForm\"] select[name*=\"socPeriod\"]');
-                selectBox.value = '2';
-                selectBox.dispatchEvent(new Event('change', { bubbles: true }));
-            ");
+            var selectBox = document.querySelector('[id*=\"BillingPeriodForm\"] select[name*=\"socPeriod\"]');
+            selectBox.value = '2';
+            selectBox.dispatchEvent(new Event('change', { bubbles: true }));
+        ");
 
                     sleep(5);
                 } else {
                     //1 month
                     //$this->exts->changeSelectbox('[id*="BillingPeriodForm"] select[name*="socPeriod"]', '1');
                     $this->exts->execute_javascript("
-                var selectBox = document.querySelector('[id*=\"BillingPeriodForm\"] select[name*=\"socPeriod\"]');
-                selectBox.value = '1';
-                selectBox.dispatchEvent(new Event('change', { bubbles: true }));
-            ");
+            var selectBox = document.querySelector('[id*=\"BillingPeriodForm\"] select[name*=\"socPeriod\"]');
+            selectBox.value = '1';
+            selectBox.dispatchEvent(new Event('change', { bubbles: true }));
+        ");
 
                     sleep(5);
                 }
@@ -275,10 +275,10 @@ class PortalScriptCDP
                     //Three months
                     //$this->exts->changeSelectbox('select[data-testid="billingView-filter-dateRange-footer-presetRangeSelector"]', '2');
                     $this->exts->execute_javascript("
-                var selectBox = document.querySelector('select[data-testid=\"billingView-filter-dateRange-footer-presetRangeSelector\"]');
-                selectBox.value = '2';
-                selectBox.dispatchEvent(new Event('change', { bubbles: true }));
-            ");
+            var selectBox = document.querySelector('select[data-testid=\"billingView-filter-dateRange-footer-presetRangeSelector\"]');
+            selectBox.value = '2';
+            selectBox.dispatchEvent(new Event('change', { bubbles: true }));
+        ");
 
                     sleep(5);
                 } else {
@@ -286,10 +286,10 @@ class PortalScriptCDP
                     //$this->exts->changeSelectbox('select[data-testid="billingView-filter-dateRange-footer-presetRangeSelector"]', '1');
 
                     $this->exts->execute_javascript("
-                var selectBox = document.querySelector('select[data-testid=\"billingView-filter-dateRange-footer-presetRangeSelector\"]');
-                selectBox.value = '1';
-                selectBox.dispatchEvent(new Event('change', { bubbles: true }));
-            ");
+            var selectBox = document.querySelector('select[data-testid=\"billingView-filter-dateRange-footer-presetRangeSelector\"]');
+            selectBox.value = '1';
+            selectBox.dispatchEvent(new Event('change', { bubbles: true }));
+        ");
                     sleep(5);
                 }
                 $this->exts->click_by_xdotool('button#button-billingView-filter-dateRange-footer-submit');
@@ -468,9 +468,9 @@ class PortalScriptCDP
 
         //$this->exts->changeSelectbox('[id*="dtp2:settings"] select[name*="dtp2:mrs"]', '6');
         $this->exts->execute_javascript("
-    var selectBox = document.querySelector('[id*=\"dtp2:settings\"] select[name*=\"dtp2:mrs\"]');
-    selectBox.value = '6';
-    selectBox.dispatchEvent(new Event('change', { bubbles: true }));
+var selectBox = document.querySelector('[id*=\"dtp2:settings\"] select[name*=\"dtp2:mrs\"]');
+selectBox.value = '6';
+selectBox.dispatchEvent(new Event('change', { bubbles: true }));
 ");
 
         sleep(10);
@@ -633,21 +633,21 @@ class PortalScriptCDP
                     }
                 }
                 // close new tab too avoid too much tabs
-                 $handles = $this->exts->get_all_tabs();
-                 if (count($handles) > 1) {
-                     $switchedtab = $this->exts->switchToTab(end($handles));
-                     $this->exts->closeTab($switchedtab);
- 
-                     $handles = $this->exts->get_all_tabs();
-                     if (count($handles) > 1) {
-                         $switchedtab1 = $this->exts->switchToTab(end($handles));
-                         $this->exts->closeTab($switchedtab1);
-                         $handles = $this->exts->get_all_tabs();
-                     }
-                     $this->exts->switchToTab($handles[0]);
-                     $this->switchToFrame('iframe[src*="/ArchiveManifest?"]');
-                     sleep(2);
-                 }
+                $handles = $this->exts->get_all_tabs();
+                if (count($handles) > 1) {
+                    $switchedtab = $this->exts->switchToTab(end($handles));
+                    $this->exts->closeTab($switchedtab);
+
+                    $handles = $this->exts->get_all_tabs();
+                    if (count($handles) > 1) {
+                        $switchedtab1 = $this->exts->switchToTab(end($handles));
+                        $this->exts->closeTab($switchedtab1);
+                        $handles = $this->exts->get_all_tabs();
+                    }
+                    $this->exts->switchToTab($handles[0]);
+                    $this->switchToFrame('iframe[src*="/ArchiveManifest?"]');
+                    sleep(2);
+                }
             }
             if ($rows > 0 && (int) $this->restrictPages == 0 && $this->exts->exists('ul.pagination li.active + li a') && $this->exts->isVisible('ul.pagination li.active + li a')) {
                 $this->exts->click_by_xdotool('ul.pagination li.active + li a');

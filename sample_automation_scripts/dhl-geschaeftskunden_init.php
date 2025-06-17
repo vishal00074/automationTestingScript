@@ -23,11 +23,11 @@ private function initPortal($count)
     $this->shipment_tracking = isset($this->exts->config_array["shipment_tracking"]) ? (int) @$this->exts->config_array["shipment_tracking"] : $this->shipment_tracking;
     $this->only_download_report = isset($this->exts->config_array["only_download_report"]) ? (int) @$this->exts->config_array["only_download_report"] : $this->only_download_report;
 
-    $this->exts->log('restrictPages '. $this->restrictPages);
-    $this->exts->log('daily_closing_list '. $this->daily_closing_list);
-    $this->exts->log('download_report '. $this->download_report);
-    $this->exts->log('shipment_tracking '. $this->shipment_tracking);
-    $this->exts->log('only_download_report '. $this->only_download_report);
+    $this->exts->log('restrictPages ' . $this->restrictPages);
+    $this->exts->log('daily_closing_list ' . $this->daily_closing_list);
+    $this->exts->log('download_report ' . $this->download_report);
+    $this->exts->log('shipment_tracking ' . $this->shipment_tracking);
+    $this->exts->log('only_download_report ' . $this->only_download_report);
 
     // Load cookies
     $this->exts->loadCookiesFromFile();
@@ -61,17 +61,17 @@ private function initPortal($count)
             }
         }
         if ($this->exts->exists('button#accept-recommended-btn-handler')) {
-            $this->exts->click_by_xdotool('button#accept-recommended-btn-handler');
+            $this->exts->moveToElementAndClick('button#accept-recommended-btn-handler');
             sleep(3);
         }
 
         if ($this->exts->exists('button#onetrust-accept-btn-handler')) {
-            $this->exts->click_by_xdotool('button#onetrust-accept-btn-handler');
+            $this->exts->moveToElementAndClick('button#onetrust-accept-btn-handler');
             sleep(3);
         }
 
         if ($this->exts->exists('div.login-module-container button[data-testid="noName"]')) {
-            $this->exts->click_by_xdotool('div.login-module-container button[data-testid="noName"]');
+            $this->exts->moveToElementAndClick('div.login-module-container button[data-testid="noName"]');
             sleep(10);
         }
 
@@ -86,7 +86,7 @@ private function initPortal($count)
                 $this->exts->refresh();
                 sleep(10);
                 if ($this->exts->exists('div.login-module-container button[data-testid="noName"]')) {
-                    $this->exts->click_by_xdotool('div.login-module-container button[data-testid="noName"]');
+                    $this->exts->moveToElementAndClick('div.login-module-container button[data-testid="noName"]');
                     sleep(10);
                 }
             } else {

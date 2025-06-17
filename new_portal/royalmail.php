@@ -33,20 +33,19 @@ class PortalScriptCDP
     }
 
     /*Define constants used in script*/
-    public $baseUrl = 'https://kundenportal-beg.de/login?redirectUrl=%2Forders';
-    public $loginUrl = 'https://kundenportal-beg.de/login?redirectUrl=%2Forders';
-    public $invoicePageUrl = 'https://kundenportal-beg.de/login?redirectUrl=%2Forders';
+    public $baseUrl = 'https://invoicing.royalmail.com/RMF/Search.aspx';
+    public $loginUrl = 'https://invoicing.royalmail.com/RMF/Search.aspx';
+    public $invoicePageUrl = 'https://invoicing.royalmail.com/RMF/Search.aspx';
 
-    public $username_selector = 'input[formcontrolname="username"]';
-    public $password_selector = 'input[formcontrolname="password"]';
+    public $username_selector = 'input[name="txtBoxUserName"]';
+    public $password_selector = 'input[name="txtBoxPassword"]';
     public $remember_me_selector = '';
-    public $submit_login_selector = 'span[id="coma-submit-button-login-label"]';
+    public $submit_login_selector = 'a[class="btn btn-danger"]';
 
-    public $check_login_failed_selector = 'mat-label.coma-error-text.ng-star-inserted';
-    public $check_login_success_selector = 'mat-icon[id="coma-header-user-profile-icon"]';
+    public $check_login_failed_selector = 'div#divConfirmationMessage';
+    public $check_login_success_selector = 'a#lnkLogOut';
 
     public $isNoInvoice = true;
-    public $restrictPages = 3;
 
     /**
      * Entry Method thats called for a portal
@@ -55,15 +54,10 @@ class PortalScriptCDP
     private function initPortal($count)
     {
         $this->exts->log('Begin initPortal ' . $count);
-        $this->restrictPages = isset($this->exts->config_array["restrictPages"]) ? (int)@$this->exts->config_array["restrictPages"] : 3;
-
-        $this->exts->log('restrictPages:: ' .  $this->restrictPages);
-
         $this->exts->openUrl($this->baseUrl);
-        sleep(10);
-
+        sleep(2);
         $this->exts->loadCookiesFromFile();
-        sleep(1);
+
         if (!$this->checkLogin()) {
             $this->exts->log('NOT logged via cookie');
 
@@ -75,8 +69,8 @@ class PortalScriptCDP
             $this->exts->log(">>>>>>>>>>>>>>>Login successful!!!!");
             $this->exts->capture("LoginSuccess");
 
-            $this->dateRange();
-
+            $this->exts->openUrl($this->invoicePageUrl);
+            $this->downloadInvoices();
             // Final, check no invoice
             if ($this->isNoInvoice) {
                 $this->exts->no_invoice();
@@ -90,7 +84,7 @@ class PortalScriptCDP
             $error_text = strtolower($this->exts->extract($this->check_login_failed_selector));
 
             $this->exts->log(__FUNCTION__ . '::Error text: ' . $error_text);
-            if (stripos($error_text, strtolower('Anmeldedaten ungültig. Bitte überprüfen Sie Ihre Eingabe')) !== false) {
+            if (stripos($error_text, strtolower('Invalid User name or Password')) !== false) {
                 $this->exts->loginFailure(1);
             } else {
                 $this->exts->loginFailure();
@@ -152,96 +146,24 @@ class PortalScriptCDP
         return $isLoggedIn;
     }
 
-    public function dateRange()
-    {
-
-        if ($this->exts->querySelector('mat-datepicker-toggle button') != null) {
-            $this->exts->moveToElementAndClick('mat-datepicker-toggle button');
-            sleep(5);
-        }
-
-
-        $selectDate = new DateTime();
-        $currentDate = strtoupper($selectDate->format('F Y'));
-
-        if ($this->restrictPages == 0) {
-            $selectDate->modify('-3 years');
-            $formattedDate = strtoupper($selectDate->format('F Y'));
-            $this->exts->capture('date-range-3-years');
-        } else {
-            $selectDate->modify('-3 months');
-            $formattedDate = strtoupper($selectDate->format('F Y'));
-            $this->exts->capture('date-range-3-months');
-        }
-
-
-        $stop = 0;
-        while (true) {
-            $calendarMonth = $this->exts->extract('button.mat-calendar-period-button span.mdc-button__label span');
-            $this->exts->log('previous currentMonth:: ' . trim($calendarMonth));
-            $this->exts->log('previous formattedDate:: ' . trim($formattedDate));
-
-            if (trim($calendarMonth) === trim($formattedDate)) {
-                sleep(4);
-                break;
-            }
-
-            $this->exts->moveToElementAndClick('button.mat-calendar-previous-button');
-            sleep(1);
-            $stop++;
-
-            if ($stop > 200) {
-                break;
-            }
-        }
-
-        $this->exts->moveToElementAndClick('tbody.mat-calendar-body tr:nth-child(2) td:nth-child(1) button');
-        sleep(5);
-
-        // select To date
-
-        $stop2  = 0;
-        while (true) {
-            $calendarMonth = $this->exts->extract('button.mat-calendar-period-button span.mdc-button__label span');
-            $this->exts->log('next currentMonth:: ' . trim($calendarMonth));
-            $this->exts->log('next currentDate:: ' . trim($currentDate));
-
-            if (trim($calendarMonth) === trim($currentDate)) {
-                sleep(4);
-                break;
-            }
-
-            $this->exts->moveToElementAndClick('button.mat-calendar-next-button');
-            sleep(1);
-
-            $stop2++;
-            if ($stop2 > 200) {
-                break;
-            }
-        }
-
-        $this->exts->moveToElementAndClick('span.mat-calendar-body-today');
-        sleep(5);
-
-        $this->downloadInvoices();
-    }
+    public $totalInvoices = 0;
 
     private function downloadInvoices($count = 1)
     {
         $this->exts->log(__FUNCTION__);
 
-        $this->exts->waitTillPresent('coma-order-card');
+        $this->exts->waitTillPresent('table tbody tr[id*="grid_DXDataRow"]');
         $this->exts->capture("4-invoices-classic");
 
         $invoices = [];
-        $rows = $this->exts->getElements('coma-order-card');
+        $rows = $this->exts->getElements('table tbody tr[id*="grid_DXDataRow"]');
         foreach ($rows as $key => $row) {
-            $invoiceLink = $this->exts->getElement('a[href*="/coma/documents/download/"]', $row);
+            $invoiceLink = $this->exts->getElement('td:nth-child(1) > a[href*="ViewDocument.aspx?"]', $row);
             if ($invoiceLink != null) {
                 $invoiceUrl = $invoiceLink->getAttribute("href");
-                $invoiceName = $this->exts->extract('div.order-supplier-info1 > coma-order-info:nth-child(1)  p.order-info-text', $row);
-                $invoiceDate = $this->exts->extract('div.order-supplier-info1 > coma-order-info:nth-child(2)  p.order-info-text', $row);
-                $invoiceAmount = '';
+                $invoiceName = $this->exts->extract('td:nth-child(3)', $row);
+                $invoiceDate = $this->exts->extract('td:nth-child(9)', $row);
+                $invoiceAmount = $this->exts->extract('td:nth-child(13)', $row);
 
                 array_push($invoices, array(
                     'invoiceName' => $invoiceName,
@@ -255,6 +177,11 @@ class PortalScriptCDP
 
         $this->exts->log('Invoices found: ' . count($invoices));
         foreach ($invoices as $invoice) {
+            // by default loading 100 invoices added restriction for download only 100 invoices 
+            if ($this->totalInvoices >= 100) {
+                return;
+            }
+
             $this->exts->log('--------------------------');
             $this->exts->log('invoiceName: ' . $invoice['invoiceName']);
             $this->exts->log('invoiceDate: ' . $invoice['invoiceDate']);
@@ -269,21 +196,30 @@ class PortalScriptCDP
             if (trim($downloaded_file) != '' && file_exists($downloaded_file)) {
                 $this->exts->new_invoice($invoice['invoiceName'], $invoice['invoiceDate'], $invoice['invoiceAmount'], $invoiceFileName);
                 sleep(1);
+                $this->totalInvoices++;
             } else {
                 $this->exts->log(__FUNCTION__ . '::No download ' . $invoiceFileName);
             }
         }
 
-        $paginations = $this->exts->getElements('mat-paginator button.mat-mdc-paginator-navigation-next');
-        $isDisabled = $this->exts->getElements('mat-paginator button.mat-mdc-paginator-navigation-next.mat-mdc-tooltip-disabled');
+        $restrictPages = isset($this->exts->config_array["restrictPages"]) ? (int)@$this->exts->config_array["restrictPages"] : 3;
 
-        if (count($paginations) != 0 && count($isDisabled) == 0) {
-            try {
-                $paginations[0]->click();
-            } catch (\Exception $e) {
-                $this->exts->execute_javascript("arguments[0].click();", [$paginations[0]]);
+
+        $pagiantionSelector = 'div[class*="PagerBottomPanel"] a[class="dxp-button dxp-bi"] img[class*="Next"]';
+        if ($restrictPages == 0) {
+            if ($count < 50 && $this->exts->querySelector($pagiantionSelector) != null) {
+                $this->exts->click_by_xdotool($pagiantionSelector);
+                sleep(7);
+                $count++;
+                $this->downloadInvoices($count);
             }
-            $this->downloadInvoices();
+        } else {
+            if ($count < $restrictPages && $this->exts->querySelector($pagiantionSelector) != null) {
+                $this->exts->click_by_xdotool($pagiantionSelector);
+                sleep(7);
+                $count++;
+                $this->downloadInvoices($count);
+            }
         }
     }
 }

@@ -1,4 +1,4 @@
-<?php // updated loginfailed code
+<?php // I have updated login and download
 
 /**
  * Chrome Remote via Chrome devtool protocol script, for specific process/portal
@@ -57,7 +57,7 @@ class PortalScriptCDP
         }
     }
 
-    // Server-Portal-ID: 167039 - Last modified: 21.02.2025 14:02:24 UTC - User: 1
+    // Server-Portal-ID: 167039 - Last modified: 13.06.2025 13:52:46 UTC - User: 1
 
     public $baseUrl = 'https://kundencenter.optadata-gruppe.de';
     public $username_selector = 'input[name="username"]';
@@ -93,14 +93,14 @@ class PortalScriptCDP
             sleep(10);
             $this->checkFillLogin();
 
-            $this->exts->waitTillAnyPresent(['div[id = "errorMessageDiv"]', 'table[class="login_table"]']);
+            $this->waitFor('div[id = "errorMessageDiv"]');
 
             if ($this->exts->exists('div[id = "errorMessageDiv"]') || $this->exts->exists('table[class="login_table"]')) {
                 $this->exts->openUrl('https://login-one.de/');
                 $this->exts->log('new Login Portal');
                 sleep(10);
                 $this->checkFillLogin();
-                $this->exts->waitTillPresent($this->check_login_success_selector, 10);
+                $this->waitFor($this->check_login_success_selector);
             }
         }
 
@@ -153,7 +153,7 @@ class PortalScriptCDP
     }
     private function checkFillLogin()
     {
-        $this->exts->waitTillPresent($this->password_selector);
+        $this->waitFor($this->password_selector);
         if ($this->exts->getElement($this->password_selector) != null) {
             sleep(3);
             $this->exts->moveToElementAndClick('img[src="/img/header.png"]');
@@ -169,6 +169,14 @@ class PortalScriptCDP
         } else {
             $this->exts->log(__FUNCTION__ . '::Login page not found');
             $this->exts->capture("2-login-page-not-found");
+        }
+    }
+
+    public function waitFor($selector, $seconds = 7)
+    {
+        for ($wait = 0; $wait < 2 && $this->exts->executeSafeScript("return !!document.querySelector('" . $selector . "');") != 1; $wait++) {
+            $this->exts->log('Waiting for Selectors.....');
+            sleep($seconds);
         }
     }
 
@@ -242,7 +250,7 @@ class PortalScriptCDP
             $invoiceDate = $this->exts->extract('td:nth-child(2)', $row, 'innerText');
             $invoiceAmount = trim(preg_replace('/[^\d\.\,]/', '', $this->exts->extract('td:nth-child(6)', $row, 'innerText'))) . ' EUR';
             $parsed_date = $this->exts->parse_date($invoiceDate, 'd.m.Y', 'Y-m-d');
-            $invoiceFileName = !empty($invoiceName) ? $invoiceName . '.pdf': '';
+            $invoiceFileName = !empty($invoiceName) ? $invoiceName . '.pdf' : '';
 
             $this->exts->log('--------------------------');
             $this->exts->log('invoiceName: ' . $invoiceName);
@@ -300,19 +308,18 @@ class PortalScriptCDP
             $invoiceDate = $this->exts->extract('td:nth-child(6)', $row, 'innerText');
             $invoiceAmount = trim(preg_replace('/[^\d\.\,]/', '', $this->exts->extract('td:nth-child(8)', $row, 'innerText'))) . ' EUR';
             $parsed_date = $this->exts->parse_date($invoiceDate, 'd.m.Y', 'Y-m-d');
-            $invoiceFileName = !empty($invoiceName) ? $invoiceName . '.pdf': '';
+            $invoiceFileName = !empty($invoiceName) ? $invoiceName . '.pdf' : '';
             $this->exts->log('--------------------------');
             $this->exts->log('invoiceName: ' . $invoiceName);
             $this->exts->log('invoiceDate: ' . $invoiceDate);
             $this->exts->log('invoiceAmount: ' . $invoiceAmount);
             $this->exts->log('Date parsed: ' . $parsed_date);
-            
+
             $this->isNoInvoice = false;
 
             // Download invoice if it not exisited
             if ($this->exts->invoice_exists($invoiceName)) {
                 $this->exts->log('Invoice existed ' . $invoiceFileName);
-                
             } else {
                 $invoiceButton = 'div[id="postEntryTable_rowSelector_' . $i . '"]';
                 // select
@@ -347,11 +354,11 @@ class PortalScriptCDP
     public function processNewPortalInvoice()
     {
         $this->exts->openUrl('https://okc.optadata.de/');
-        $this->exts->waitTillPresent('div[class="row ng-star-inserted"]');
+        $this->waitFor('div[class="row ng-star-inserted"]');
 
         if (!$this->exts->exists('div[class="row ng-star-inserted"]')) {
             $this->checkFillLogin();
-            $this->exts->waitTillPresent('div[class="row ng-star-inserted"]');
+            $this->waitFor('div[class="row ng-star-inserted"]');
         }
 
         $rows = $this->exts->getElements('div[class="row ng-star-inserted"]  div[class*="status-card"]');
@@ -378,7 +385,7 @@ class PortalScriptCDP
             $invoiceDate = '';
             $invoiceAmount = '';
             $parsed_date = '';
-            $invoiceFileName = !empty( $invoiceName) ?  $invoiceName . '.pdf': '';
+            $invoiceFileName = !empty($invoiceName) ?  $invoiceName . '.pdf' : '';
             $this->exts->log('--------------------------');
             $this->exts->log('invoiceName: ' . $invoiceName);
             $this->exts->log('invoiceDate: ' . $invoiceDate);

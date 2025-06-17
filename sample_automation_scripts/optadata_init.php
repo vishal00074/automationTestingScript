@@ -32,14 +32,14 @@ private function initPortal($count)
         sleep(10);
         $this->checkFillLogin();
 
-        $this->exts->waitTillAnyPresent(['div[id = "errorMessageDiv"]', 'table[class="login_table"]']);
+        $this->waitFor('div[id = "errorMessageDiv"]');
 
         if ($this->exts->exists('div[id = "errorMessageDiv"]') || $this->exts->exists('table[class="login_table"]')) {
             $this->exts->openUrl('https://login-one.de/');
             $this->exts->log('new Login Portal');
             sleep(10);
             $this->checkFillLogin();
-            $this->exts->waitTillPresent($this->check_login_success_selector, 10);
+            $this->waitFor($this->check_login_success_selector);
         }
     }
 
@@ -87,7 +87,7 @@ private function initPortal($count)
 }
 private function checkFillLogin()
 {
-    $this->exts->waitTillPresent($this->password_selector);
+    $this->waitFor($this->password_selector);
     if ($this->exts->getElement($this->password_selector) != null) {
         sleep(3);
         $this->exts->moveToElementAndClick('img[src="/img/header.png"]');
@@ -105,3 +105,12 @@ private function checkFillLogin()
         $this->exts->capture("2-login-page-not-found");
     }
 }
+
+public function waitFor($selector, $seconds = 7)
+{
+    for ($wait = 0; $wait < 2 && $this->exts->executeSafeScript("return !!document.querySelector('" . $selector . "');") != 1; $wait++) {
+        $this->exts->log('Waiting for Selectors.....');
+        sleep($seconds);
+    }
+}
+// commented due to processInvoices and  processAccountingDocuments is similar code
