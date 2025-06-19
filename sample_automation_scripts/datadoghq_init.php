@@ -16,9 +16,9 @@ public $isNoInvoice = true;
 public $google_login_selector = 'button.authentication_login_google-login-button';
 public $google_login = 0;
 /**
- * Entry Method thats called for a portal
- * @param Integer $count Number of times portal is retried.
- */
+    * Entry Method thats called for a portal
+    * @param Integer $count Number of times portal is retried.
+    */
 private function initPortal($count)
 {
     $this->exts->log('Begin initPortal ' . $count);
@@ -41,9 +41,7 @@ private function initPortal($count)
         // $this->exts->clearCookies();
         $this->exts->openUrl($this->loginUrl);
         sleep(15);
-        // if($this->exts->exists('.error_msg a[href="/"]')){
 
-        // }
         $this->exts->log('google login config: ' . $this->google_login);
         if ($this->google_login == 1) {
             $this->exts->moveToElementAndClick($this->google_login_selector);
@@ -97,7 +95,9 @@ private function checkFillLogin()
 
         $this->exts->capture("2-login-page-filled");
         $this->exts->moveToElementAndClick($this->submit_login_selector);
-        sleep(3);
+        sleep(5);
+        $this->waitFor('iframe[src*="/recaptcha/api2/anchor?"]');
+        $this->checkFillRecaptcha();
         $this->checkFillRecaptcha();
     } else {
         $this->exts->log(__FUNCTION__ . '::Login page not found');
@@ -107,10 +107,11 @@ private function checkFillLogin()
 
 private function checkFillRecaptcha()
 {
+
     $this->exts->log(__FUNCTION__);
     $recaptcha_iframe_selector = 'iframe[src*="/recaptcha/api2/anchor?"]';
     $recaptcha_textarea_selector = 'textarea[name="g-recaptcha-response"]';
-    if ($this->exts->exists($recaptcha_iframe_selector)) {
+    if ($this->exts->querySelector($recaptcha_iframe_selector) != null) {
         $iframeUrl = $this->exts->extract($recaptcha_iframe_selector, null, 'src');
         $data_siteKey = explode('&', end(explode("&k=", $iframeUrl)))[0];
         $this->exts->log("iframe url  - " . $iframeUrl);
@@ -1006,11 +1007,9 @@ private function fillGoogleTwoFactor($input_selector, $message_selector, $submit
                     $this->exts->notification_uid = '';
                     $this->exts->two_factor_attempts++;
                     if ($this->exts->querySelector('form input[name="idvPin"], form input[name="totpPin"], input[name="code"], input#backupCodePin') != null) {
-                        // if(strpos(strtoupper($this->exts->extract('div:last-child[style*="visibility: visible;"] [role="button"]')), 'CODE') !== false){
                         $this->exts->click_by_xdotool('[aria-relevant="additions"] + [style*="visibility: visible;"] [role="button"]');
                         sleep(2);
                         $this->exts->capture("2.2-two-factor-resend-code-" . $this->exts->two_factor_attempts);
-                        // }
                     }
 
                     $this->fillGoogleTwoFactor($input_selector, $message_selector, $submit_selector);
@@ -1026,3 +1025,10 @@ private function fillGoogleTwoFactor($input_selector, $message_selector, $submit
     }
 }
 // End GOOGLE login
+public function waitFor($selector, $seconds = 7)
+{
+    for ($wait = 0; $wait < 2 && $this->exts->executeSafeScript("return !!document.querySelector('" . $selector . "');") != 1; $wait++) {
+        $this->exts->log('Waiting for Selectors.....');
+        sleep($seconds);
+    }
+}
