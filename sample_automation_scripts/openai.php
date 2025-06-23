@@ -609,7 +609,7 @@ class PortalScriptCDP
         }
 
         // STEP 2: (Optional)
-        if ($this->exts->exists('#idDiv_RemoteNGC_PollingDescription, #idRemoteNGC_DisplaySign, .confirmIdentityPageControl #iPollSessionDesc')) {
+        if ($this->exts->querySelector('#idDiv_RemoteNGC_PollingDescription, #idRemoteNGC_DisplaySign, .confirmIdentityPageControl #iPollSessionDesc') != null) {
             // If method is click some number on Microsoft Authenticator app, send 2FA to ask user to do click it
             $message_selector = '#idDiv_RemoteNGC_PollingDescription, #idRemoteNGC_DisplaySign, .confirmIdentityPageControl #iPollSessionDesc';
             $this->exts->two_factor_notif_msg_en = trim(join("\n", $this->exts->getElementsAttribute($message_selector, 'innerText')));
@@ -618,7 +618,7 @@ class PortalScriptCDP
 
             $this->exts->two_factor_attempts = 2;
             $this->fillMicrosoftTwoFactor('', '', '', '');
-        } else if ($this->exts->exists('[data-bind*="Type.TOTPAuthenticatorV2"]')) {
+        } else if ($this->exts->querySelector('[data-bind*="Type.TOTPAuthenticatorV2"]') != null) {
             // If method is Microsoft Authenticator app: send 2FA to ask user approve on Microsoft app.
             // Then wait. If not success, click to select two factor by code from mobile app
             $input_selector = '';
@@ -633,7 +633,7 @@ class PortalScriptCDP
                 $this->exts->moveToElementAndClick('a#idA_SAASTO_TOTP');
                 sleep(5);
             }
-        } else if ($this->exts->exists('input[name="ProofConfirmation"]:not([type="hidden"]), .confirmIdentityPageControl [id^="iProof"][style*="display: block"] >  input[name^="iProof"] .confirmIdentityPageControl [id^="iProof"][style*="display: table"] >  input[name^="iProof"]:not([type="hidden"])')) {
+        } else if ($this->exts->querySelector('input[name="ProofConfirmation"]:not([type="hidden"]), .confirmIdentityPageControl [id^="iProof"][style*="display: block"] >  input[name^="iProof"] .confirmIdentityPageControl [id^="iProof"][style*="display: table"] >  input[name^="iProof"]:not([type="hidden"])') != null) {
             // If method is email code or phone code, This site may be ask for confirm phone/email first, So send 2FA to ask user phone/email
             $input_selector = 'input[name="ProofConfirmation"]:not([type="hidden"]), .confirmIdentityPageControl [id^="iProof"][style*="display: block"] >  input[name^="iProof"] .confirmIdentityPageControl [id^="iProof"][style*="display: table"] >  input[name^="iProof"]:not([type="hidden"])';
             $message_selector = '#idDiv_SAOTCS_ProofConfirmationDesc, #iAdditionalProofInfo #iEnterProofDesc, #iAdditionalProofInfo #iEnterProofDesc ~ * #iConfirmProofEmailDomain';
@@ -644,7 +644,7 @@ class PortalScriptCDP
         }
 
         // STEP 3: input code
-        if ($this->exts->exists('input[name="otc"], input[name="iOttText"]')) {
+        if ($this->exts->querySelector('input[name="otc"], input[name="iOttText"]') != null) {
             $input_selector = 'input[name="otc"], input[name="iOttText"]';
             $message_selector = 'div#idDiv_SAOTCC_Description, .OTTLabel';
             $remember_selector = 'label#idLbl_SAOTCC_TD_Cb';
@@ -652,6 +652,21 @@ class PortalScriptCDP
             $this->exts->two_factor_attempts = 0;
             $this->fillMicrosoftTwoFactor($input_selector, $message_selector, $remember_selector, $submit_selector);
         }
+
+        $this->exts->log('Other ways to sign in');
+
+        $this->exts->click_element('//span[contains(text(), "Other ways to sign in")]');
+        sleep(10);
+        $this->exts->click_element('//span[contains(text(), "Use your password")]');
+        sleep(10);
+
+        if ($this->exts->getElement($this->microsoft_password_selector) != null) {
+            $this->exts->log("Enter microsoft Password");
+            $this->exts->moveToElementAndType($this->microsoft_password_selector, $this->password);
+            sleep(2);
+        }
+        $this->exts->moveToElementAndClick($this->microsoft_submit_login_selector);
+        sleep(5);
     }
     private function fillMicrosoftTwoFactor($input_selector, $message_selector, $remember_selector, $submit_selector)
     {
