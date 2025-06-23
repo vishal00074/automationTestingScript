@@ -1,4 +1,4 @@
-<?php //
+<?php
 
 /**
  * Chrome Remote via Chrome devtool protocol script, for specific process/portal
@@ -57,641 +57,202 @@ class PortalScriptCDP
         }
     }
 
+    // Server-Portal-ID: 544 - Last modified: 21.01.2025 15:02:27 UTC - User: 1
 
-    public $baseUrl = 'https://platform.openai.com/settings/organization/billing/history';
-    public $loginUrl = 'https://platform.openai.com/';
-    public $username_selector = 'input[name="email"], input#email-input, input#username';
-    public $password_selector = 'input#password, input[name="password"]';
+    public $baseUrl = "https://cmrc.logmeininc.com";
+    public $loginUrl = "https://cmrc.logmeininc.com";
+    public $invoicePageUrl = "https://cmrc.logmeininc.com/billingHistory.tmpl";
+    public $username_selector = "input#emailAddress";
+    public $password_selector = "input#password";
+    public $next_button_selector = "form#credentials input#next-button";
+    public $submit_button_selector = "form#credentials input#submit";
+    public $twofa_form_selector = "#challengeDiv input#challengeCode";
+    public $login_tryout = 0;
 
     public $isNoInvoice = true;
-    public $login_with_google = 0;
-    public $login_with_microsoft = 0;
-    public $check_login_failed_selector = 'span[slot="errorMessage"] li';
 
 
-
-    /**
-     * Entry Method thats called for a portal
-     * @param Integer $count Number of times portal is retried.
-     */
     private function initPortal($count)
     {
         $this->exts->log('Begin initPortal ' . $count);
-        $this->login_with_google = isset($this->exts->config_array["login_with_google"]) ? (int)$this->exts->config_array["login_with_google"] : $this->login_with_google;
-        $this->login_with_microsoft = isset($this->exts->config_array["login_with_microsoft"]) ? (int)@$this->exts->config_array["login_with_microsoft"] : $this->login_with_microsoft;
 
-        $this->exts->log('CONFIG login_with_google: ' . $this->login_with_google);
-        $this->exts->log('CONFIG login_with_microsoft: ' . $this->login_with_microsoft);
-
-        $this->exts->loadCookiesFromFile();
-        sleep(1);
         $this->exts->openUrl($this->baseUrl);
-        sleep(10);
-        $this->exts->waitTillAnyPresent(['//button//*[contains(text(), "Log in")]', 'a[href="/settings/profile"]', '//input[starts-with(@name, "cf") and contains(@name, "response") and string-length(@value) <= 0]']);
-        $this->check_solve_cloudflare_page();
-        $this->exts->capture('1-init-page');
+        sleep(2);
+        $this->exts->capture("Home-page-without-cookie");
 
-        if (!$this->isLoggedin()) {
-            $this->userNotLoggedIn();
-
-            $authError = strtolower($this->exts->extract('h1[class*="heading"] span'));
-            $this->exts->log("Auth Error:: " . $authError);
-
-            if (
-                stripos($authError, strtolower('Oops, an error occurred!')) !== false ||
-                stripos($authError, strtolower('Authentication Error')) !== false
-            ) {
-                $invalidRequestError = strtolower($this->exts->extract('div[class*="subTitle"] > span > div[class*="subtitle"]'));
-                $this->exts->log("invalidRequestError:: " . $invalidRequestError);
-                if (stripos($invalidRequestError, strtolower('which is not the authentication method you used during sign up')) !== false) {
-                    $this->exts->capture('capture-invalid_request_error');
-                    $this->exts->loginFailure(1);
-                }
-
-                $this->exts->capture("try-again-login");
-                $this->exts->moveToElementAndClick('button[aria-describedby]');
-                $this->exts->moveToElementAndClick('a[href*="auth_provider=auth0"]');
-
-                sleep(5);
-                $this->clearChrome();
-                $this->exts->openUrl($this->baseUrl);
-                sleep(5);
-                $this->exts->waitTillAnyPresent(['//button//*[contains(text(), "Log in")]', 'a[href="/settings/profile"]', '//input[starts-with(@name, "cf") and contains(@name, "response") and string-length(@value) <= 0]']);
-                $this->check_solve_cloudflare_page();
-                $this->userNotLoggedIn();
+        $isCookieLoginSuccess = false;
+        if ($this->exts->loadCookiesFromFile()) {
+            $this->exts->openUrl($this->baseUrl);
+            sleep(15);
+            $this->exts->capture("Home-page-with-cookie");
+            // We need this because in most cases you will get login form and after filling it get logged in without 2FA
+            if ($this->exts->getElement($this->username_selector) != null) {
+                $this->fillForm(0);
+                sleep(10);
             }
-
-            $this->check_solve_cloudflare_page();
-            $this->checkFillTwoFactor();
-            $this->check_solve_cloudflare_page();
-            $this->exts->waitTillPresent('a[href="/settings/profile"]');
+            if ($this->checkLogin()) {
+                $isCookieLoginSuccess = true;
+            } else {
+                $this->exts->clearCookies();
+                $this->exts->openUrl($this->loginUrl);
+                sleep(5);
+            }
         }
 
+        if (!$isCookieLoginSuccess) {
+            $this->exts->capture("after-login-clicked");
+            $this->fillForm(0);
+            sleep(10);
 
+            if ($this->checkLogin() == false && $this->exts->getElement("#challengeDiv input#challengeCode") != null) {
+                $this->processTFA();
+            }
+        }
+        if ($this->exts->exists('a#moreMyAccount') && !$this->checkLogin()) {
+            $this->exts->moveToElementAndClick('a#moreMyAccount');
+            sleep(15);
+        }
 
-        if ($this->isLoggedin()) {
-            sleep(5);
-            $this->exts->log(__FUNCTION__ . '::User logged in');
-            $popup_ok = $this->exts->getElementByText('[role="dialog"][data-state="open"] button.btn-primary', 'Okay', null, false);
-            if ($popup_ok != null) {
-                $this->exts->click_element($popup_ok);
-                sleep(2);
-            }
-            if ($this->exts->exists('[role="dialog"][data-state="open"] .text-token-text-tertiary button')) {
-                $this->exts->click_element('[role="dialog"][data-state="open"] .text-token-text-tertiary button');
-                sleep(1);
-            }
-            if ($this->exts->exists('[role="dialog"][data-state="open"]')) {
-                $unwanted_dialog = $this->exts->getElement('[role="dialog"][data-state="open"]');
-                $this->exts->execute_javascript('arguments[0].remove();', [$unwanted_dialog]);
-                sleep(1);
-            }
-            $this->exts->capture("3-login-success");
+        if ($this->checkLogin()) {
+            $this->exts->log(">>>>>>>>>>>>>>>Login successful!!!!");
+            $this->exts->capture("LoginSuccess");
+            $this->exts->openUrl('https://billing.logmeininc.com');
+            sleep(12);
 
-            $this->processAfterLogin();
+            $currentUrl =  $this->exts->getUrl();
+            $this->exts->log('currentUrl:: ' . $currentUrl);
+            $invoiceUrl = str_replace("subscriptions", "invoices", $currentUrl);
+            $this->exts->openUrl($invoiceUrl);
+            sleep(12);
+
+            $this->processInvoices();
+
+            // Final, check no invoice
+            if ($this->isNoInvoice) {
+                $this->exts->no_invoice();
+            }
+            $this->exts->success();
         } else {
-            $this->exts->log(__FUNCTION__ . '::Use login failed');
-            $isTwoFAError = $this->exts->execute_javascript('document.body.innerHTML.includes("The code you entered is incorrect. Please try again.")');
-            $this->exts->log('isTwoFAError ' . $isTwoFAError);
-
-            // if microsoft LoginFailed
-            $isMicroSoftError = strtolower($this->exts->extract('form[data-testid="usernameForm"] div.ext-error'));
-            $isMicroSoftPassError = strtolower($this->exts->extract('div.fui-Field__validationMessage span:nth-child(2)'));
-            $errorText = strtolower($this->exts->extract($this->check_login_failed_selector));
-            $this->exts->log('Login Error:: ' . $errorText);
-
-            if ($this->exts->exists('#error-element-password[data-error-code]')) {
-                $this->exts->loginFailure(1);
-            } elseif (stripos($errorText, strtolower('Incorrect email address, phone number, or password. Phone numbers must include the country code.')) !== false) {
-                $this->exts->loginFailure(1);
-            } elseif ($isTwoFAError) {
-                $this->exts->capture("incorrect-2FA");
-                $this->exts->log('incorrect TwoFA');
-                $this->exts->loginFailure(1);
-            } else if (stripos($isMicroSoftError, strtolower("That Microsoft account doesn't exist. Enter a different account or")) !== false) {
-                $this->exts->capture("microsoft-login-failed");
-                $this->exts->loginFailure(1);
-            } else if (stripos($isMicroSoftPassError, strtolower("That password is incorrect for your Microsoft account.")) !== false) {
-                $this->exts->capture("microsoft-login-failed-pass");
+            if ($this->exts->exists('[id="credentials.errors"], form[action*="/signin/v2/challenge/password/"] input[name="password"], form #top-blurb b, #invalidEmailMessage')) {
+                $this->exts->capture("LoginFailed");
                 $this->exts->loginFailure(1);
             } else {
+                $this->exts->capture("LoginFailed");
                 $this->exts->loginFailure();
             }
         }
     }
 
-    private function userNotLoggedIn()
+    function fillForm($count)
     {
-        sleep(2);
-        $this->exts->click_element('//button//*[contains(text(), "Log in")]');
-        sleep(5);
-        $this->check_solve_cloudflare_page();
-        sleep(5);
-        $this->exts->waitTillPresent($this->username_selector, 10);
-        if ($this->exts->querySelector($this->username_selector) != null && $this->login_with_google != '1' && $this->login_with_microsoft != '1') {
-            $this->exts->log("Enter Username");
-            $this->exts->moveToElementAndType($this->username_selector, $this->username);
-            sleep(1);
-            $this->exts->capture("2-username-filled");
-            $this->exts->moveToElementAndClick('button[type="submit"]');
+        $this->exts->log("Begin fillForm " . $count);
+        try {
             sleep(5);
-            $this->check_solve_cloudflare_page();
-        }
-
-        $this->selectLoginType();
-
-        for ($i = 0; $i < 5 && $this->exts->getElementByText('h1', ['Oops, an error occurred!'], null, false) != null; $i++) {
-            $this->clearChrome();
-            $this->exts->openUrl($this->baseUrl);
-            sleep(5);
-            $this->exts->waitTillPresent('//button//*[contains(text(), "Log in")]');
-            $this->check_solve_cloudflare_page();
-            sleep(2);
-            $this->exts->click_element('//button//*[contains(text(), "Log in")]');
-            sleep(5);
-            $this->check_solve_cloudflare_page();
-            sleep(5);
-            $this->exts->waitTillPresent($this->username_selector, 10);
-            if ($this->exts->querySelector($this->username_selector) != null && $this->login_with_google != '1') {
+            if ($this->exts->getElement($this->username_selector) != null) {
+                sleep(2);
+                $this->login_tryout = (int)$this->login_tryout + 1;
+                $this->exts->capture("1-pre-login");
                 $this->exts->log("Enter Username");
                 $this->exts->moveToElementAndType($this->username_selector, $this->username);
-                sleep(1);
-                $this->exts->capture("2-username-filled");
-                $this->exts->moveToElementAndClick('button[type="submit"]');
+                //$this->exts->getElement($this->username_selector)->sendKeys($this->username);
+                sleep(2);
+
+                $this->exts->moveToElementAndClick($this->next_button_selector);
                 sleep(5);
-                $this->check_solve_cloudflare_page();
-            }
-            $this->selectLoginType();
-        }
 
-        if ($this->login_with_google == '1') {
-            $this->loginGoogleIfRequired();
-        } elseif ($this->login_with_microsoft == '1') {
-            $this->loginMicrosoftIfRequired();
-        } else {
-            $this->checkFillLogin();
-            sleep(6);
-        }
-    }
+                if ($this->exts->exists($this->password_selector)) {
+                    $this->exts->log("Enter Password");
+                    //$this->exts->getElement($this->password_selector)->sendKeys($this->password);
+                    $this->exts->moveToElementAndType($this->password_selector, $this->password);
+                    sleep(5);
 
-    private function selectLoginType()
-    {
-        if ($this->login_with_google == '1') {
-            $this->exts->click_element('//button[contains(text(), "Google")]');
-            sleep(5);
-        } else if ($this->login_with_microsoft == '1') {
-            $this->exts->click_element('//button[contains(text(), "Microsoft")]');
-            sleep(5);
-        }
-    }
+                    $this->exts->moveToElementAndClick($this->submit_button_selector);
+                    sleep(10);
+                } else if ($this->exts->exists('div#googleLogin td.google-login-button-cell')) {
+                    $this->exts->moveToElementAndClick('div#googleLogin td.google-login-button-cell');
+                    sleep(15);
 
-    private function clearChrome()
-    {
-        $this->exts->log("Clearing browser history, cookie, cache");
-        $this->exts->openUrl('chrome://settings/clearBrowserData');
-        sleep(10);
-        $this->exts->execute_javascript('document.querySelector("settings-ui").shadowRoot.querySelector("settings-main").shadowRoot.querySelector("settings-basic-page").shadowRoot.querySelector("settings-privacy-page").shadowRoot.querySelector("settings-clear-browsing-data-dialog").shadowRoot.querySelector("#pages").querySelector("#clearFromBasic").shadowRoot.querySelector("#dropdownMenu").value = 4;');
-        sleep(1);
-        $this->exts->capture("clear-page");
-        $this->exts->execute_javascript('document.querySelector("settings-ui").shadowRoot.querySelector("settings-main").shadowRoot.querySelector("settings-basic-page").shadowRoot.querySelector("settings-privacy-page").shadowRoot.querySelector("settings-clear-browsing-data-dialog").shadowRoot.querySelector("#clearButton").click();');
-        sleep(15);
-        $this->exts->capture("after-clear");
-    }
-    private function checkFillLogin()
-    {
-        $this->exts->capture("2-login-page");
-        if ($this->exts->querySelector($this->username_selector) != null) {
-            $this->exts->log("Enter Username");
-            $this->exts->moveToElementAndType($this->username_selector, $this->username);
-            sleep(1);
-            $this->exts->capture("2-username-filled");
-            $this->exts->moveToElementAndClick('button[type="submit"]');
-            sleep(5);
-            $this->check_solve_cloudflare_page();
-        }
-        $this->exts->waitTillPresent($this->password_selector, 30);
-
-        if ($this->exts->querySelector($this->password_selector) != null) {
-            $this->exts->log("Enter Password");
-            $this->exts->moveToElementAndType($this->password_selector, $this->password);
-            sleep(5);
-            $this->exts->capture("2-password-filled");
-            if ($this->exts->exists('//button[contains(text(), "Continue")]')) {
-                $this->exts->click_element('//button[contains(text(), "Continue")]');
-            } else {
-                $this->exts->moveToElementAndClick('button[type="submit"][class*="button-login-password"]');
-            }
-            sleep(5);
-        } else {
-            $this->exts->log(__FUNCTION__ . '::Login page not found');
-            $this->exts->capture("2-password-not-found");
-        }
-    }
-    private function checkFillTwoFactor()
-    {
-        $two_factor_selector = 'input[autocomplete="one-time-code"], input#code';
-        $two_factor_message_selector = 'header p, [class*="loginChallengePage"] > p';
-        $two_factor_submit_selector = 'button[value="continue"], button[class*="continueButton"], button[type="submit"][data-action-button-primary="true"]';
-
-        if ($this->exts->querySelector($two_factor_selector) != null && $this->exts->two_factor_attempts < 3) {
-            $this->exts->log("Two factor page found.");
-            $this->exts->capture("2.1-two-factor");
-
-            if ($this->exts->querySelector($two_factor_message_selector) != null) {
-                $this->exts->two_factor_notif_msg_en = "";
-                for ($i = 0; $i < count($this->exts->getElements($two_factor_message_selector)); $i++) {
-                    $this->exts->two_factor_notif_msg_en = $this->exts->two_factor_notif_msg_en . $this->exts->getElements($two_factor_message_selector)[$i]->getAttribute('innerText') . "\n";
+                    if ($this->exts->urlContains('google.')) {
+                        $this->loginGoogleIfRequired();
+                        sleep(15);
+                        // Click next if confirm form showed
+                        $this->exts->moveToElementAndClick('div[data-ownership-changed-phone-number] div:nth-child(2) > [role="button"]');
+                        $this->checkGoogleTwoFactorMethod();
+                    } else {
+                        $this->exts->log(__FUNCTION__ . '::Not required google login.');
+                        $this->exts->capture("3-no-google-required");
+                    }
                 }
-                $this->exts->two_factor_notif_msg_en = trim($this->exts->two_factor_notif_msg_en);
-                $this->exts->two_factor_notif_msg_de = $this->exts->two_factor_notif_msg_en;
-                $this->exts->log("Message:\n" . $this->exts->two_factor_notif_msg_en);
             }
-            if ($this->exts->two_factor_attempts == 2) {
-                $this->exts->two_factor_notif_msg_en = $this->exts->two_factor_notif_msg_en . ' ' . $this->exts->two_factor_notif_msg_retry_en;
-                $this->exts->two_factor_notif_msg_de = $this->exts->two_factor_notif_msg_de . ' ' . $this->exts->two_factor_notif_msg_retry_de;
+            sleep(10);
+        } catch (\Exception $exception) {
+            $this->exts->log("Exception filling loginform " . $exception->getMessage());
+        }
+    }
+
+    function processTFA()
+    {
+        try {
+            $this->exts->log("Current URL - " . $this->exts->getUrl());
+
+            if ($this->exts->getElement($this->twofa_form_selector) != null) {
+                $this->handleTwoFactorCode($this->twofa_form_selector, "#challengeDiv input#submit, #challengeDiv input#submit-button");
+                sleep(5);
             }
+            if ($this->exts->getElement($this->twofa_form_selector) != null) {
+                $this->exts->capture("LoginFailed");
+                $this->exts->loginFailure();
+            }
+        } catch (\Exception $exception) {
+            $this->exts->log("Exception process TFA " . $exception->getMessage());
+        }
+    }
 
-            $two_factor_code = trim($this->exts->fetchTwoFactorCode());
-
-            $this->exts->log("checkFillTwoFactor: Entering two_factor_code. " . $two_factor_code);
-
-            if (!empty($two_factor_code) && trim($two_factor_code) != '') {
-
-                $this->exts->moveToElementAndClick('label[for="rememberBrowser"]');
+    function handleTwoFactorCode($two_factor_selector, $submit_btn_selector)
+    {
+        if ($this->exts->two_factor_attempts == 2) {
+            $this->exts->two_factor_notif_msg_en = $this->exts->two_factor_notif_msg_en . $this->exts->two_factor_notif_msg_retry_en;
+            $this->exts->two_factor_notif_msg_de = $this->exts->two_factor_notif_msg_de . $this->exts->two_factor_notif_msg_retry_de;
+        }
+        $two_factor_code = trim($this->exts->fetchTwoFactorCode());
+        if (trim($two_factor_code) != "" && !empty($two_factor_code)) {
+            try {
+                $this->exts->log("SIGNIN_PAGE: Entering two_factor_code.");
                 $this->exts->moveToElementAndType($two_factor_selector, $two_factor_code);
 
-                $this->exts->log("checkFillTwoFactor: Clicking submit button.");
-                sleep(1);
-                $this->exts->capture("2.2-two-factor-filled-" . $this->exts->two_factor_attempts);
+                $this->exts->log("SIGNIN_PAGE: Clicking the [SIGN_IN] button.");
+                $this->exts->moveToElementAndClick($submit_btn_selector);
 
-                $this->exts->moveToElementAndClick($two_factor_submit_selector);
-                sleep(10);
-                if ($this->exts->exists('div[class*="errorMessage"]')) {
-
-                    $this->exts->capture("wrong 2FA code error-" . $this->exts->two_factor_attempts);
-                    $this->exts->log('The code you entered is incorrect. Please try again.');
-                }
-
-                if ($this->exts->querySelector($two_factor_selector) == null) {
-                    $this->exts->log("Two factor solved");
-                } else if ($this->exts->two_factor_attempts < 3) {
+                if ($this->exts->getElement($two_factor_selector) != null && $this->exts->two_factor_attempts < 3) {
                     $this->exts->two_factor_attempts++;
-                    $this->checkFillTwoFactor();
-                } else {
-                    $this->exts->log("Two factor can not solved");
+                    $this->exts->notification_uid = "";
+                    $this->handleTwoFactorCode($two_factor_selector, $submit_btn_selector);
                 }
-            } else {
-                $this->exts->log("Not received two factor code");
+            } catch (\Exception $exception) {
+                $this->exts->log('processTwoFactorAuth::ERROR while taking snapshot');
             }
         }
     }
 
 
-    private function check_solve_cloudflare_page()
-    {
-        $unsolved_cloudflare_input_xpath = '//input[starts-with(@name, "cf") and contains(@name, "response") and string-length(@value) <= 0]';
-        $solved_cloudflare_input_xpath = '//input[starts-with(@name, "cf") and contains(@name, "response") and string-length(@value) > 0]';
-        $this->exts->capture("cloudflare-checking");
-        if (
-            !$this->exts->oneExists([$solved_cloudflare_input_xpath, $unsolved_cloudflare_input_xpath]) &&
-            $this->exts->exists('#cf-please-wait > p:not([style*="display: none"]):not([style*="display:none"])')
-        ) {
-            for ($waiting = 0; $waiting < 10; $waiting++) {
-                sleep(2);
-                if ($this->exts->oneExists([$solved_cloudflare_input_xpath, $unsolved_cloudflare_input_xpath])) {
-                    sleep(3);
-                    break;
-                }
-            }
-        }
-
-        if ($this->exts->exists($unsolved_cloudflare_input_xpath)) {
-            $this->exts->click_by_xdotool('*:has(>input[name^="cf"][name$="response"])', 30, 28);
-            sleep(5);
-            $this->exts->capture("cloudflare-clicked-1", true);
-            sleep(3);
-            if ($this->exts->exists($unsolved_cloudflare_input_xpath)) {
-                $this->exts->click_by_xdotool('*:has(>input[name^="cf"][name$="response"])', 30, 28);
-                sleep(5);
-                $this->exts->capture("cloudflare-clicked-2", true);
-                sleep(15);
-            }
-            if ($this->exts->exists($unsolved_cloudflare_input_xpath)) {
-                $this->exts->click_by_xdotool('*:has(>input[name^="cf"][name$="response"])', 30, 28);
-                sleep(5);
-                $this->exts->capture("cloudflare-clicked-3", true);
-                sleep(15);
-            }
-        }
-    }
-    private function isLoggedin()
-    {
-        $isLoggedin = false;
-        if ($this->exts->exists('a[href="/settings/profile"]')) {
-            $isLoggedin = true;
-        }
-        return $isLoggedin;
-    }
-
-    // MICROSOFT Login
-    public $microsoft_username_selector = 'input[name="loginfmt"], input[id="usernameEntry"]';
-    public $microsoft_password_selector = 'input[name="passwd"]';
-    public $microsoft_remember_me_selector = 'input[name="KMSI"] + span';
-    public $microsoft_submit_login_selector = 'button[type="submit"]#idSIButton9, button[type="submit"][data-testid="primaryButton"]';
-
-    public $microsoft_account_type = 0;
-    public $microsoft_phone_number = '';
-    public $microsoft_recovery_email = '';
     /**
-     * Entry Method thats called for a portal
-     * @param Integer $count Number of times portal is retried.
+     * Method to Check where user is logged in or not
+     * return boolean true/false
      */
-    private function loginMicrosoftIfRequired()
+    function checkLogin()
     {
-        $this->microsoft_phone_number = isset($this->exts->config_array["phone_number"]) ? $this->exts->config_array["phone_number"] : '';
-        $this->microsoft_recovery_email = isset($this->exts->config_array["recovery_email"]) ? $this->exts->config_array["recovery_email"] : '';
-        $this->microsoft_account_type = isset($this->exts->config_array["account_type"]) ? (int)@$this->exts->config_array["account_type"] : 0;
-
-        if ($this->exts->urlContains('microsoft') || $this->exts->urlContains('live.')) {
-            $this->checkFillMicrosoftLogin();
-            sleep(10);
-            $this->checkMicrosoftTwoFactorMethod();
-
-            if ($this->exts->exists('input#newPassword')) {
-                $this->exts->account_not_ready();
-            } else if ($this->exts->getElement('#passwordError a[href*="ResetPassword"], #passwordError a[href*="passwordreset"]') != null) {
-                $this->exts->loginFailure(1);
+        $this->exts->log("Begin checkLogin ");
+        $isLoggedIn = false;
+        try {
+            if ($this->exts->getElement('div[data-section="my-account-product-container"],li.logout-button, li a#signout, [icon="notifications"] button, li a[href*="/logout"], a.instanceLink[href*="/User/GoToInstance/"]') != null) {
+                $this->exts->log(">>>>>>>>>>>>>>>Login successful!!!!");
+                $isLoggedIn = true;
             }
-        } else {
-            $this->exts->log(__FUNCTION__ . '::Not required microsoft login.');
-            $this->exts->capture("3-no-microsoft-required");
+        } catch (Exception $exception) {
+            $this->exts->log("Exception checking loggedin " . $exception);
         }
+        return $isLoggedIn;
     }
-    private function checkFillMicrosoftLogin()
-    {
-        $this->exts->log(__FUNCTION__);
-        // When open login page, sometime it show previous logged user, select login with other user.
-        if ($this->exts->exists('[role="listbox"] .row #otherTile[role="option"], [role="listitem"] #otherTile')) {
-            $this->exts->moveToElementAndClick('[role="listbox"] .row #otherTile[role="option"], [role="listitem"] #otherTile');
-            sleep(10);
-        }
-
-        $this->exts->capture("2-microsoft-login-page");
-        if ($this->exts->getElement($this->microsoft_username_selector) != null) {
-            sleep(3);
-            $this->exts->log("Enter microsoft Username");
-            $this->exts->moveToElementAndType($this->microsoft_username_selector, $this->username);
-            sleep(1);
-            $this->exts->moveToElementAndClick($this->microsoft_submit_login_selector);
-            sleep(15);
-        }
-
-        // Stay Signed In
-        if ($this->exts->exists('div#pageContent button#acceptButton')) {
-            $this->exts->moveToElementAndClick('div#pageContent button#acceptButton');
-            sleep(15);
-        }
-
-        if ($this->exts->exists('div[data-testid="routeAnimationFluent"] button[data-testid="primaryButton"]')) {
-            $this->exts->moveToElementAndClick('div[data-testid="routeAnimationFluent"] button[data-testid="primaryButton"]');
-            sleep(15);
-        }
-
-        if ($this->exts->exists('a[data-bind*="href: svr.urlSwitch"][href*="/logout"]')) {
-            // if site show: Already login with .. account, click logout and login with other account
-            $this->exts->moveToElementAndClick('a[data-bind*="href: svr.urlSwitch"][href*="/logout"]');
-            sleep(10);
-        }
-        if ($this->exts->exists('a#mso_account_tile_link, #aadTile, #msaTile')) {
-            // if site show: This Email is being used with multiple Microsoft accounts, Select depending on account_type variable
-            //if account type is 1 then only personal account will be selected otherwise business account.
-            if ($this->microsoft_account_type == 1) {
-                $this->exts->moveToElementAndClick('#msaTile');
-            } else {
-                $this->exts->moveToElementAndClick('a#mso_account_tile_link, #aadTile');
-            }
-            sleep(10);
-        }
-        if ($this->exts->exists('form #idA_PWD_SwitchToPassword')) {
-            $this->exts->moveToElementAndClick('form #idA_PWD_SwitchToPassword');
-            sleep(5);
-        }
-
-        if ($this->exts->getElement($this->microsoft_password_selector) != null) {
-            $this->exts->log("Enter microsoft Password");
-            $this->exts->moveToElementAndType($this->microsoft_password_selector, $this->password);
-            sleep(1);
-            $this->exts->moveToElementAndClick($this->microsoft_remember_me_selector);
-            sleep(2);
-            $this->exts->capture("2-microsoft-password-page-filled");
-            $this->exts->moveToElementAndClick($this->microsoft_submit_login_selector);
-            sleep(15);
-            $this->exts->capture("2-microsoft-after-submit-password");
-            // Stay Signed In
-            if ($this->exts->exists('div#pageContent button#acceptButton')) {
-                $this->exts->moveToElementAndClick('div#pageContent button#acceptButton');
-                sleep(15);
-            }
-
-            if ($this->exts->exists('div[data-testid="routeAnimationFluent"] button[data-testid="primaryButton"]')) {
-                $this->exts->moveToElementAndClick('div[data-testid="routeAnimationFluent"] button[data-testid="primaryButton"]');
-                sleep(15);
-            }
-        } else {
-            $this->exts->log(__FUNCTION__ . '::microsoft Password page not found');
-        }
-
-        $this->checkConfirmMicrosoftButton();
-    }
-    private function checkConfirmMicrosoftButton()
-    {
-        // After submit password, It have many button can be showed, check and click it
-        if ($this->exts->exists('form[action*="/kmsi"] input[name="DontShowAgain"], input#idSIButton9[aria-describedby="KmsiDescription"]')) {
-            // if site show: Do this to reduce the number of times you are asked to sign in. Click yes
-            $this->exts->moveToElementAndClick('form input[name="DontShowAgain"] + span');
-            sleep(3);
-            $this->exts->moveToElementAndClick('form[action*="/kmsi"] input#idSIButton9, input#idSIButton9[aria-describedby="KmsiDescription"]');
-            sleep(10);
-        }
-        if ($this->exts->getElement("#verifySetup a#verifySetupCancel") != null) {
-            $this->exts->moveToElementAndClick("#verifySetup a#verifySetupCancel");
-            sleep(10);
-        }
-        if ($this->exts->getElement('#authenticatorIntro a#iCancel') != null) {
-            $this->exts->moveToElementAndClick('#authenticatorIntro a#iCancel');
-            sleep(10);
-        }
-        if ($this->exts->getElement("input#iLooksGood") != null) {
-            $this->exts->moveToElementAndClick("input#iLooksGood");
-            sleep(10);
-        }
-        if ($this->exts->getElement("input#StartAction") != null) {
-            $this->exts->moveToElementAndClick("input#StartAction");
-            sleep(10);
-        }
-        if ($this->exts->getElement(".recoveryCancelPageContainer input#iLandingViewAction") != null) {
-            $this->exts->moveToElementAndClick(".recoveryCancelPageContainer input#iLandingViewAction");
-            sleep(10);
-        }
-        if ($this->exts->getElement("input#idSubmit_ProofUp_Redirect") != null) {
-            $this->exts->moveToElementAndClick("input#idSubmit_ProofUp_Redirect");
-            sleep(10);
-        }
-        if ($this->exts->getElement('div input#iNext') != null) {
-            $this->exts->moveToElementAndClick('div input#iNext');
-            sleep(10);
-        }
-        if ($this->exts->getElement('input[value="Continue"]') != null) {
-            $this->exts->moveToElementAndClick('input[value="Continue"]');
-            sleep(10);
-        }
-        if ($this->exts->getElement('form[action="/kmsi"] input#idSIButton9') != null) {
-            $this->exts->moveToElementAndClick('form[action="/kmsi"] input#idSIButton9');
-            sleep(10);
-        }
-        if ($this->exts->getElement('a#CancelLinkButton') != null) {
-            $this->exts->moveToElementAndClick('a#CancelLinkButton');
-            sleep(10);
-        }
-        if ($this->exts->exists('form[action*="/kmsi"] input[name="DontShowAgain"]')) {
-            // if site show: Do this to reduce the number of times you are asked to sign in. Click yes
-            $this->exts->moveToElementAndClick('form[action*="/kmsi"] input[name="DontShowAgain"] + span');
-            sleep(3);
-            $this->exts->moveToElementAndClick('form[action*="/kmsi"] input#idSIButton9');
-            sleep(10);
-        }
-    }
-    private function checkMicrosoftTwoFactorMethod()
-    {
-        // Currently we met 4 two factor methods
-        // - Email 
-        // - Text Message
-        // - Approve request in Microsoft Authenticator app
-        // - Use verification code from mobile app
-        $this->exts->log(__FUNCTION__);
-        sleep(5);
-        $this->exts->capture("2.0-microsoft-two-factor-checking");
-        // STEP 0 if it's hard to solve, so try back to choose list
-        if ($this->exts->exists('[value="PhoneAppNotification"]') && $this->exts->exists('a#signInAnotherWay')) {
-            $this->exts->moveToElementAndClick('a#signInAnotherWay');
-            sleep(5);
-        }
-        // STEP 1: Check if list of two factor methods showed, select first
-        if ($this->exts->exists('#idDiv_SAOTCS_Proofs_Section #idDiv_SAOTCS_Proofs [role="option"]')) {
-            if ($this->exts->exists('#idDiv_SAOTCS_Proofs_Section #idDiv_SAOTCS_Proofs [role="option"]:not([data-value*="Voice"])')) {
-                $this->exts->moveToElementAndClick('#idDiv_SAOTCS_Proofs_Section #idDiv_SAOTCS_Proofs [role="option"]:not([data-value*="Voice"])');
-            } else {
-                $this->exts->moveToElementAndClick('#idDiv_SAOTCS_Proofs_Section #idDiv_SAOTCS_Proofs [role="option"]');
-            }
-            sleep(3);
-        } else if ($this->exts->exists('#iProofList input[name="proof"]')) {
-            $this->exts->moveToElementAndClick('#iProofList input[name="proof"]');
-            sleep(3);
-        } else if ($this->exts->exists('#idDiv_SAOTCS_Proofs [role="listitem"]')) {
-            // Updated 11-2020
-            if ($this->exts->exists('#idDiv_SAOTCS_Proofs [role="listitem"] [data-value="PhoneAppOTP"]')) {
-                $this->exts->moveToElementAndClick('#idDiv_SAOTCS_Proofs [role="listitem"] [data-value="PhoneAppOTP"]');
-            } else if ($this->exts->exists('#idDiv_SAOTCS_Proofs [role="listitem"] [data-value="OneWaySMS"]')) {
-                $this->exts->moveToElementAndClick('#idDiv_SAOTCS_Proofs [role="listitem"] [data-value="OneWaySMS"]');
-            } else if ($this->exts->exists('#idDiv_SAOTCS_Proofs [role="listitem"] [data-value="PhoneAppNotification"]')) {
-                $this->exts->moveToElementAndClick('#idDiv_SAOTCS_Proofs [role="listitem"] [data-value="PhoneAppNotification"]');
-            } else {
-                $this->exts->moveToElementAndClick('#idDiv_SAOTCS_Proofs [role="listitem"]');
-            }
-            sleep(5);
-        }
-
-        // STEP 2: (Optional)
-        if ($this->exts->exists('#idDiv_RemoteNGC_PollingDescription, #idRemoteNGC_DisplaySign, .confirmIdentityPageControl #iPollSessionDesc')) {
-            // If method is click some number on Microsoft Authenticator app, send 2FA to ask user to do click it
-            $message_selector = '#idDiv_RemoteNGC_PollingDescription, #idRemoteNGC_DisplaySign, .confirmIdentityPageControl #iPollSessionDesc';
-            $this->exts->two_factor_notif_msg_en = trim(join("\n", $this->exts->getElementsAttribute($message_selector, 'innerText')));
-            $this->exts->two_factor_notif_msg_en = $this->exts->two_factor_notif_msg_en . "\n>>>Enter \"OK\" after confirming on device";
-            $this->exts->two_factor_notif_msg_de = $this->exts->two_factor_notif_msg_en . "\n>>>Geben Sie danach hier unten \"OK\" ein.";
-
-            $this->exts->two_factor_attempts = 2;
-            $this->fillMicrosoftTwoFactor('', '', '', '');
-        } else if ($this->exts->exists('[data-bind*="Type.TOTPAuthenticatorV2"]')) {
-            // If method is Microsoft Authenticator app: send 2FA to ask user approve on Microsoft app.
-            // Then wait. If not success, click to select two factor by code from mobile app
-            $input_selector = '';
-            $message_selector = 'div#idDiv_SAOTCAS_Description';
-            $remember_selector = 'label#idLbl_SAOTCAS_TD_Cb';
-            $submit_selector = '';
-            $this->exts->two_factor_attempts = 2;
-            $this->fillMicrosoftTwoFactor($input_selector, $message_selector, $remember_selector, $submit_selector);
-            sleep(30);
-
-            if ($this->exts->exists('a#idA_SAASTO_TOTP')) {
-                $this->exts->moveToElementAndClick('a#idA_SAASTO_TOTP');
-                sleep(5);
-            }
-        } else if ($this->exts->exists('input[name="ProofConfirmation"]:not([type="hidden"]), .confirmIdentityPageControl [id^="iProof"][style*="display: block"] >  input[name^="iProof"] .confirmIdentityPageControl [id^="iProof"][style*="display: table"] >  input[name^="iProof"]:not([type="hidden"])')) {
-            // If method is email code or phone code, This site may be ask for confirm phone/email first, So send 2FA to ask user phone/email
-            $input_selector = 'input[name="ProofConfirmation"]:not([type="hidden"]), .confirmIdentityPageControl [id^="iProof"][style*="display: block"] >  input[name^="iProof"] .confirmIdentityPageControl [id^="iProof"][style*="display: table"] >  input[name^="iProof"]:not([type="hidden"])';
-            $message_selector = '#idDiv_SAOTCS_ProofConfirmationDesc, #iAdditionalProofInfo #iEnterProofDesc, #iAdditionalProofInfo #iEnterProofDesc ~ * #iConfirmProofEmailDomain';
-            $remember_selector = '';
-            $submit_selector = 'input#idSubmit_SAOTCS_SendCode, input#iSelectProofAction[type="submit"]';
-            $this->exts->two_factor_attempts = 1;
-            $this->fillMicrosoftTwoFactor($input_selector, $message_selector, $remember_selector, $submit_selector);
-        }
-
-        // STEP 3: input code
-        if ($this->exts->exists('input[name="otc"], input[name="iOttText"]')) {
-            $input_selector = 'input[name="otc"], input[name="iOttText"]';
-            $message_selector = 'div#idDiv_SAOTCC_Description, .OTTLabel';
-            $remember_selector = 'label#idLbl_SAOTCC_TD_Cb';
-            $submit_selector = 'input#idSubmit_SAOTCC_Continue, input#iVerifyCodeAction';
-            $this->exts->two_factor_attempts = 0;
-            $this->fillMicrosoftTwoFactor($input_selector, $message_selector, $remember_selector, $submit_selector);
-        }
-    }
-    private function fillMicrosoftTwoFactor($input_selector, $message_selector, $remember_selector, $submit_selector)
-    {
-        $this->exts->log(__FUNCTION__);
-        $this->exts->log("microsoft Two factor page found.");
-        $this->exts->capture("2.1-microsoft-two-factor-page");
-        $this->exts->log($message_selector);
-        if ($this->exts->getElement($message_selector) != null) {
-            $this->exts->two_factor_notif_msg_en = join("\n", $this->exts->getElementsAttribute($message_selector, 'innerText'));
-            $this->exts->two_factor_notif_msg_en = trim($this->exts->two_factor_notif_msg_en);
-            $this->exts->two_factor_notif_msg_de = $this->exts->two_factor_notif_msg_en;
-        }
-        $this->exts->log("Message:\n" . $this->exts->two_factor_notif_msg_en);
-        $this->exts->notification_uid = "";
-        $two_factor_code = trim($this->exts->fetchTwoFactorCode());
-        if (!empty($two_factor_code) && trim($two_factor_code) != '') {
-            if ($this->exts->getElement($input_selector) != null) {
-                $this->exts->log("microsoftfillTwoFactor: Entering two_factor_code." . $two_factor_code);
-                $this->exts->moveToElementAndType($input_selector, $two_factor_code);
-                sleep(2);
-                if ($this->exts->exists($remember_selector)) {
-                    $this->exts->moveToElementAndClick($remember_selector);
-                }
-                $this->exts->capture("2.2-microsoft-two-factor-filled-" . $this->exts->two_factor_attempts);
-
-                if ($this->exts->exists($submit_selector)) {
-                    $this->exts->log("microsoftfillTwoFactor: Clicking submit button.");
-                    $this->exts->moveToElementAndClick($submit_selector);
-                }
-                sleep(15);
-
-                if ($this->exts->getElement($input_selector) == null) {
-                    $this->exts->log("microsoftTwo factor solved");
-                } else if ($this->exts->two_factor_attempts < 3) {
-                    $this->exts->two_factor_attempts++;
-                    $this->fillMicrosoftTwoFactor($input_selector, $message_selector, $remember_selector, $submit_selector);
-                } else {
-                    $this->exts->log("microsoft Two factor can not solved");
-                }
-            } else {
-                $this->exts->log("Not found microsoft two factor input");
-            }
-        } else {
-            $this->exts->log("Not received microsoft two factor code");
-        }
-    }
-    //*********** END Microsoft Login
 
     // -------------------- GOOGLE login
     public $google_username_selector = 'input[name="identifier"]';
@@ -1151,8 +712,11 @@ class PortalScriptCDP
             exec("sudo docker exec " . $node_name . " bash -c 'xdotool key Return'");
             sleep(3);
             $this->exts->capture("2.0-cancel-security-usb");
-            $this->exts->click_by_xdotool('[data-view-id] [data-secondary-action-label] > div > div:nth-child(2) [role="button"], [data-view-id] [data-secondary-action-label] > div > div:nth-child(2) button');
             sleep(5);
+            $this->exts->type_key_by_xdotool('Escape');
+            sleep(5);
+            $this->exts->click_by_xdotool('[data-view-id] [data-secondary-action-label] > div > div:nth-child(2) [role="button"], [data-view-id] [data-secondary-action-label] > div > div:nth-child(2) button');
+            sleep(10);
             $this->exts->capture("2.0-backed-methods-list");
         } else if ($this->isExists('[data-view-id*="authzenView"] form, form [data-illustration*="authzen"]') || $this->exts->urlContains('/challenge/dp?')) {
             // (updated special case 09-May-2020): If Notification method showed immediately, This method often make user confused
@@ -1188,6 +752,12 @@ class PortalScriptCDP
             }
             sleep(5);
             $this->exts->capture("2.0-backed-methods-list");
+        }
+
+        if ($this->isExists('[data-view-id] [data-secondary-action-label] > div > div:nth-child(2) [role="button"], [data-view-id] [data-secondary-action-label] > div > div:nth-child(2) button')) {
+            $this->exts->click_by_xdotool('[data-view-id] [data-secondary-action-label] > div > div:nth-child(2) [role="button"], [data-view-id] [data-secondary-action-label] > div > div:nth-child(2) button');
+            sleep(10);
+            $this->exts->capture("try-another-way-0");
         }
 
         // STEP 1: Check if list of two factor methods showed, select first
@@ -1438,101 +1008,42 @@ class PortalScriptCDP
     }
     // -------------------- GOOGLE login END
 
-    // Custom Exists function to check element found or not
-    private function isExists($selector = '')
-    {
-        $safeSelector = addslashes($selector);
-        $this->exts->log('Element:: ' . $safeSelector);
-        $isElement = $this->exts->execute_javascript('!!document.querySelector("' . $safeSelector . '")');
-        if ($isElement) {
-            $this->exts->log('Element Found');
-            return true;
-        } else {
-            $this->exts->log('Element not Found');
-            return false;
-        }
-    }
-
-
-    private function processAfterLogin()
-    {
-        if (!$this->exts->urlContains('/billing/history')) {
-            $this->exts->openUrl($this->baseUrl);
-            sleep(5);
-        }
-        $this->exts->click_if_existed('[data-testid="cookie-consent-banner"] button + button.btn-primary');
-        $this->processInvoices();
-
-        // check if have more profiles
-        $this->exts->click_if_existed('button[id="select-trigger-radix-:r0:"][data-state="closed"][aria-haspopup="dialog"]');
-        sleep(2);
-        if ($this->exts->exists('[role="dialog"][data-state="open"] [data-option-id]:not([aria-selected="true"])')) {
-            $this->exts->moveToElementAndClick('[role="dialog"][data-state="open"] [data-option-id]:not([aria-selected="true"])');
-            $this->processInvoices();
-        }
-
-        // Final, check no invoice
-        if ($this->isNoInvoice) {
-            $this->exts->no_invoice();
-        }
-        $this->exts->success();
-    }
     private function processInvoices()
     {
         sleep(10);
-        exec("sudo docker exec -i --user root " . $this->exts->node_name . " sh -c 'sudo chmod -R 777 /home/seluser/Downloads/'");
-        $this->exts->capture("4-invoices-page-" . time());
+        $this->exts->capture("4-invoices-page");
         $invoices = [];
 
-        $rows = $this->exts->getElements('.billing-history-table tr');
+        $rows = $this->exts->getElements('chameleon-data-table.invoice-table chameleon-data-table-body chameleon-data-table-row');
         foreach ($rows as $row) {
-            $invoice_link = $row->querySelector('a[href*="invoice.stripe.com"]');
-            if ($invoice_link != null) {
-                $invoice_url = $invoice_link->getAttribute("href");
-                $invoice_name = trim($this->exts->extract('td:nth-child(1)', $row));
-                $invoice_amount = trim($this->exts->extract('td:nth-child(3)', $row));
-                array_push($invoices, array(
-                    'invoice_name' => $invoice_name,
-                    'invoice_date' => '',
-                    'invoice_amount' => $invoice_amount,
-                    'invoice_url' => $invoice_url
-                ));
-                $this->isNoInvoice = false;
-            }
-        }
+            $invoiceBtn = $this->exts->getElement('chameleon-icon-button[label-id="pdf"]', $row);
 
-        // Download all invoices
-        $this->exts->log('Invoices found: ' . count($invoices));
-        if (count($invoices) > 0) {
-            $this->exts->openNewTab();
-        }
-        foreach ($invoices as $invoice) {
+            sleep(2);
+            $invoiceUrl = '';
+            $invoiceName = $this->exts->extract('chameleon-data-table-cell:nth-child(1)', $row);
+            $invoiceDate = $this->exts->extract('chameleon-data-table-cell:nth-child(2)', $row);
+            $invoiceAmount = $this->exts->extract('chameleon-data-table-cell:nth-child(4)', $row);
+
+            $this->isNoInvoice = false;
+
             $this->exts->log('--------------------------');
-            $this->exts->log('invoice_name: ' . $invoice['invoice_name']);
-            $this->exts->log('invoice_amount: ' . $invoice['invoice_amount']);
-            $this->exts->log('invoice_url: ' . $invoice['invoice_url']);
-            if ($this->exts->invoice_exists($invoice['invoice_name'])) {
-                $this->exts->log('Invoice Existed ' . $invoice['invoice_name']);
+            $this->exts->log('invoiceName: ' . $invoiceName);
+            $this->exts->log('invoiceDate: ' . $invoiceDate);
+            $this->exts->log('invoiceAmount: ' . $invoiceAmount);
+            $this->exts->log('invoiceUrl: ' . $invoiceUrl);
+
+            $invoiceFileName = !empty($invoiceName) ?  $invoiceName . '.pdf': '';
+            $invoiceDate = $this->exts->parse_date($invoiceDate, 'd.m.Y', 'Y-m-d');
+            $this->exts->log('Date parsed: ' .  $invoiceDate);
+
+            $downloaded_file = $this->exts->click_and_download($invoiceBtn, 'pdf', $invoiceFileName);
+            sleep(2);
+            if (trim($downloaded_file) != '' && file_exists($downloaded_file)) {
+                $this->exts->new_invoice($invoiceUrl,  $invoiceDate, $invoiceAmount, $downloaded_file);
+                sleep(1);
             } else {
-                $invoiceFileName =  !empty($invoice['invoice_name']) ?  $invoice['invoice_name'] . '.pdf' : '';
-                $this->exts->openUrl($invoice['invoice_url']);
-                sleep(2);
-
-                $this->exts->click_element('//button//*[contains(text(), "Download invoice") or contains(text(), "Rechnung herunterladen")]/../..');
-                sleep(6);
-                $this->exts->wait_and_check_download('pdf');
-
-                $downloaded_file = $this->exts->find_saved_file('pdf', $invoiceFileName);
-                if (trim($downloaded_file) != '' && file_exists($downloaded_file)) {
-                    $this->exts->new_invoice($invoice['invoice_name'], '', $invoice['invoice_amount'], $downloaded_file);
-                } else {
-                    $this->exts->log(__FUNCTION__ . '::No download ' . $invoice['invoice_name']);
-                }
+                $this->exts->log(__FUNCTION__ . '::No download ' . $invoiceFileName);
             }
-        }
-
-        if (count($invoices) > 0) {
-            $this->exts->switchToInitTab();
         }
     }
 }
