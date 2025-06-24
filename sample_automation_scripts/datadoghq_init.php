@@ -1,6 +1,6 @@
 public $baseUrl = 'https://app.datadoghq.com/account/billing_history';
 public $loginUrl = 'https://app.datadoghq.com/account/billing_history';
-// public $invoicePageUrl = 'https://flagbit.datadoghq.com/billing/history';
+// public $invoicePageUrl = 'https://flagbit.datadoghq.com/billing/history';s
 public $invoicePageUrl = 'https://app.datadoghq.com/account/billing_history';
 
 
@@ -263,7 +263,7 @@ public  function checkLogin()
             $this->exts->log('Waiting for login.....');
             sleep(10);
         }
-        if ($this->exts->exists($this->check_login_success_selector)) {
+        if ($this->exts->querySelector($this->check_login_success_selector) != null) {
             $this->exts->log(">>>>>>>>>>>>>>>Login successful!!!!");
             $isLoggedIn = true;
         }
@@ -1025,6 +1025,8 @@ private function fillGoogleTwoFactor($input_selector, $message_selector, $submit
     }
 }
 // End GOOGLE login
+
+
 public function waitFor($selector, $seconds = 7)
 {
     for ($wait = 0; $wait < 2 && $this->exts->executeSafeScript("return !!document.querySelector('" . $selector . "');") != 1; $wait++) {

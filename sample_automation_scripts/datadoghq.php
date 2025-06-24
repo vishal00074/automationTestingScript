@@ -1,4 +1,4 @@
-<?php //  I have updated google login code and download code and migrated the script  and update the invoicePageUrl 
+<?php //  updated download code.
 
 /**
  * Chrome Remote via Chrome devtool protocol script, for specific process/portal
@@ -62,7 +62,7 @@ class PortalScriptCDP
     /*Define constants used in script*/
     public $baseUrl = 'https://app.datadoghq.com/account/billing_history';
     public $loginUrl = 'https://app.datadoghq.com/account/billing_history';
-    // public $invoicePageUrl = 'https://flagbit.datadoghq.com/billing/history';
+    // public $invoicePageUrl = 'https://flagbit.datadoghq.com/billing/history';s
     public $invoicePageUrl = 'https://app.datadoghq.com/account/billing_history';
 
 
@@ -123,7 +123,7 @@ class PortalScriptCDP
             $this->exts->capture("3-login-success");
 
             // Open invoices url and download invoice
-            $this->exts->openUrl($this->invoicePageUrl);
+            // $this->exts->openUrl($this->invoicePageUrl);
             $this->processInvoices();
 
             // Final, check no invoice
@@ -330,7 +330,7 @@ class PortalScriptCDP
                 $this->exts->log('Waiting for login.....');
                 sleep(10);
             }
-            if ($this->exts->exists($this->check_login_success_selector)) {
+            if ($this->exts->querySelector($this->check_login_success_selector) != null) {
                 $this->exts->log(">>>>>>>>>>>>>>>Login successful!!!!");
                 $isLoggedIn = true;
             }
@@ -1111,19 +1111,17 @@ class PortalScriptCDP
 
         $invoices = [];
         $rows = count($this->exts->getElements('table.druids_table_table__table tbody tr'));
-        for ($i = 0; $i < count($rows); $i++) {
+        for ($i = 0; $i < $rows; $i++) {
             $invoiceDate = '';
             $invoiceAmount = '';
+            $j = $i + 1;
 
-            $clickableselector = 'div.billing_billing-history_billing-history-table table.druids_table_table__table tbody tr:nth-child(' . $i . ')';
+            $this->exts->execute_javascript("document.querySelector('div.billing_billing-history_billing-history-table table.druids_table_table__table tbody tr:nth-child(" . $j . ") a').click();");
 
-            if ($this->exts->querySelector($clickableselector) != null) {
-                $this->exts->click_and_download($clickableselector);
-                sleep(5);
-            }
-            $this->waitFor('a[href*="billing"]');
-
-            $invoiceLink = $this->exts->getElement('a[href*="billing"]');
+            $this->waitFor('a[href*="/api/v2/billing/receipts/"]');
+            
+            // Sometimes getting popup
+            $invoiceLink = $this->exts->getElement('a[href*="/api/v2/billing/receipts/"]');
             if ($invoiceLink != null) {
                 $invoiceUrl = $invoiceLink->getAttribute("href");
                 $pattern = '/receipts\/(.*?)\/pdf/';
@@ -1141,8 +1139,23 @@ class PortalScriptCDP
                 ));
                 $this->isNoInvoice = false;
 
-                $this->exts->closeCurrentTab();
-                sleep(5);
+                if ($this->exts->querySelector('button[aria-label="Close"]') != null) {
+                    $this->exts->moveToElementAndClick('button[aria-label="Close"]');
+                    sleep(5);
+                }
+            } else {
+                $this->exts->wait_and_check_download('pdf');
+                $invoiceFileName = '';
+                $downloaded_file = $this->exts->find_saved_file('pdf', $invoiceFileName);
+                if (trim($downloaded_file) != '' && file_exists($downloaded_file)) {
+                    $invoiceName = basename($downloaded_file, '.pdf');
+
+                    $this->exts->log('invoiceName: ' . $invoiceName);
+                    $this->exts->new_invoice($invoiceName, $invoiceDate, $invoiceAmount, $downloaded_file);
+                    sleep(5);
+                } else {
+                    $this->exts->log('Timeout when download ');
+                }
             }
         }
 
