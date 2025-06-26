@@ -105,16 +105,16 @@ private function checkFillLogin()
         }
         sleep(10);
         $alertBox = $this->exts->evaluate('
-        let alertDisplayed = false;
-        // Override alert function
-        window.alert = function (message) {
-            if (message.toLowerCase().includes("incorrect")) {
-                alertDisplayed = true;
-                return alertDisplayed;
-            }
-            console.log("Alert triggered:", message);
-        };
-    ');
+    let alertDisplayed = false;
+    // Override alert function
+    window.alert = function (message) {
+        if (message.toLowerCase().includes("incorrect")) {
+            alertDisplayed = true;
+            return alertDisplayed;
+        }
+        console.log("Alert triggered:", message);
+    };
+');
         $this->exts->log("print msg ----->" . $alertBox);
 
         sleep(15);
@@ -151,7 +151,26 @@ function isValidEmail($username)
     return false;
 }
 
+public function switchToFrame($query_string)
+{
+    $this->exts->log(__FUNCTION__ . " Begin with " . $query_string);
+    $frame = null;
+    if (is_string($query_string)) {
+        $frame = $this->exts->queryElement($query_string);
+    }
 
+    if ($frame != null) {
+        $frame_context = $this->exts->get_frame_excutable_context($frame);
+        if ($frame_context != null) {
+            $this->exts->current_context = $frame_context;
+            return true;
+        }
+    } else {
+        $this->exts->log(__FUNCTION__ . " Frame not found " . $query_string);
+    }
+
+    return false;
+}
 
 private function solve_captcha_by_clicking($count = 1)
 {
@@ -202,17 +221,17 @@ private function click_point($selector = '', $x_on_element = 0, $y_on_element = 
     $this->exts->log(__FUNCTION__ . " $selector $x_on_element $y_on_element");
     $selector = base64_encode($selector);
     $element_coo = $this->exts->execute_javascript('
-        var x_on_element = ' . $x_on_element . '; 
-        var y_on_element = ' . $y_on_element . ';
-        var coo = document.querySelector(atob("' . $selector . '")).getBoundingClientRect();
-        // Default get center point in element, if offset inputted, out put them
-        if(x_on_element > 0 || y_on_element > 0) {
-            Math.round(coo.x + x_on_element) + "|" + Math.round(coo.y + y_on_element);
-        } else {
-            Math.round(coo.x + coo.width/2) + "|" + Math.round(coo.y + coo.height/2);
-        }
-        
-    ');
+    var x_on_element = ' . $x_on_element . '; 
+    var y_on_element = ' . $y_on_element . ';
+    var coo = document.querySelector(atob("' . $selector . '")).getBoundingClientRect();
+    // Default get center point in element, if offset inputted, out put them
+    if(x_on_element > 0 || y_on_element > 0) {
+        Math.round(coo.x + x_on_element) + "|" + Math.round(coo.y + y_on_element);
+    } else {
+        Math.round(coo.x + coo.width/2) + "|" + Math.round(coo.y + coo.height/2);
+    }
+    
+');
     // sleep(1);
     $this->exts->log("Browser clicking position: $element_coo");
     $element_coo = explode('|', $element_coo);
@@ -291,16 +310,16 @@ private function disable_extensions()
     $this->exts->openUrl('chrome://extensions/');
     sleep(2);
     $this->exts->execute_javascript("
-        let manager = document.querySelector('extensions-manager');
-        if (manager && manager.shadowRoot) {
-            let itemList = manager.shadowRoot.querySelector('extensions-item-list');
-            if (itemList && itemList.shadowRoot) {
-                let items = itemList.shadowRoot.querySelectorAll('extensions-item');
-                items.forEach(item => {
-                    let toggle = item.shadowRoot.querySelector('#enableToggle[checked]');
-                    if (toggle) toggle.click();
-                });
-            }
+    let manager = document.querySelector('extensions-manager');
+    if (manager && manager.shadowRoot) {
+        let itemList = manager.shadowRoot.querySelector('extensions-item-list');
+        if (itemList && itemList.shadowRoot) {
+            let items = itemList.shadowRoot.querySelectorAll('extensions-item');
+            items.forEach(item => {
+                let toggle = item.shadowRoot.querySelector('#enableToggle[checked]');
+                if (toggle) toggle.click();
+            });
         }
-    ");
+    }
+");
 }

@@ -1,4 +1,4 @@
-<?php //use custom js isExists and waitFor function  updated download code extracted invoice date and ammount
+<?php
 
 /**
  * Chrome Remote via Chrome devtool protocol script, for specific process/portal
@@ -57,7 +57,7 @@ class PortalScriptCDP
         }
     }
 
-    // Server-Portal-ID: 7524 - Last modified: 15.04.2025 13:31:13 UTC - User: 1
+    // Server-Portal-ID: 7524 - Last modified: 25.04.2025 13:18:33 UTC - User: 1
 
     public $baseUrl = 'https://klarmobil.de/';
     public $invoicePageUrl = 'https://www.klarmobil.de/online-service/meine-rechnungen';
@@ -65,7 +65,7 @@ class PortalScriptCDP
     public $password_selector = 'input#password';
     public $remember_me_selector = '';
     public $submit_login_selector = 'button[type="submit"]';
-    public $check_login_success_selector = 'form#logout_form, .main-navigation a[href="/online-service/meine-daten"]';
+    public $check_login_success_selector = 'form#logout_form, .main-navigation a[href="/online-service/meine-daten"], button[data-testid="logout"]';
     public $isNoInvoice = true;
 
     /**
@@ -75,6 +75,8 @@ class PortalScriptCDP
     private function initPortal($count)
     {
         $this->exts->log('Begin initPortal ' . $count);
+        $this->disable_extensions();
+        sleep(5);
 
         // Load cookies
         $this->exts->openUrl($this->baseUrl);
@@ -104,53 +106,60 @@ class PortalScriptCDP
 
             // $this->exts->clearCookies();// Expired cookie doern't affect to login but it make download getting error, so clear it.
             $this->exts->openUrl($this->invoicePageUrl);
+            sleep(10);
             $this->checkFillLogin();
 
-            if ($this->checkLogin()) {
-                sleep(3);
-                $this->exts->log(__FUNCTION__ . '::User logged in');
-                $this->exts->capture("3-login-success");
+            if ($this->exts->getElement($this->username_selector) != null) {
+                $this->checkFillLogin();
+            }
+        }
 
-                $this->exts->openUrl($this->invoicePageUrl);
+        if ($this->checkLogin()) {
+            sleep(3);
+            $this->exts->log(__FUNCTION__ . '::User logged in');
+            $this->exts->capture("3-login-success");
 
-                $this->accept_consent();
-                $this->check_multil_contract();
+            $this->exts->openUrl($this->invoicePageUrl);
+            sleep(10);
 
-                if ($this->isExists('[data-qa="no-permission-skeleton"]')) {
-                    $this->exts->no_permission();
-                }
+            $this->accept_consent();
+            $this->check_multil_contract();
 
-                // Final, check no invoice
-                if ($this->isNoInvoice) {
-                    $this->exts->no_invoice();
-                }
-                $this->exts->success();
+            if ($this->isExists('[data-qa="no-permission-skeleton"]')) {
+                $this->exts->no_permission();
+            }
+
+            // Final, check no invoice
+            if ($this->isNoInvoice) {
+                $this->exts->no_invoice();
+            }
+            $this->exts->success();
+        } else {
+            $this->exts->log(__FUNCTION__ . '::Use login failed ' . $this->exts->getUrl());
+
+            // Aufgrund zu vieler fehlerhafter Login-Versuche wurde der Login zu Ihrer Sicherheit bis
+            if (strpos(strtolower($this->exts->extract('span.status-message__text')), 'deine eingegebene e-mail-adresse und das passwort') !== false) {
+                $this->exts->loginFailure();
+            } else if ($this->exts->urlContains('onlineservice/fehler') && $this->isExists('a[href*="logout"]') || $this->exts->urlContains('/onlineservice/benutzer-verknuepfen')) {
+                $this->exts->account_not_ready();
+            } else if (
+                $this->exts->urlContains('onlineservice/info') &&
+                (strpos($this->exts->extract('span.status-message__text'), 'Zu Ihrem Zugang konnten keine aktiven') !== false ||
+                    strpos($this->exts->extract('span.status-message__text'), 'Zu Deinem Online-Konto existiert kein aktiver Vertrag') !== false ||
+                    strpos($this->exts->extract('span.status-message__text'), 'Zu Ihrem Online-Account existiert kein aktiver Vertrag') !== false)
+            ) {
+                $this->exts->account_not_ready();
+            } else if ($this->exts->urlContains('benutzer-verknuepfen') || $this->exts->urlContains('user-link')) {
+                $this->exts->account_not_ready();
+            } else if ($this->isExists('div#error-cs-email-invalid') || $this->isExists('span[id*="error-element-password"]')) {
+                $this->exts->loginFailure(1);
             } else {
-                $this->exts->log(__FUNCTION__ . '::Use login failed ' . $this->exts->getUrl());
-
-                // Aufgrund zu vieler fehlerhafter Login-Versuche wurde der Login zu Ihrer Sicherheit bis
-                if (strpos(strtolower($this->exts->extract('span.status-message__text')), 'deine eingegebene e-mail-adresse und das passwort') !== false) {
-                    $this->exts->loginFailure();
-                } else if ($this->exts->urlContains('onlineservice/fehler') && $this->isExists('a[href*="logout"]') || $this->exts->urlContains('/onlineservice/benutzer-verknuepfen')) {
-                    $this->exts->account_not_ready();
-                } else if (
-                    $this->exts->urlContains('onlineservice/info') &&
-                    (strpos($this->exts->extract('span.status-message__text'), 'Zu Ihrem Zugang konnten keine aktiven') !== false ||
-                        strpos($this->exts->extract('span.status-message__text'), 'Zu Deinem Online-Konto existiert kein aktiver Vertrag') !== false ||
-                        strpos($this->exts->extract('span.status-message__text'), 'Zu Ihrem Online-Account existiert kein aktiver Vertrag') !== false)
-                ) {
-                    $this->exts->account_not_ready();
-                } else if ($this->exts->urlContains('benutzer-verknuepfen') || $this->exts->urlContains('user-link')) {
-                    $this->exts->account_not_ready();
-                } else if ($this->isExists('div#error-cs-email-invalid') || $this->isExists('span[id*="error-element-password"]')) {
-                    $this->exts->loginFailure(1);
-                } else {
-                    $this->exts->capture("else-login-failed-page");
-                    $this->exts->loginFailure();
-                }
+                $this->exts->capture("else-login-failed-page");
+                $this->exts->loginFailure();
             }
         }
     }
+
     private function clearChrome()
     {
         $this->exts->log("Clearing browser history, cookie, cache");
@@ -217,6 +226,25 @@ class PortalScriptCDP
         }
     }
 
+    private function disable_extensions()
+    {
+        $this->exts->openUrl('chrome://extensions/'); // disable Block origin extension
+        sleep(2);
+        $this->exts->execute_javascript("
+        let manager = document.querySelector('extensions-manager');
+        if (manager && manager.shadowRoot) {
+            let itemList = manager.shadowRoot.querySelector('extensions-item-list');
+            if (itemList && itemList.shadowRoot) {
+                let items = itemList.shadowRoot.querySelectorAll('extensions-item');
+                items.forEach(item => {
+                    let toggle = item.shadowRoot.querySelector('#enableToggle[checked]');
+                    if (toggle) toggle.click();
+                });
+            }
+        }
+    ");
+    }
+
     public function switchToFrame($query_string)
     {
         $this->exts->log(__FUNCTION__ . " Begin with " . $query_string);
@@ -246,19 +274,21 @@ class PortalScriptCDP
 
             $this->exts->log("Enter Username");
             $this->exts->moveToElementAndType($this->username_selector, $this->username);
-            sleep(2);
+            sleep(5);
 
             $this->exts->log("Enter Password");
             $this->exts->moveToElementAndType($this->password_selector, $this->password);
-            sleep(2);
+            sleep(5);
 
-            if ($this->remember_me_selector != '')
+            if ($this->remember_me_selector != '') {
                 $this->exts->moveToElementAndClick($this->remember_me_selector);
+            }
             sleep(2);
 
             $this->exts->capture("2-login-page-filled");
 
-            sleep(5); // Portal itself has one second delay after showing toast
+            sleep(15); // Portal itself has one second delay after showing toast
+
             $this->solve_login_cloudflare();
 
             if ($this->isExists($this->submit_login_selector)) {
@@ -269,6 +299,7 @@ class PortalScriptCDP
             $this->exts->capture("2-login-page-not-found");
         }
     }
+
 
     private function solve_login_cloudflare()
     {
@@ -356,7 +387,34 @@ class PortalScriptCDP
         }
     }
 
-    private function processInvoices()
+    private function changeSelectbox($select_box = '', $option_value = '')
+    {
+        $this->exts->waitTillPresent($select_box, 10);
+        if ($this->exts->exists($select_box)) {
+            $option = $option_value;
+            $this->exts->click_by_xdotool($select_box);
+            sleep(2);
+            $optionIndex = $this->exts->executeSafeScript('
+        const selectBox = document.querySelector("' . $select_box . '");
+        const targetValue = "' . $option_value . '";
+        const optionIndex = [...selectBox.options].findIndex(option => option.value === targetValue);
+        return optionIndex;
+    ');
+            $this->exts->log($optionIndex);
+            sleep(1);
+            for ($i = 0; $i < $optionIndex; $i++) {
+                $this->exts->log('>>>>>>>>>>>>>>>>>> Down');
+                // Simulate pressing the down arrow key
+                $this->exts->type_key_by_xdotool('Down');
+                sleep(1);
+            }
+            $this->exts->type_key_by_xdotool('Return');
+        } else {
+            $this->exts->log('Select box does not exist');
+        }
+    }
+
+    private function processInvoices($count = 0)
     {
         $this->exts->update_process_lock();
         sleep(5);
@@ -372,7 +430,12 @@ class PortalScriptCDP
                 $invoiceName = end(explode(',', $invoiceName));
                 $invoiceName = end(explode('.', $invoiceName));
                 $invoiceName = trim($invoiceName);
-                $invoiceFileName = !empty($invoiceName) ? $invoiceName . '.pdf' : '';
+                // in case invoice name is empty then use custom name
+                if (empty($invoiceName)) {
+                    $invoiceName = time();
+                    sleep(1);
+                }
+                $invoiceFileName =  $invoiceName . '.pdf';
                 $invoiceDate = $this->exts->extract('span.title-text span.title span:nth-child(1)', $invoice_section);
                 $invoiceAmount = $this->exts->extract('span.title-text span.title span:nth-child(2)', $invoice_section);
 
@@ -403,6 +466,23 @@ class PortalScriptCDP
                         $this->exts->log(__FUNCTION__ . '::No pdf ' . $invoiceFileName);
                     }
                 }
+            }
+        }
+        $restrictPages = isset($this->exts->config_array["restrictPages"]) ? (int)@$this->exts->config_array["restrictPages"] : 3;
+        $this->exts->log(__FUNCTION__ . 'restrictPages:: ' . $restrictPages);
+        if ($restrictPages == 0 && $count < 3) {
+            $years = $this->exts->getElements('select[data-qa="period-select"] option');
+            foreach ($years as $key => $year) {
+                if ($key == 0) {
+                    continue;
+                }
+                $value  = $year->getHtmlAttribute("value");
+                $this->exts->log(__FUNCTION__ . 'Year:: ' . $value);
+
+                $this->changeSelectbox('select[data-qa="period-select"]', $value);
+                sleep(2);
+                $count++;
+                $this->processInvoices($count);
             }
         }
     }

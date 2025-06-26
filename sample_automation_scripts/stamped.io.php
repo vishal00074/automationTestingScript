@@ -57,9 +57,7 @@ class PortalScriptCDP
         }
     }
 
-    // Server-Portal-ID: 97926 - Last modified: 01.05.2025 14:16:25 UTC - User: 1
-
-    /*start script*/
+    // Server-Portal-ID: 97926 - Last modified: 06.06.2025 03:21:30 UTC - User: 1
 
     public $loginUrl = 'https://stamped.io/account/signin';
     public $invoicePageUrl = 'https://go.stamped.io/v3/';
@@ -186,16 +184,16 @@ class PortalScriptCDP
             }
             sleep(10);
             $alertBox = $this->exts->evaluate('
-			let alertDisplayed = false;
-			// Override alert function
-			window.alert = function (message) {
-				if (message.toLowerCase().includes("incorrect")) {
-					alertDisplayed = true;
-					return alertDisplayed;
-				}
-				console.log("Alert triggered:", message);
-			};
-		');
+		let alertDisplayed = false;
+		// Override alert function
+		window.alert = function (message) {
+			if (message.toLowerCase().includes("incorrect")) {
+				alertDisplayed = true;
+				return alertDisplayed;
+			}
+			console.log("Alert triggered:", message);
+		};
+	');
             $this->exts->log("print msg ----->" . $alertBox);
 
             sleep(15);
@@ -302,17 +300,17 @@ class PortalScriptCDP
         $this->exts->log(__FUNCTION__ . " $selector $x_on_element $y_on_element");
         $selector = base64_encode($selector);
         $element_coo = $this->exts->execute_javascript('
-			var x_on_element = ' . $x_on_element . '; 
-			var y_on_element = ' . $y_on_element . ';
-			var coo = document.querySelector(atob("' . $selector . '")).getBoundingClientRect();
-			// Default get center point in element, if offset inputted, out put them
-			if(x_on_element > 0 || y_on_element > 0) {
-				Math.round(coo.x + x_on_element) + "|" + Math.round(coo.y + y_on_element);
-			} else {
-				Math.round(coo.x + coo.width/2) + "|" + Math.round(coo.y + coo.height/2);
-			}
-			
-		');
+		var x_on_element = ' . $x_on_element . '; 
+		var y_on_element = ' . $y_on_element . ';
+		var coo = document.querySelector(atob("' . $selector . '")).getBoundingClientRect();
+		// Default get center point in element, if offset inputted, out put them
+		if(x_on_element > 0 || y_on_element > 0) {
+			Math.round(coo.x + x_on_element) + "|" + Math.round(coo.y + y_on_element);
+		} else {
+			Math.round(coo.x + coo.width/2) + "|" + Math.round(coo.y + coo.height/2);
+		}
+		
+	');
         // sleep(1);
         $this->exts->log("Browser clicking position: $element_coo");
         $element_coo = explode('|', $element_coo);
@@ -391,18 +389,18 @@ class PortalScriptCDP
         $this->exts->openUrl('chrome://extensions/');
         sleep(2);
         $this->exts->execute_javascript("
-            let manager = document.querySelector('extensions-manager');
-            if (manager && manager.shadowRoot) {
-                let itemList = manager.shadowRoot.querySelector('extensions-item-list');
-                if (itemList && itemList.shadowRoot) {
-                    let items = itemList.shadowRoot.querySelectorAll('extensions-item');
-                    items.forEach(item => {
-                        let toggle = item.shadowRoot.querySelector('#enableToggle[checked]');
-                        if (toggle) toggle.click();
-                    });
-                }
+        let manager = document.querySelector('extensions-manager');
+        if (manager && manager.shadowRoot) {
+            let itemList = manager.shadowRoot.querySelector('extensions-item-list');
+            if (itemList && itemList.shadowRoot) {
+                let items = itemList.shadowRoot.querySelectorAll('extensions-item');
+                items.forEach(item => {
+                    let toggle = item.shadowRoot.querySelector('#enableToggle[checked]');
+                    if (toggle) toggle.click();
+                });
             }
-        ");
+        }
+    ");
     }
 
     private function processInvoices()
