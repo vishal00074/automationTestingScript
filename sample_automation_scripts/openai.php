@@ -1495,6 +1495,7 @@ class PortalScriptCDP
     private function processInvoices()
     {
         sleep(10);
+        // permision
         exec("sudo docker exec -i --user root " . $this->exts->node_name . " sh -c 'sudo chmod -R 777 /home/seluser/Downloads/'");
         $this->exts->capture("4-invoices-page-" . time());
         $invoices = [];
