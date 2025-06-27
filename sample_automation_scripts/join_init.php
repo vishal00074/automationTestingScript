@@ -20,8 +20,8 @@ private function initPortal($count)
     $this->exts->loadCookiesFromFile();
     sleep(1);
     $this->exts->openUrl($this->baseUrl);
-    sleep(3);
-    $this->exts->waitTillAnyPresent([$this->username_selector, $this->check_login_success_selector], 150);
+    sleep(15);
+    $this->waitFor($this->check_login_success_selector, 10);
 
     if ($this->exts->exists('div#cookiescript_accept')) {
         $this->exts->moveToElementAndClick('div#cookiescript_accept');
@@ -32,7 +32,7 @@ private function initPortal($count)
     if ($this->exts->querySelector($this->check_login_success_selector) == null) {
         $this->exts->log('NOT logged via cookie');
         $this->checkFillLogin();
-        $this->exts->waitTillPresent($this->check_login_success_selector, 100);
+        $this->waitFor($this->check_login_success_selector, 20);
     }
 
     if ($this->exts->querySelector($this->check_login_success_selector) != null) {
@@ -104,25 +104,25 @@ private function checkFillRecaptcha()
 
             // Step 2, check if callback function need executed
             $gcallbackFunction = $this->exts->execute_javascript('
-            if(document.querySelector("[data-callback]") != null){
-                return document.querySelector("[data-callback]").getAttribute("data-callback");
-            }
+        if(document.querySelector("[data-callback]") != null){
+            return document.querySelector("[data-callback]").getAttribute("data-callback");
+        }
 
-            var result = ""; var found = false;
-            function recurse (cur, prop, deep) {
-                if(deep > 5 || found){ return;}console.log(prop);
-                try {
-                    if(cur == undefined || cur == null || cur instanceof Element || Object(cur) !== cur || Array.isArray(cur)){ return;}
-                    if(prop.indexOf(".callback") > -1){result = prop; found = true; return;
-                    } else { deep++;
-                        for (var p in cur) { recurse(cur[p], prop ? prop + "." + p : p, deep);}
-                    }
-                } catch(ex) { console.log("ERROR in function: " + ex); return; }
-            }
+        var result = ""; var found = false;
+        function recurse (cur, prop, deep) {
+            if(deep > 5 || found){ return;}console.log(prop);
+            try {
+                if(cur == undefined || cur == null || cur instanceof Element || Object(cur) !== cur || Array.isArray(cur)){ return;}
+                if(prop.indexOf(".callback") > -1){result = prop; found = true; return;
+                } else { deep++;
+                    for (var p in cur) { recurse(cur[p], prop ? prop + "." + p : p, deep);}
+                }
+            } catch(ex) { console.log("ERROR in function: " + ex); return; }
+        }
 
-            recurse(___grecaptcha_cfg.clients[0], "", 0);
-            return found ? "___grecaptcha_cfg.clients[0]." + result : null;
-        ');
+        recurse(___grecaptcha_cfg.clients[0], "", 0);
+        return found ? "___grecaptcha_cfg.clients[0]." + result : null;
+    ');
             $this->exts->log('Callback function: ' . $gcallbackFunction);
             if ($gcallbackFunction != null) {
                 $this->exts->execute_javascript($gcallbackFunction . '("' . $this->exts->recaptcha_answer . '");');
@@ -131,5 +131,13 @@ private function checkFillRecaptcha()
         }
     } else {
         $this->exts->log(__FUNCTION__ . '::Not found reCaptcha');
+    }
+}
+
+public function waitFor($selector, $seconds = 7)
+{
+    for ($wait = 0; $wait < 2 && $this->exts->executeSafeScript("return !!document.querySelector('" . $selector . "');") != 1; $wait++) {
+        $this->exts->log('Waiting for Selectors.....');
+        sleep($seconds);
     }
 }
