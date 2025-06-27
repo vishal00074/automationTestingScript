@@ -179,6 +179,14 @@ class PortalScriptCDP
         return $isLoggedIn;
     }
 
+    public function waitFor($selector, $seconds = 7)
+    {
+        for ($wait = 0; $wait < 2 && $this->exts->executeSafeScript("return !!document.querySelector('" . $selector . "');") != 1; $wait++) {
+            $this->exts->log('Waiting for Selectors.....');
+            sleep($seconds);
+        }
+    }
+
     public $totalInvoices = 0;
 
     private function processInvoices($paging_count = 1)
@@ -190,63 +198,66 @@ class PortalScriptCDP
 
         $rows = $this->exts->querySelectorAll('div.MuiPaper-root');
         $count = 0;
-
-        foreach ($rows as $row) {
-
+        $key = 1;
+        foreach ($rows as  $row) {
             if ($this->totalInvoices >= 50 && $restrictPages != 0) {
                 return;
             }
-
             $count++;
-
             if ($this->exts->querySelector('div.MuiAccordionDetails-root a.itn--file-action:last-child', $row) != null) {
 
+                $extractText = $this->exts->extract('li', $row);
                 $invoiceUrl = '';
-                $invoiceName = '';
+                $invoiceName = str_replace(" ", "",  $extractText);
                 $invoiceAmount = '';
                 $invoiceDate = $this->exts->extract('div.MuiAccordionSummary-content p', $row);
                 sleep(2);
-                $downloadBtn = $this->exts->querySelector('div.MuiAccordionDetails-root a.itn--file-action:last-child', $row);
-
+                $downloadBtn = $this->exts->querySelector('div.MuiAccordionSummary-expandIconWrappers', $row);
                 array_push($invoices, array(
                     'invoiceName' => $invoiceName,
                     'invoiceDate' => $invoiceDate,
                     'invoiceAmount' => $invoiceAmount,
-                    'invoiceUrl' => $invoiceUrl,
-                    'downloadBtn' => $downloadBtn
+                    'invoiceUrl' => $invoiceUrl
                 ));
 
                 $this->isNoInvoice = false;
 
                 $this->exts->log('--------------------------');
+                $this->exts->log('invoiceName: ' . $invoiceName);
                 $this->exts->log('invoiceDate: ' . $invoiceDate);
                 $this->exts->log('invoiceAmount: ' . $invoiceAmount);
                 $this->exts->log('invoiceUrl: ' . $invoiceUrl);
 
+                $invoiceFileName = !empty($invoiceName) ?  $invoiceName . '.pdf' : '';
                 $invoiceDate = $this->exts->parse_date(trim($invoiceDate), 'F Y', 'Y-m-01');
                 $this->exts->log('Date parsed: ' . $invoiceDate);
+                $j = $key + 1;
+                $key++;
 
-                $this->exts->execute_javascript("arguments[0].click();", [$downloadBtn]);
+                $invoiceBtn = $this->exts->getElement('main div.MuiPaper-root:nth-child(' . $j . ') div.itn--file-action-wrapper a:nth-child(2)');
+                if ($invoiceBtn != null) {
 
-                // $this->exts->execute_javascript("
-				// 	var element = 'div.MuiPaper-root:nth-of-type(" . $count . ") div.MuiAccordionDetails-root a.itn--file-action:last-child';
-				// 	document.querySelector(element).click();
-				// ");
+                    if ($this->exts->document_exists($invoiceFileName)) {
+                        continue;
+                    }
 
-                sleep(10);
+                    $this->exts->no_margin_pdf = 1;
 
-                $this->exts->wait_and_check_download('pdf');
-                $downloaded_file = $this->exts->find_saved_file('pdf');
+                    $this->exts->execute_javascript('arguments[0].click()', [$invoiceBtn]);
+                    sleep(4);
+                    $file_ext = $this->exts->get_file_extension($invoiceFileName);
 
-                if (trim($downloaded_file) != '' && file_exists($downloaded_file)) {
-                    $invoiceName = basename($downloaded_file, '.pdf');
+                    $this->exts->wait_and_check_download($file_ext);
 
-                    $this->exts->log('invoiceName: ' . $invoiceName);
-                    $this->exts->new_invoice($invoiceName, $invoiceDate, $invoiceAmount, $downloaded_file);
-                    $this->totalInvoices++;
-                    sleep(5);
-                } else {
-                    $this->exts->log('Timeout when download ');
+                    $downloaded_file =  $this->exts->find_saved_file('pdf', $invoiceFileName);
+
+                    if (trim($downloaded_file) != '' && file_exists($downloaded_file)) {
+                        $this->exts->new_invoice($invoiceUrl,  $invoiceDate, $invoiceAmount, $downloaded_file);
+                        sleep(1);
+                        $this->totalInvoices++;
+                    } else {
+                        $this->exts->log(__FUNCTION__ . '::No download ' . $invoiceFileName);
+                    }
                 }
             }
         }
