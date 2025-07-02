@@ -1,89 +1,70 @@
-public $baseUrl = 'https://www.velocityfleet.com';
-public $loginUrl = 'https://www.velocityfleet.com/accounts/login/';
+public $baseUrl = 'https://www.velocityfleet.com/index';
+public $loginUrl = 'https://www.velocityfleet.com/en-us/accounts/login';
 public $invoicePageUrl = 'https://www.velocityfleet.com/app/invoices/list/all-invoices';
-public $UserUrl = 'https://www.velocityfleet.com/selectSessionCustomer/';
 
-public $username_selector = 'form input#id_username, form[action*="/login"] input[name*="username"]';
-public $password_selector = 'form input#id_password, form[action*="/login"] input[name*="password"]';
+public $username_selector = 'input[name="username"]';
+public $password_selector = 'input[name="password"]';
 public $remember_me_selector = '';
-public $submit_login_selector = 'form input[data-qa-id="button__login"], form[action*="/login"] button[type="submit"]';
+public $submit_login_selector = 'button.login-panel__submit';
 
-public $check_login_failed_selector = '.messages-section .alert.message, form#login-panel__form ul.errorlist';
-public $check_login_success_selector = 'div#logout-top-nav a[href*="/logout"], a[href="/accounts/logout/"]';
+public $check_login_failed_selector = 'ul.errorlist';
+public $check_login_success_selector = 'a[href="/accounts/logout/"]';
 
 public $isNoInvoice = true;
+
 /**
+
     * Entry Method thats called for a portal
+
     * @param Integer $count Number of times portal is retried.
+
     */
 private function initPortal($count)
 {
+
     $this->exts->log('Begin initPortal ' . $count);
-
-    // $this->fake_user_agent('Mozilla/5.0 (Windows NT 10.0; WOW64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/92.0.4515.131 Safari/537.36');   
-    $this->exts->openUrl($this->baseUrl);
-    sleep(1);
-
-    // Load cookies
     $this->exts->loadCookiesFromFile();
-    sleep(1);
     $this->exts->openUrl($this->baseUrl);
-    sleep(10);
-    $this->exts->capture('1-init-page');
 
-    // If user hase not logged in from cookie, clear cookie, open the login url and do login
-    if ($this->exts->getElement($this->check_login_success_selector) == null) {
+    if (!$this->checkLogin()) {
         $this->exts->log('NOT logged via cookie');
         $this->exts->clearCookies();
         $this->exts->openUrl($this->loginUrl);
-        sleep(15);
-        $this->checkFillLogin();
-        sleep(5);
-        for ($i = 0; $i < 3 && !$this->exts->check_exist_by_chromedevtool('div[style*="visibility: visible"] > div  >  iframe[src*="frame=challenge"]'); $i++) {
-            sleep(5);
+
+        $this->fillForm(0);
+
+        $this->check_solve_challenge();
+        sleep(10);
+        if ($this->exts->querySelector('a[href="/mfa/enter-code-mfa-email/"]') != null) {
+            $this->exts->moveToElementAndClick('a[href="/mfa/enter-code-mfa-email/"]');
+            sleep(10);
         }
-        $this->check_solve_hcaptcha_challenge();
-        $this->check_solve_hcaptcha_challenge();
-        // if Step above failed, try again
-        for ($i = 0; $i < 3 && !$this->exts->exists($this->check_login_failed_selector) && $this->exts->getElement($this->check_login_success_selector) == null; $i++) {
-            $this->clearChrome();
-            $this->exts->openUrl($this->loginUrl);
-            sleep(15);
-            $this->checkFillLogin();
-            sleep(5);
-            for ($i = 0; $i < 3 && !$this->exts->check_exist_by_chromedevtool('div[style*="visibility: visible"] > div  >  iframe[src*="frame=challenge"]'); $i++) {
-                sleep(5);
-            }
-            $this->check_solve_hcaptcha_challenge();
-            $this->check_solve_hcaptcha_challenge();
-        }
-        if (stripos($this->exts->extract('form#login-panel__form ul.errorlist li'), 'You could not be logged in at this time') !== false) {
-            $this->exts->openUrl($this->loginUrl);
-            sleep(15);
-            $this->checkFillLogin();
-            sleep(5);
-            for ($i = 0; $i < 3 && !$this->exts->check_exist_by_chromedevtool('div[style*="visibility: visible"] > div  >  iframe[src*="frame=challenge"]'); $i++) {
-                sleep(5);
-            }
-            $this->check_solve_hcaptcha_challenge();
-            $this->check_solve_hcaptcha_challenge();
+
+        $this->checkFillTwoFactor();
+        sleep(7);
+        if ($this->exts->querySelector('div[class="contactus-field-container contactus-field-error-container"] p')) {
+            $this->exts->moveToElementAndClick('a[id="resend_code_btn"]');
+            sleep(10);
+            $this->checkFillTwoFactor();
         }
     }
 
+    if ($this->checkLogin()) {
+        $this->exts->log(">>>>>>>>>>>>>>>Login successful!!!!");
+        $this->exts->capture("LoginSuccess");
 
-    if ($this->exts->getElement($this->check_login_success_selector) != null) {
-        sleep(3);
-        $this->exts->log(__FUNCTION__ . '::User logged in');
-        $this->exts->capture("3-login-success");
-
+        sleep(2);
         if (!empty($this->exts->config_array['allow_login_success_request'])) {
-            $this->exts->triggerLoginSuccess();
+                $this->exts->triggerLoginSuccess();
         }
 
         $this->exts->success();
     } else {
-        $this->exts->log(__FUNCTION__ . '::Use login failed');
-        if (stripos($this->exts->extract($this->check_login_failed_selector, null, 'innerText'), 'passwor') !== false) {
+        if ($this->exts->exists($this->check_login_failed_selector)) {
+            $this->exts->log("Wrong credential !!!!");
+            $this->exts->loginFailure(1);
+        } else if ($this->exts->exists('div[class="contactus-field-container contactus-field-error-container"] p')) {
+            $this->exts->log("Wrong credential !!!!");
             $this->exts->loginFailure(1);
         } else {
             $this->exts->loginFailure();
@@ -91,154 +72,242 @@ private function initPortal($count)
     }
 }
 
-private function checkFillLogin()
+function fillForm($count)
 {
-    if ($this->exts->exists('button#CybotCookiebotDialogBodyLevelButtonLevelOptinAllowAll')) {
-        $this->exts->moveToElementAndClick('button#CybotCookiebotDialogBodyLevelButtonLevelOptinAllowAll');
+    $this->exts->log("Begin fillForm " . $count);
+    $this->exts->waitTillPresent($this->username_selector, 10);
+    try {
+        if ($this->exts->querySelector($this->username_selector) != null) {
+
+            $this->exts->capture("1-pre-login");
+            $this->exts->log("Enter Username");
+            $this->exts->moveToElementAndType($this->username_selector, $this->username);
+            sleep(1);
+
+            $this->exts->log("Enter Password");
+            $this->exts->moveToElementAndType($this->password_selector, $this->password);
+            sleep(1);
+
+            if ($this->exts->exists($this->remember_me_selector)) {
+                $this->exts->log("Remember Me");
+                $this->exts->moveToElementAndClick($this->remember_me_selector);
+                sleep(1);
+            }
+
+            $this->exts->capture("1-login-page-filled");
+            sleep(5);
+
+            if ($this->exts->exists($this->submit_login_selector)) {
+                $this->exts->click_by_xdotool($this->submit_login_selector);
+            }
+            sleep(10);
+        }
+    } catch (\Exception $exception) {
+        $this->exts->log("Exception filling loginform " . $exception->getMessage());
+    }
+}
+
+private function checkFillTwoFactor()
+{
+    $two_factor_selector = 'input#id_code';
+    $two_factor_message_selector = '';
+    $two_factor_submit_selector = 'button.radiusBtn';
+
+    if ($this->exts->querySelector($two_factor_selector) != null && $this->exts->two_factor_attempts < 3) {
+        $this->exts->log("Two factor page found.");
+        $this->exts->capture("2.1-two-factor");
+
+        if ($this->exts->querySelector($two_factor_message_selector) != null) {
+            $this->exts->two_factor_notif_msg_en = "";
+            for ($i = 0; $i < count($this->exts->getElements($two_factor_message_selector)); $i++) {
+                $this->exts->two_factor_notif_msg_en = $this->exts->two_factor_notif_msg_en . $this->exts->getElements($two_factor_message_selector)[$i]->getAttribute('innerText') . "\n";
+            }
+            $this->exts->two_factor_notif_msg_en = trim($this->exts->two_factor_notif_msg_en);
+            $this->exts->two_factor_notif_msg_de = $this->exts->two_factor_notif_msg_en;
+            $this->exts->log("Message:\n" . $this->exts->two_factor_notif_msg_en);
+        }
+        if ($this->exts->two_factor_attempts == 2) {
+            $this->exts->two_factor_notif_msg_en = $this->exts->two_factor_notif_msg_en . ' ' . $this->exts->two_factor_notif_msg_retry_en;
+            $this->exts->two_factor_notif_msg_de = $this->exts->two_factor_notif_msg_de . ' ' . $this->exts->two_factor_notif_msg_retry_de;
+        }
+
+        $two_factor_code = trim($this->exts->fetchTwoFactorCode());
+
+        if (!empty($two_factor_code) && trim($two_factor_code) != '') {
+            $this->exts->log("checkFillTwoFactor: Entering two_factor_code." . $two_factor_code);
+            $this->exts->moveToElementAndType($two_factor_selector, $two_factor_code);
+
+            $this->exts->log("checkFillTwoFactor: Clicking submit button.");
+            sleep(3);
+            $this->exts->capture("2.2-two-factor-filled-" . $this->exts->two_factor_attempts);
+
+            $this->exts->moveToElementAndClick($two_factor_submit_selector);
+            sleep(10);
+            if ($this->exts->exists('div[class*="errorMessage"]')) {
+
+                $this->exts->capture("wrong 2FA code error-" . $this->exts->two_factor_attempts);
+                $this->exts->log('The code you entered is incorrect. Please try again.');
+            }
+
+            if ($this->exts->querySelector($two_factor_selector) == null) {
+                $this->exts->log("Two factor solved");
+            } else if ($this->exts->two_factor_attempts < 3) {
+                $this->exts->notification_uid = '';
+                $this->exts->two_factor_attempts++;
+                $this->checkFillTwoFactor();
+            } else {
+                $this->exts->log("Two factor can not solved");
+            }
+        } else {
+            $this->exts->log("Not received two factor code");
+        }
+    }
+}
+
+/**
+
+    * Method to Check where user is logged in or not
+
+    * return boolean true/false
+
+    */
+function checkLogin()
+{
+    $this->exts->log("Begin checkLogin ");
+    $isLoggedIn = false;
+    try {
+        $this->exts->waitTillPresent($this->check_login_success_selector, 20);
+        if ($this->exts->exists($this->check_login_success_selector) && !$this->exts->urlContains('mfa/enter-code-mfa-email/')) {
+
+            $this->exts->log(">>>>>>>>>>>>>>>Login successful!!!!");
+
+            $isLoggedIn = true;
+        }
+    } catch (Exception $exception) {
+        $this->exts->log("Exception checking loggedin " . $exception);
+    }
+
+    return $isLoggedIn;
+}
+
+private function check_solve_challenge()
+{
+    $is_captcha = $this->solve_captcha_by_clicking(0);
+    if ($is_captcha) {
+        for ($i = 1; $i < 30; $i++) {
+            if ($is_captcha == false) {
+                break;
+            }
+            $is_captcha = $this->solve_captcha_by_clicking($i);
+        }
+    }
+}
+
+private function solve_captcha_by_clicking($count = 1)
+{
+    $this->exts->log("Checking captcha");
+    $language_code = '';
+
+    $this->exts->switchToDefault();
+
+    $captcha_iframe_selector = 'div[style*="visibility: visible;"] div iframe[src*="hcaptcha"]';
+
+    $this->exts->waitTillPresent($captcha_iframe_selector, 30);
+
+    if ($this->exts->exists($captcha_iframe_selector)) {
+
+        $this->exts->log(">>>>>>>>>>>>>> hcaptcha");
+
+        $this->exts->capture("velocity-fleet-captcha");
+
+        $captcha_instruction = '';
+
+        $this->exts->log('language_code: ' . $language_code . ' Instruction: ' . $captcha_instruction);
+
+        $captcha_wraper_selector = $captcha_iframe_selector;
+
+        $this->exts->switchToDefault();
         sleep(2);
-    }
-    $this->exts->type_key_by_xdotool("F5");
-    sleep(7);
 
-    $this->exts->type_text_by_xdotool($this->username);
-    sleep(1);
-    $this->exts->type_key_by_xdotool("Tab");
-    $this->exts->type_text_by_xdotool($this->password);
-    sleep(1);
-    $this->exts->type_key_by_xdotool("Return");
-    sleep(10);
-}
+        if ($this->exts->exists($captcha_wraper_selector)) {
+            $coordinates = $this->getCoordinates($captcha_wraper_selector, $captcha_instruction, '', $json_result = false);
 
-
-private function check_solve_hcaptcha_challenge()
-{
-    $this->exts->waitTillPresent('iframe[src*="hcaptcha.com/captcha"][title*="checkbox"][data-hcaptcha-response=""]');
-    $unsolved_hcaptcha_submit_selector = 'iframe[src*="hcaptcha.com/captcha"][title*="checkbox"][data-hcaptcha-response=""]';
-    $hcaptcha_challenger_wraper_selector = 'div[style*="visibility: visible"] > div  >  iframe[src*="frame=challenge"]';
-    if ($this->isExists($unsolved_hcaptcha_submit_selector) || $this->isExists($hcaptcha_challenger_wraper_selector)) { // if exist hcaptcha and it isn't solved
-        // Check if challenge images hasn't showed yet, Click checkbox to show images challenge
-        $this->exts->log("Captcha found");
-        if (!$this->isExists($hcaptcha_challenger_wraper_selector)) {
-            $this->exts->click_by_xdotool($unsolved_hcaptcha_submit_selector);
-            sleep(5);
-        }
-
-        if ($this->isExists($hcaptcha_challenger_wraper_selector)) { // Select language English always
-            $this->exts->log("Select language English always");
-            $wraper_side = $this->exts->evaluate('
-            window.lastMousePosition = null;
-            window.addEventListener("mousemove", function(e){
-                window.lastMousePosition = e.clientX +"|" + e.clientY;
-            });
-            var coo = document.querySelector(atob("' . base64_encode($hcaptcha_challenger_wraper_selector) . '")).getBoundingClientRect();
-            coo.width + "|" + coo.height;
-        ');
-            $evalJson = json_decode($wraper_side, true);
-            $wraper_side = $evalJson['result']['result']['value'];
-
-            $this->exts->log('Select English language ' . $wraper_side);
-            $wraper_side = explode('|', $wraper_side);
-            $this->exts->click_by_xdotool($hcaptcha_challenger_wraper_selector, 20, (int)$wraper_side[1] - 71);
-            sleep(1);
-            $this->exts->type_key_by_xdotool('e');
-            sleep(1);
-            $this->exts->type_key_by_xdotool('Return');
-            sleep(2);
-        }
-        $this->exts->log("prcess hcaptcha start");
-
-        $this->process_hcaptcha_by_clicking();
-        $this->process_hcaptcha_by_clicking();
-        sleep(5);
-        if ($this->isExists($hcaptcha_challenger_wraper_selector)) {
-            $this->process_hcaptcha_by_clicking();
-            $this->process_hcaptcha_by_clicking();
-            $this->process_hcaptcha_by_clicking();
-            $this->process_hcaptcha_by_clicking();
-            sleep(5);
-        }
-        if ($this->isExists($hcaptcha_challenger_wraper_selector)) {
-            $this->process_hcaptcha_by_clicking();
-            $this->process_hcaptcha_by_clicking();
-            sleep(5);
-        }
-        sleep(10);
-        $this->exts->capture("2-after-solving-hcaptcha");
-    } else {
-        $this->exts->log("Captcha Not found");
-    }
-}
-private function process_hcaptcha_by_clicking()
-{
-    $unsolved_hcaptcha_submit_selector = '.h-captcha[data-size="normal"] iframe[data-hcaptcha-response=""]';
-    $hcaptcha_challenger_wraper_selector = 'div[style*="visibility: visible"] > div  >  iframe[src*="frame=challenge"]';
-    if ($this->isExists($unsolved_hcaptcha_submit_selector) || $this->isExists($hcaptcha_challenger_wraper_selector)) { // if exist hcaptcha and it isn't solved
-        $this->exts->capture("hcaptcha");
-        // Check if challenge images hasn't showed yet, Click checkbox to show images challenge
-        if (!$this->isExists($hcaptcha_challenger_wraper_selector)) {
-            $this->exts->click_by_xdotool($unsolved_hcaptcha_submit_selector);
-            sleep(5);
-        }
-        // $this->exts->switchToDefault();
-        if ($this->isExists($hcaptcha_challenger_wraper_selector)) { // If image chalenge doesn't displayed, maybe captcha solved after clicking checkbox
-            $captcha_instruction = '';
-            $old_height = $this->exts->evaluate('
-            var wrapper = document.querySelector(atob("' . base64_encode($hcaptcha_challenger_wraper_selector) . '"));
-            var old_height = wrapper.style.height;
-            wrapper.style.height = "600px";
-            old_height
-        ');
-            $evalJson = json_decode($old_height, true);
-            $old_height = $evalJson['result']['result']['value'];
-            $coordinates = $this->processClickCaptcha($hcaptcha_challenger_wraper_selector, $captcha_instruction, '', $json_result = true, 85); // use $language_code and $captcha_instruction if they changed captcha content
-            if ($coordinates == '') {
-                $coordinates = $this->processClickCaptcha($hcaptcha_challenger_wraper_selector, $captcha_instruction, '', $json_result = true, 85);
-            }
             if ($coordinates != '') {
-                if ($this->isExists($hcaptcha_challenger_wraper_selector)) {
-                    if (!empty($old_height)) {
-                        $this->exts->evaluate('
-                        document.querySelector(atob("' . base64_encode($hcaptcha_challenger_wraper_selector) . '")).style.height = "' . $old_height . '";
-                    ');
-                    }
 
-                    foreach ($coordinates as $coordinate) {
-                        if (!$this->isExists($hcaptcha_challenger_wraper_selector)) {
-                            $this->exts->log('Error');
-                            return;
-                        }
-                        $this->click_hcaptcha_point($hcaptcha_challenger_wraper_selector, (int)$coordinate['x'], (int)$coordinate['y']);
-                        // sleep(1);
-                        if (!$this->isExists($hcaptcha_challenger_wraper_selector)) {
-                            $this->exts->log('Error');
-                            return;
-                        }
-                    }
-                    $marked_time = time();
-                    $this->exts->capture("hcaptcha-selected-" . $marked_time);
-
-                    $wraper_side = $this->exts->evaluate('
-                    var coo = document.querySelector(atob("' . base64_encode($hcaptcha_challenger_wraper_selector) . '")).getBoundingClientRect();
-                    coo.width + "|" + coo.height;
-                ');
-
-                    $evalJson = json_decode($wraper_side, true);
-                    $wraper_side = $evalJson['result']['result']['value'];
-
-                    $wraper_side = explode('|', $wraper_side);
-                    $this->click_hcaptcha_point($hcaptcha_challenger_wraper_selector, (int)$wraper_side[0] - 50, (int)$wraper_side[1] - 30);
-
-                    sleep(5);
-                    $this->exts->capture("hcaptcha-submitted-" . $marked_time);
+                foreach ($coordinates as $coordinate) {
+                    $this->click_captcha_point($captcha_wraper_selector, (int)$coordinate['x'], (int)$coordinate['y']);
                 }
+
+                $this->exts->switchToDefault();
+                sleep(2);
+
+                $this->exts->capture("artstation-captcha-selected " . $count);
+
+                if ($this->exts->exists($captcha_iframe_selector)) {
+                    $this->exts->log("Clicking next button!!!");
+                    $iframe = $this->exts->makeFrameExecutable($captcha_iframe_selector);
+                    $submitBtn = $iframe->querySelector('div.button-submit');
+                    $iframe->execute_javascript("arguments[0].click();", [$submitBtn]);
+                } else {
+                    $this->exts->log("-----Captcha submit button not found!!!-----");
+                }
+
+                sleep(5);
+                $this->exts->switchToDefault();
+                return true;
             }
         }
-        return true;
+        $this->exts->switchToDefault();
+        return false;
     }
-    return false;
 }
 
-private function click_hcaptcha_point($selector = '', $x_on_element = 0, $y_on_element = 0)
+private function getCoordinates($captcha_image_selector, $instruction = '', $lang_code = '', $json_result = false, $image_dpi = 75)
+{
+    $this->exts->log("--GET Coordinates By 2CAPTCHA--");
+    $response = '';
+    $image_path = $this->exts->captureElement($this->exts->process_uid, $captcha_image_selector);
+    $source_image = imagecreatefrompng($image_path);
+    imagejpeg($source_image, $this->exts->screen_capture_location . $this->exts->process_uid . '.jpg', $image_dpi);
+
+    $cmd = $this->exts->config_array['click_captcha_shell_script'] . " --PROCESS_UID::" . $this->exts->process_uid . " --CAPTCHA_INSTRUCTION::" . urlencode($instruction) . " --LANG_CODE::" . urlencode($lang_code) . " --JSON_RESULT::" . urlencode($json_result);
+    $this->exts->log('Executing command : ' . $cmd);
+    exec($cmd, $output, $return_var);
+    $this->exts->log('Command Result : ' . print_r($output, true));
+
+    if (!empty($output)) {
+        $output = trim($output[0]);
+        if ($json_result) {
+            if (strpos($output, '"status":1') !== false) {
+                $response = json_decode($output, true);
+                $response = $response['request'];
+            }
+        } else {
+            if (strpos($output, 'coordinates:') !== false) {
+                $array = explode("coordinates:", $output);
+                $response = trim(end($array));
+                $coordinates = [];
+                $pairs = explode(';', $response);
+                foreach ($pairs as $pair) {
+                    preg_match('/x=(\d+),y=(\d+)/', $pair, $matches);
+                    if (!empty($matches)) {
+                        $coordinates[] = ['x' => (int)$matches[1], 'y' => (int)$matches[2]];
+                    }
+                }
+                $this->exts->log('>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>');
+                $this->exts->log(print_r($coordinates, true));
+                return $coordinates;
+            }
+        }
+    }
+
+    if ($response == '') {
+        $this->exts->log("Can not get result from API");
+    }
+    return $response;
+}
+
+private function click_captcha_point($selector = '', $x_on_element = 0, $y_on_element = 0)
 {
     $this->exts->log(__FUNCTION__ . " $selector $x_on_element $y_on_element");
     $selector = base64_encode($selector);
@@ -275,85 +344,4 @@ private function click_hcaptcha_point($selector = '', $x_on_element = 0, $y_on_e
     exec("sudo docker exec " . $node_name . " bash -c 'xdotool mousemove " . rand($clicking_x - 10, $clicking_x + 10) . " " . rand($clicking_y - 10, $clicking_y + 10) . "'");
 
     exec("sudo docker exec " . $node_name . " bash -c 'xdotool mousemove " . $clicking_x . " " . $clicking_y . " click 1;'");
-}
-
-
-private function processClickCaptcha(
-    $captcha_image_selector,
-    $instruction = '',
-    $lang_code = '',
-    $json_result = false,
-    $image_dpi = 90
-) {
-    $this->exts->log("--CAll CLICK CAPTCHA SERVICE-");
-    $response = '';
-    $image_path = $this->exts->captureElement($this->exts->process_uid, $captcha_image_selector);
-    $source_image = imagecreatefrompng($image_path);
-    imagejpeg($source_image, $this->exts->screen_capture_location . $this->exts->process_uid . '.jpg', $image_dpi);
-
-    $cmd = $this->exts->config_array['click_captcha_shell_script'] . " --PROCESS_UID::" . $this->exts->process_uid . " --CAPTCHA_INSTRUCTION::" . urlencode($instruction) . " --LANG_CODE::" . urlencode($lang_code) . " --JSON_RESULT::" . urlencode($json_result);
-    $this->exts->log('Executing command : ' . $cmd);
-    exec($cmd, $output, $return_var);
-    $this->exts->log('Command Result : ' . print_r($output, true));
-
-    if (!empty($output)) {
-        $output = trim($output[0]);
-        if ($json_result) {
-            if (strpos($output, '"status":1') !== false) {
-                $response = json_decode($output, true);
-                $response = $response['request'];
-            }
-        } else {
-            if (strpos($output, 'coordinates:') !== false) {
-                $response = trim(end(explode("coordinates:", $output)));
-            }
-        }
-    }
-    if ($response == '') {
-        $this->exts->log("Can not get result from API");
-    }
-    return $response;
-}
-//END block
-
-private function clearChrome()
-{
-    $this->exts->log("Clearing browser history, cookie, cache");
-    $this->exts->openUrl('chrome://settings/clearBrowserData');
-    sleep(10);
-    $this->exts->capture("clear-page");
-    for ($i = 0; $i < 2; $i++) {
-        $this->exts->type_key_by_xdotool('Tab');
-        sleep(1);
-    }
-    $this->exts->type_key_by_xdotool('Tab');
-    sleep(1);
-    $this->exts->type_key_by_xdotool('Return');
-    sleep(1);
-    $this->exts->type_key_by_xdotool('a');
-    sleep(1);
-    $this->exts->type_key_by_xdotool('Return');
-    sleep(3);
-    $this->exts->capture("clear-page");
-    for ($i = 0; $i < 5; $i++) {
-        $this->exts->type_key_by_xdotool('Tab');
-        sleep(1);
-    }
-    $this->exts->type_key_by_xdotool('Return');
-    sleep(10);
-    $this->exts->capture("after-clear");
-}
-
-private function isExists($selector = '')
-{
-    $safeSelector = addslashes($selector);
-    $this->exts->log('Element:: ' . $safeSelector);
-    $isElement = $this->exts->execute_javascript('!!document.querySelector("' . $safeSelector . '")');
-    if ($isElement) {
-        $this->exts->log('Element Found');
-        return true;
-    } else {
-        $this->exts->log('Element not Found');
-        return false;
-    }
 }

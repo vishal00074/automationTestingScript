@@ -1,4 +1,4 @@
-<?php // replace exists with custom js function and waitTillPresent
+<?php //  optmize the scripts
 
 /**
  * Chrome Remote via Chrome devtool protocol script, for specific process/portal
@@ -56,7 +56,6 @@ class PortalScriptCDP
             echo 'Script execution failed.. ' . "\n";
         }
     }
-    // Server-Portal-ID: 20591 - Last modified: 24.03.2025 14:22:08 UTC - User: 1
 
     public $baseUrl = "https://biz.ikea.com/de/de/profile/transactions#";
     public $loginUrl = "https://www.ikea.com/de/de/profile/login";
@@ -99,7 +98,7 @@ class PortalScriptCDP
         $isCookieLoginSuccess = false;
 
 
-        for ($wait = 0; $wait < 15 && $this->exts->executeSafeScript('return !!document.querySelector("a[href*=\\"/#/login\\"]");') != 1; $wait++) {
+        for ($wait = 0; $wait < 4 && $this->exts->executeSafeScript('return !!document.querySelector("a[href*=\\"/#/login\\"]");') != 1; $wait++) {
             $this->exts->log('Waiting for login.....');
             sleep(10);
         }
@@ -314,13 +313,13 @@ class PortalScriptCDP
         // $this->exts->openUrl('https://www.ikea.com/de/de/purchases/');
         //sleep(10);
         /* // go to profile overview page
-			 $this->exts->execute_javascript('location.href = "https://www.ikea.com/de/de/local-apps/business-formulare/#/portal/overview";');
-			 sleep(5);
-			 $this->exts->capture('profile_overview');
-			 // click Purchases nav link (open link)
-			 $this->exts->execute_javascript('location.href = "https://biz.ikea.com/de/de/profile/transactions";');
-			 sleep(5);
-			 $this->exts->capture('transactions_page'); */
+		 $this->exts->execute_javascript('location.href = "https://www.ikea.com/de/de/local-apps/business-formulare/#/portal/overview";');
+		 sleep(5);
+		 $this->exts->capture('profile_overview');
+		 // click Purchases nav link (open link)
+		 $this->exts->execute_javascript('location.href = "https://biz.ikea.com/de/de/profile/transactions";');
+		 sleep(5);
+		 $this->exts->capture('transactions_page'); */
         $this->exts->openUrl("https://www.ikea.com/de/de/business-profile/transactions/");
         sleep(10);
         $this->exts->capture('purchases_page');
@@ -333,7 +332,7 @@ class PortalScriptCDP
 
         $this->processInvoicesNew();
 
-        if ($this->isNoInvoice == true) {
+        if ($this->isNoInvoice) {
             $this->exts->log("No invoice !!! ");
             $this->exts->no_invoice();
         }
@@ -380,8 +379,8 @@ class PortalScriptCDP
 
         $this->exts->capture("4-invoices-page");
 
-
-        while ($this->moreBtn) {
+        $stop = 0;
+        while ($this->moreBtn && $stop < 20) {
             // Check if the button exists
             $this->waitFor('[id="history-list-completed"] +div >div > button', 15);
             if ($this->isExists('[id="history-list-completed"] +div >div > button, button[aria-label="Mehr Käufe ansehen"]')) {
@@ -391,6 +390,7 @@ class PortalScriptCDP
                 // Exit the loop if the button does not exist
                 $this->moreBtn = false;
             }
+            $stop++;
         }
 
         $rows = count($this->exts->getElements('ul[id*="list-completed"] > li ,ul[id="ph_list-completed"] > li'));
@@ -434,7 +434,7 @@ class PortalScriptCDP
                 sleep(15);
 
                 $invoiceName = $this->exts->extract('ul[id="purchase-details"] li:nth-child(1) span[class="list-view-item__description"],ul[id="Purchase-details"] li:nth-child(1) span[class="list-view-item__description"]');
-                $invoiceFileName = $invoiceName . '.pdf';
+                $invoiceFileName = !empty($invoiceName) ? $invoiceName . '.pdf' : '';
                 $invoice_amount = $this->exts->extract('ul[id="PaymentsList"] li:nth-child(1) span[class="list-view-item__description"]');
                 $invoiceAmount = trim(preg_replace('/[^\d\.\,]/', '', $invoice_amount)) . ' EUR';
                 $invoiceDate = '';
@@ -501,7 +501,7 @@ class PortalScriptCDP
             if ($show_document_button != null) {
                 $this->isNoInvoice = false;
                 $invoice_name = trim($this->exts->getElements('td', $row)[0]->getAttribute('innerText'));
-                $invoice_file_name = $invoice_name . '.pdf';
+                $invoice_file_name = !empty($invoice_name) ? $invoice_name . '.pdf' : '';
                 $invoice_amount = $this->exts->getElements('td', $row)[3]->getAttribute('innerText');
                 $invoice_amount = trim(preg_replace('/[^\d\.\,]/', '', $invoice_amount)) . ' EUR';
 
