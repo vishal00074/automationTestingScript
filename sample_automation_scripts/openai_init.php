@@ -1249,6 +1249,24 @@ private function checkGoogleTwoFactorMethod()
             $this->fillGoogleTwoFactor($input_selector, $message_selector, $submit_selector, true);
             sleep(5);
         }
+
+        $isFailed = $this->exts->execute_javascript('document.body.innerHTML.includes("Please check the country and number")');
+        $isFailedTwo = $this->exts->execute_javascript('document.body.innerHTML.includes("There was a problem")');
+        $this->exts->log('Is Phone number failed-2:: ' . $isFailed);
+        $this->exts->log('Is Phone number isFailedTwo-2:: ' . $isFailedTwo);
+
+
+        if ($isFailed && $this->exts->querySelector($input_selector) != null) {
+            $this->fillGoogleTwoFactor($input_selector, $message_selector, $submit_selector, true);
+        }
+        if ($isFailedTwo) {
+            $this->exts->log('Problem with phone number');
+            $this->tryAnotherWay();
+
+            if ($this->exts->querySelector($input_selector) != null) {
+                $this->fillGoogleTwoFactor($input_selector, $message_selector, $submit_selector, true);
+            }
+        }
     } else if ($this->exts->querySelector('input#phoneNumberId') != null) {
         // Enter a phone number to receive an SMS with a confirmation code.
         $this->exts->log('Request for 2fa mobile-2');
@@ -1264,6 +1282,23 @@ private function checkGoogleTwoFactorMethod()
         }
         if ($this->exts->querySelector($input_selector) != null) {
             $this->fillGoogleTwoFactor($input_selector, $message_selector, $submit_selector, true);
+        }
+        sleep(5);
+        $isFailed = $this->exts->execute_javascript('document.body.innerHTML.includes("Please check the country and number")');
+        $isFailedTwo = $this->exts->execute_javascript('document.body.innerHTML.includes("There was a problem with your phone number")');
+        $this->exts->log('Is Phone number failed-2:: ' . $isFailed);
+        $this->exts->log('Is Phone number isFailedTwo-2:: ' . $isFailedTwo);
+
+        if ($isFailed && $this->exts->querySelector($input_selector) != null) {
+            $this->fillGoogleTwoFactor($input_selector, $message_selector, $submit_selector, true);
+        }
+        if ($isFailedTwo) {
+            $this->exts->log('Problem with phone number');
+            $this->tryAnotherWay();
+
+            if ($this->exts->querySelector($input_selector) != null) {
+                $this->fillGoogleTwoFactor($input_selector, $message_selector, $submit_selector, true);
+            }
         }
     } else if ($this->exts->querySelector('[data-view-id*="authzenView"] form, form [data-illustration*="authzen"]') != null || $this->exts->urlContains('/challenge/dp?')) {
         // Check your smartphone. Google has sent a notification to your smartphone. Tap Yes in the notification, then tap 91 on your smartphone to continue
@@ -1404,11 +1439,83 @@ private function fillGoogleTwoFactor($input_selector, $message_selector, $submit
         $this->exts->log("Not received two factor code");
     }
 }
+
+private function tryAnotherWay()
+{
+    $back_button_xpath = '//*[contains(text(), "Try another way") or contains(text(), "Andere Option w") or contains(text(), "Essayer une autre m")';
+    $back_button_xpath = $back_button_xpath . ' or contains(text(), "Probeer het op een andere manier") or contains(text(), "Probar otra manera") or contains(text(), "Prova un altro metodo")';
+    $back_button_xpath = $back_button_xpath . ']/..';
+    $back_button = $this->exts->getElement($back_button_xpath, null, 'xpath');
+    if ($back_button != null) {
+        try {
+            $this->exts->log(__FUNCTION__ . ' back to method list to find Authenticator app.');
+            $this->exts->execute_javascript("arguments[0].click();", [$back_button]);
+        } catch (\Exception $exception) {
+            $this->exts->executeSafeScript("arguments[0].click()", [$back_button]);
+        }
+    }
+    sleep(5);
+    if ($this->exts->exists('li [data-challengetype]:not([data-challengeunavailable="true"])')) {
+        $this->exts->capture("2.1-2FA-method-list");
+
+        // Updated 03-2023 since we setup sub-system to get authenticator code without request to end-user. So from now, We priority for code from Authenticator app top 1, sms code or email code 2st, then other methods
+        if ($this->exts->exists('li [data-challengetype="6"]:not([data-challengeunavailable="true"])')) {
+            // We RECOMMEND TOP 1 method type = 6 is get code from Google Authenticator
+            $this->exts->click_by_xdotool('li [data-challengetype="6"]:not([data-challengeunavailable="true"])');
+        } else if ($this->exts->exists('li [data-challengetype="13"]:not([data-challengeunavailable="true"])') && isset($this->security_phone_number) && $this->security_phone_number != '') {
+            $this->exts->click_by_xdotool('li [data-challengetype="13"]:not([data-challengeunavailable="true"])');
+        } else if ($this->exts->exists('li [data-challengetype="12"]:not([data-challengeunavailable="true"])') && isset($this->recovery_email) && $this->recovery_email != '') {
+            $this->exts->click_by_xdotool('li [data-challengetype="12"]:not([data-challengeunavailable="true"])');
+        } else if ($this->exts->exists('li [data-challengetype="1"]:not([data-challengeunavailable="true"])')) {
+            // Select enter your passowrd, if only option is passkey
+            $this->exts->click_by_xdotool('li [data-challengetype="1"]:not([data-challengeunavailable="true"])');
+            sleep(3);
+            $this->checkFillGoogleLogin();
+            sleep(3);
+            $this->checkGoogleTwoFactorMethod();
+        } else if ($this->exts->exists('li [data-challengetype="6"]:not([data-challengeunavailable="true"])')) {
+            // We RECOMMEND method type = 6 is get code from Google Authenticator
+            $this->exts->click_by_xdotool('li [data-challengetype="6"]:not([data-challengeunavailable="true"])');
+        } else if ($this->exts->exists('li [data-challengetype][data-sendmethod="SMS"]:not([data-challengeunavailable="true"])') && (isset($this->security_phone_number) && $this->security_phone_number != '')) {
+            // We second RECOMMEND method type = 9 is get code from SMS
+            $this->exts->click_by_xdotool('li [data-challengetype][data-sendmethod="SMS"]:not([data-challengeunavailable="true"])');
+        } else if ($this->exts->exists('li [data-challengetype="4"][data-sendauthzenprompt="true"]:not([data-challengeunavailable="true"]), li [data-challengetype="39"][data-challengeid="10"]:not([data-challengeunavailable="true"])')) {
+            // We recommend method type = 4 and [data-sendauthzenprompt="true"] is  Tap YES on your smartphone or tablet
+            $this->exts->click_by_xdotool('li [data-challengetype="4"][data-sendauthzenprompt="true"]:not([data-challengeunavailable="true"]), li [data-challengetype="39"]:not([data-challengeunavailable="true"])');
+        } else if ($this->exts->exists('li [data-challengetype="4"][data-sendauthzenprompt="true"]:not([data-challengeunavailable="true"]), li [data-challengetype="39"][data-challengeid="12"]:not([data-challengeunavailable="true"])')) {
+            // We recommend method type = 4 and [data-sendauthzenprompt="true"] is  Tap YES on your smartphone or tablet
+            $this->exts->click_by_xdotool('li [data-challengetype="4"][data-sendauthzenprompt="true"]:not([data-challengeunavailable="true"]), li [data-challengetype="39"]:not([data-challengeunavailable="true"])');
+        } else if ($this->exts->exists('li [data-challengetype="5"]:not([data-challengeunavailable="true"])')) {
+            // Use a smartphone or tablet to receive a security code (even when offline)
+            $this->exts->click_by_xdotool('li [data-challengetype="5"]:not([data-challengeunavailable="true"])');
+        } else if ($this->exts->exists('li div[data-sendmethod="SMS"]')) {
+            // Click on phone option
+
+            $this->exts->click_by_xdotool('li div[data-sendmethod="SMS"]');
+            $this->exts->capture('select-phone');
+        } else if ($this->exts->exists('li [data-challengetype]:not([data-challengetype="4"]):not([data-challengetype="2"]):not([data-challengeunavailable="true"])')) {
+            // We DONT recommend method is QR code OR is Security USB, we can not solve this type of 2FA
+            $this->exts->click_by_xdotool('li [data-challengetype]:not([data-challengetype="4"]):not([data-challengetype="2"]):not([data-challengeunavailable="true"])');
+        } else {
+            $this->exts->click_by_xdotool('li [data-challengetype]:not([data-challengeunavailable="true"])');
+        }
+        sleep(10);
+    } else if ($this->exts->exists('#smsButton, [data-illustration="accountRecoverySmsPin"]')) {
+        // Sometime user must confirm before google send sms
+        $this->exts->click_by_xdotool('#smsButton, div:first-child > [role="button"], [data-secondary-action-label] > div > div:nth-child(1) button');
+        sleep(10);
+    } else if ($this->exts->exists('#authzenNext') && $this->exts->exists('[data-view-id*="authzenView"], [data-illustration*="authzen"]')) {
+        $this->exts->click_by_xdotool('[data-view-id] #authzenNext');
+        sleep(10);
+    } else if ($this->exts->exists('#idvpreregisteredemailNext') && !$this->exts->exists('form input:not([type="hidden"])')) {
+        $this->exts->click_by_xdotool('#idvpreregisteredemailNext');
+        sleep(10);
+    }
+}
 // -------------------- GOOGLE login END
 
 private function processAfterLogin()
 {
-
     if (!empty($this->exts->config_array['allow_login_success_request'])) {
             $this->exts->triggerLoginSuccess();
     }

@@ -54,9 +54,7 @@ private function initPortal($count)
             sleep(7);
         }
 
-        if (!empty($this->exts->config_array['allow_login_success_request'])) {
-            $this->exts->triggerLoginSuccess();
-        }
+        c
 
         $this->exts->success();
     } else {
