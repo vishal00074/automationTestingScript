@@ -61,11 +61,11 @@ class PortalScriptCDP
 
     /*Define constants used in script*/
     public $baseUrl = "https://www.shirtee.com/de/customer/account/login/";
-    public $username_selector = '#login-form #email';
-    public $password_selector = '#login-form #pass';
-    public $submit_btn = "#login-form #send2";
+    public $username_selector = '#login-form #email, input[id="header-login-form-email"]';
+    public $password_selector = '#login-form #pass, input[id="header-login-form-password"]';
+    public $submit_btn = "#login-form #send2, button.btn-checkout";
     public $logout_btn = '[href*="/logout"]';
-    public $wrong_credential_selector = "#login-form .error-msg li";
+    public $wrong_credential_selector = "li.error-msg li span, #login-form .error-msg li";
 
     public $isNoInvoice = true;
 
@@ -85,12 +85,11 @@ class PortalScriptCDP
         $this->exts->openUrl($this->baseUrl);
         sleep(12);
 
-        if ($this->exts->querySelector('div.std span a[href*="shirtee"]')) {
-            $this->exts->moveToElementAndClick('div.std span a[href*="shirtee"]');
-            $this->clearChrome();
+        if ($this->exts->querySelector('div.before-header div.bhi-link-right > a') != null) {
+            $this->exts->moveToElementAndClick('div.before-header div.bhi-link-right > a');
+            sleep(5);
+            $this->fillForm(0);
         }
-        $this->exts->openUrl($this->baseUrl);
-        sleep(10);
 
         if ($isCookieLoaded) {
             $this->exts->capture("Home-page-with-cookie");
@@ -98,7 +97,7 @@ class PortalScriptCDP
             $this->exts->capture("Home-page-without-cookie");
         }
 
-        if (!$this->checkLogin() && !$this->isWrongCredential()) {
+        if (!$this->checkLogin()) {
             if ($this->exts->exists('.cc-btn.cc-dismiss')) {
                 $this->exts->moveToElementAndClick('.cc-btn.cc-dismiss');
                 sleep(1);
@@ -125,6 +124,7 @@ class PortalScriptCDP
             if ($this->isNoInvoice) {
                 $this->exts->no_invoice();
             }
+            $this->exts->success();
         } else {
             $this->exts->capture("LoginFailed");
             if ($this->isWrongCredential()) {
@@ -145,29 +145,6 @@ class PortalScriptCDP
         return false;
     }
 
-    private function clearChrome()
-    {
-        $this->exts->log("Clearing browser history, cookie, cache");
-        $this->exts->openUrl('chrome://settings/clearBrowserData');
-        sleep(10);
-        $this->exts->capture("clear-page");
-        for ($i = 0; $i < 2; $i++) {
-            $this->exts->type_key_by_xdotool('Tab');
-        }
-        $this->exts->type_key_by_xdotool('Tab');
-        $this->exts->type_key_by_xdotool('Return');
-        $this->exts->type_key_by_xdotool('a');
-        sleep(1);
-        $this->exts->type_key_by_xdotool('Return');
-        sleep(3);
-        $this->exts->capture("clear-page");
-        for ($i = 0; $i < 6; $i++) {
-            $this->exts->type_key_by_xdotool('Tab');
-        }
-        $this->exts->type_key_by_xdotool('Return');
-        sleep(15);
-        $this->exts->capture("after-clear");
-    }
 
     /**
      * Method to fill login form
