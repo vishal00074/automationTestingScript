@@ -24,7 +24,7 @@ private function initPortal($count)
     sleep(1);
 
     // Load cookies
-    $this->exts->loadCookiesFromFile();
+    // $this->exts->loadCookiesFromFile();
     sleep(1);
     $this->exts->openUrl($this->baseUrl);
     sleep(10);
@@ -50,10 +50,6 @@ private function initPortal($count)
     }
 
     // then check user logged in or not
-    // for ($wait_count = 1; $wait_count <= 10 && $this->exts->getElementByCssSelector($this->check_login_success_selector) == null; $wait_count++) {
-    // 	$this->exts->log('Waiting for login...');
-    // 	sleep(5);
-    // }
     if ($this->exts->querySelector($this->check_login_success_selector) != null) {
         sleep(3);
         $this->exts->log(__FUNCTION__ . '::User logged in');

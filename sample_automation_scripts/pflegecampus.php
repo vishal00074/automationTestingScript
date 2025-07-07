@@ -1,4 +1,4 @@
-<?php // use custom funtion isExists and updated login code added pagaintaion code
+<?php // 
 
 /**
  * Chrome Remote via Chrome devtool protocol script, for specific process/portal
@@ -60,7 +60,6 @@ class PortalScriptCDP
     // Server-Portal-ID: 472920 - Last modified: 25.06.2025 17:57:17 UTC - User: 1
 
     /*Define constants used in script*/
-
     public $baseUrl = 'https://www.pflegecampus.de/login';
     public $loginUrl = 'https://www.pflegecampus.de/login';
     public $invoicePageUrl = '';
@@ -69,7 +68,6 @@ class PortalScriptCDP
     public $password_selector = 'input[name="password"]';
     public $remember_me_selector = '';
     public $submit_login_selector = 'form button[type="submit"]';
-
     public $check_login_failed_selector = 'div.pcx_loginerror p';
     public $check_login_success_selector = 'a[href*="logout"].logout_header_btn';
 
@@ -102,7 +100,6 @@ class PortalScriptCDP
         if ($this->checkLogin()) {
             $this->exts->log(">>>>>>>>>>>>>>>Login successful!!!!");
             $this->exts->capture("LoginSuccess");
-
             sleep(2);
 
             if ($this->isExists('nav.group-nav.new_navi a[href="/customerdata/billing"]')) {
@@ -156,6 +153,7 @@ class PortalScriptCDP
                 if ($this->isExists($this->submit_login_selector)) {
                     $this->exts->moveToElementAndClick($this->submit_login_selector);
                 }
+                sleep(12);
             }
         } catch (\Exception $exception) {
             $this->exts->log("Exception filling loginform " . $exception->getMessage());
@@ -196,7 +194,7 @@ class PortalScriptCDP
         $this->exts->log("Begin checkLogin ");
         $isLoggedIn = false;
         try {
-            $this->waitFor($this->check_login_success_selector, 10);
+            $this->waitFor($this->check_login_success_selector, 12);
             if ($this->isExists($this->check_login_success_selector)) {
 
                 $this->exts->log(">>>>>>>>>>>>>>>Login successful!!!!");
@@ -234,6 +232,8 @@ class PortalScriptCDP
         sleep(4);
     }
 
+    public $totalInvoices = 0;
+
     private function processInvoices($paging_count = 1)
     {
         $this->exts->execute_javascript('
@@ -252,11 +252,10 @@ class PortalScriptCDP
         $this->exts->capture("4-invoices-page");
         $invoices = [];
 
-        $rows = $this->exts->querySelectorAll('div#InvoiceTableWrap table tbody tr');
-        $anchor = 'td a.pdf';
+        $rows = $this->exts->getElements('div#InvoiceTableWrap table tbody tr');
+        $this->exts->log('Invoices found: ' . count($rows));
 
-
-        if (count($this->exts->querySelectorAll('div#InvoiceTableWrap table tbody tr td a.pdf')) == 0) {
+        if (count($this->exts->getElements('div#InvoiceTableWrap table tbody tr td a.pdf')) == 0) {
             $this->exts->refresh();
             sleep(10);
             $this->dateRange();
@@ -265,8 +264,11 @@ class PortalScriptCDP
 
         foreach ($rows as $row) {
 
-            if ($this->exts->querySelector($anchor, $row) != null) {
+            if ($this->exts->getElement('td a.pdf', $row) != null) {
 
+                if ($this->restrictPages != 0 && $this->totalInvoices >= 100) {
+                    return;
+                }
                 $invoiceUrl = '';
 
                 $invoiceName = $this->exts->extract('td:first-child', $row);
@@ -279,7 +281,7 @@ class PortalScriptCDP
 
                 $invoiceDate = $this->exts->extract('td:nth-child(2)', $row);
 
-                $downloadBtn = $this->exts->querySelector($anchor, $row);
+                $downloadBtn = $this->exts->getElement('td a.pdf', $row);
 
                 array_push($invoices, array(
                     'invoiceName' => $invoiceName,
@@ -297,13 +299,11 @@ class PortalScriptCDP
                 $this->exts->log('invoiceAmount: ' . $invoiceAmount);
                 $this->exts->log('invoiceUrl: ' . $invoiceUrl);
 
-                $invoiceFileName = $invoiceName . '.pdf';
+                $invoiceFileName = !empty($invoiceName) ? $invoiceName . '.pdf' : '';
                 $invoiceDate = $this->exts->parse_date(trim($invoiceDate), 'd.m.Y', 'Y-m-d');
                 $this->exts->log('Date parsed: ' . $invoiceDate);
-
                 $this->exts->execute_javascript("arguments[0].click();", [$downloadBtn]);
-
-                sleep(5);
+                sleep(7);
 
                 $this->exts->wait_and_check_download('pdf');
                 $downloaded_file = $this->exts->find_saved_file('pdf');
@@ -316,6 +316,7 @@ class PortalScriptCDP
                 if (trim($downloaded_file) != '' && file_exists($downloaded_file)) {
                     $this->exts->new_invoice($invoiceName, $invoiceDate, $invoiceAmount, $invoiceFileName);
                     sleep(1);
+                    $this->totalInvoices++;
                 } else {
                     $this->exts->log(__FUNCTION__ . '::No download ' . $invoiceFileName);
                 }
@@ -327,7 +328,7 @@ class PortalScriptCDP
         }
 
         // Download all invoices
-        $this->exts->log('Invoices found: ' . count($invoices));
+
     }
 }
 

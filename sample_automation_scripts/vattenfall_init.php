@@ -8,7 +8,7 @@ public $remember_me_selector = '';
 public $submit_login_selector = 'form.cso-login-with-password button[type="submit"]';
 
 public $check_login_failed_selector = 'input[id*="loginModel.password"]';
-public $check_login_success_selector = 'a[href="/benutzerprofil"]';
+public $check_login_success_selector = 'li > a[href="/kontostandinformationen"][class="link navigation--link"]';
 
 public $isNoInvoice = true;
 
@@ -38,6 +38,7 @@ private function initPortal(int $count): void
 
         // If it did not redirect to login page after opening baseUrl, open loginUrl and wait for login page.
         $this->checkFillLogin();
+        sleep(10);
         $this->exts->waitTillPresent($this->check_login_success_selector); // Wait for login to complete
     }
 

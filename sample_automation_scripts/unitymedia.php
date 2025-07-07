@@ -57,6 +57,7 @@ class PortalScriptCDP
         }
     }
 
+    // Server-Portal-ID: 4905 - Last modified: 02.07.2025 15:10:16 UTC - User: 1
     public $baseUrl = 'https://www.unitymedia.de/kundencenter/meine-rechnungen/alle-rechnungen/';
     public $loginUrl = 'https://www.unitymedia.de/benutzerkonto/login/zugangsdaten';
     public $invoicePageUrl = 'https://www.unitymedia.de/kundencenter/meine-rechnungen/alle-rechnungen/';
@@ -83,7 +84,7 @@ class PortalScriptCDP
         sleep(1);
 
         // Load cookies
-        $this->exts->loadCookiesFromFile();
+        // $this->exts->loadCookiesFromFile();
         sleep(1);
         $this->exts->openUrl($this->baseUrl);
         sleep(10);
@@ -109,22 +110,11 @@ class PortalScriptCDP
         }
 
         // then check user logged in or not
-        // for ($wait_count = 1; $wait_count <= 10 && $this->exts->getElementByCssSelector($this->check_login_success_selector) == null; $wait_count++) {
-        // 	$this->exts->log('Waiting for login...');
-        // 	sleep(5);
-        // }
         if ($this->exts->querySelector($this->check_login_success_selector) != null) {
             sleep(3);
             $this->exts->log(__FUNCTION__ . '::User logged in');
             $this->exts->capture("3-login-success");
 
-            // Open invoices url and download invoice
-            // $restrictPages = isset($this->exts->config_array["restrictPages"]) ? (int)@$this->exts->config_array["restrictPages"] : 3;
-            // if ($restrictPages == 0) {
-            // 	$this->exts->openUrl('https://www.unitymedia.de/kundencenter/meine-rechnungen/alle-rechnungen?months=12');
-            // }else{
-            // 	$this->exts->openUrl($this->invoicePageUrl);
-            // }
             $this->exts->waitTillPresent('a[automation-id="meineRechnungen_Link"]', 100);
             if ($this->exts->exists('a[automation-id="meineRechnungen_Link"]')) {
                 $this->exts->click_element('a[automation-id="meineRechnungen_Link"]');
@@ -297,7 +287,6 @@ class PortalScriptCDP
             $this->exts->log('invoiceAmount: ' . $invoice['invoiceAmount']);
             $this->exts->log('invoiceUrl: ' . $invoice['invoiceUrl']);
 
-            // $invoiceFileName = $invoice['invoiceName'] . '.pdf';
             $invoice['invoiceDate'] = $this->exts->parse_date($invoice['invoiceDate'], 'y-m-d', 'Y-m-d');
             $this->exts->log('Date parsed: ' . $invoice['invoiceDate']);
 

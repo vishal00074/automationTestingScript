@@ -1,49 +1,46 @@
-public $baseUrl = 'https://login.payjoe.de/login';
-public $loginUrl = 'https://login.payjoe.de/login';
-public $invoicePageUrl = 'https://login.payjoe.de/activities';
-
-public $username_selector = 'input[id="mat-input-0"]';
-public $password_selector = 'input[id="mat-input-1"]';
-public $remember_me_selector = 'label[class="mat-checkbox-layout"]';
-public $submit_login_selector = 'button[type="submit"]';
-
-public $check_login_failed_selector = 'div mat-error[id="mat-error-0"]';
-public $check_login_success_selector = 'a[href="/activities"]';
-
+public $baseUrl = "https://kundenportal.ww-ag.de";
+public $loginUrl = "https://kundenportal.ww-ag.de";
+public $invoicePageUrl = 'https://kundenportal.ww-ag.de/pk/postfach';
+public $username_selector = 'input[name="username"]';
+public $password_selector = 'input[name="password"]';
+public $submit_button_selector = 'button[type="submit"]';
+public $check_login_failed_selector = 'error-message';
+public $check_login_success_selector = 'button[aria-label="Log out"], button[aria-label="Abmelden"], div.logout-btn';
+public $login_tryout = 0;
 public $isNoInvoice = true;
 
 /**
 
     * Entry Method thats called for a portal
 
-    * @param Integer $count Number of times portal is retried.  a[href*="SignIn"]
+    * @param Integer $count Number of times portal is retried.
 
     */
+
 private function initPortal($count)
 {
-
     $this->exts->log('Begin initPortal ' . $count);
     $this->exts->loadCookiesFromFile();
-    $this->exts->openUrl($this->loginUrl);
+    $this->exts->openUrl($this->baseUrl);
+
     if (!$this->checkLogin()) {
         $this->exts->log('NOT logged via cookie');
         $this->exts->clearCookies();
         $this->exts->openUrl($this->loginUrl);
-
         $this->fillForm(0);
     }
-
     if ($this->checkLogin()) {
         $this->exts->log(">>>>>>>>>>>>>>>Login successful!!!!");
         $this->exts->capture("LoginSuccess");
-        
+
         if (!empty($this->exts->config_array['allow_login_success_request'])) {
 			$this->exts->triggerLoginSuccess();
 		}
 
         $this->exts->success();
     } else {
-        if (stripos(strtolower($this->exts->extract($this->check_login_failed_selector)), 'passwor') !== false) {
+        $this->exts->waitTillPresent($this->check_login_failed_selector, 20);
+        if ($this->exts->exists($this->check_login_failed_selector)) {
             $this->exts->log("Wrong credential !!!!");
             $this->exts->loginFailure(1);
         } else {
@@ -52,43 +49,29 @@ private function initPortal($count)
     }
 }
 
-
-function fillForm($count)
+private function fillForm($count)
 {
     $this->exts->log("Begin fillForm " . $count);
-    $this->exts->waitTillPresent($this->username_selector, 5);
+    $this->exts->waitTillPresent($this->username_selector, 20);
     try {
         if ($this->exts->querySelector($this->username_selector) != null) {
 
+            $this->login_tryout = (int)$this->login_tryout + 1;
             $this->exts->capture("1-pre-login");
             $this->exts->log("Enter Username");
             $this->exts->moveToElementAndType($this->username_selector, $this->username);
-
-            if ($this->exts->exists($this->submit_login_selector)) {
-                $this->exts->click_by_xdotool($this->submit_login_selector);
-            }
 
             $this->exts->log("Enter Password");
             $this->exts->moveToElementAndType($this->password_selector, $this->password);
             sleep(1);
 
-            if ($this->exts->exists($this->remember_me_selector)) {
-                $this->exts->click_by_xdotool($this->remember_me_selector);
-                sleep(1);
-            }
-
-            $this->exts->capture("1-login-page-filled");
-            sleep(5);
-            if ($this->exts->exists($this->submit_login_selector)) {
-                $this->exts->click_by_xdotool($this->submit_login_selector);
-            }
+            $this->exts->moveToElementAndClick($this->submit_button_selector);
+            sleep(2); // Portal itself has one second delay after showing toast
         }
     } catch (\Exception $exception) {
-
         $this->exts->log("Exception filling loginform " . $exception->getMessage());
     }
 }
-
 
 /**
 
@@ -97,7 +80,7 @@ function fillForm($count)
     * return boolean true/false
 
     */
-function checkLogin()
+private function checkLogin()
 {
     $this->exts->log("Begin checkLogin ");
     $isLoggedIn = false;

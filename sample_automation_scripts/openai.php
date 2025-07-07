@@ -1348,7 +1348,7 @@ class PortalScriptCDP
             }
             sleep(5);
             $isFailed = $this->exts->execute_javascript('document.body.innerHTML.includes("Please check the country and number")');
-            $isFailedTwo = $this->exts->execute_javascript('document.body.innerHTML.includes("There was a problem with your phone number")');
+            $isFailedTwo = $this->exts->execute_javascript('document.body.innerHTML.includes("There was a problem")');
             $this->exts->log('Is Phone number failed-2:: ' . $isFailed);
             $this->exts->log('Is Phone number isFailedTwo-2:: ' . $isFailedTwo);
 

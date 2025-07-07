@@ -6,7 +6,6 @@ public $username_selector = 'input[name="usernameOrEmail"]';
 public $password_selector = 'input[name="password"]';
 public $remember_me_selector = '';
 public $submit_login_selector = 'form button[type="submit"]';
-
 public $check_login_failed_selector = 'div.pcx_loginerror p';
 public $check_login_success_selector = 'a[href*="logout"].logout_header_btn';
 
@@ -39,7 +38,6 @@ private function initPortal($count)
     if ($this->checkLogin()) {
         $this->exts->log(">>>>>>>>>>>>>>>Login successful!!!!");
         $this->exts->capture("LoginSuccess");
-
         sleep(2);
 
         if (!empty($this->exts->config_array['allow_login_success_request'])) {
@@ -85,6 +83,7 @@ private function fillForm($count)
             if ($this->isExists($this->submit_login_selector)) {
                 $this->exts->moveToElementAndClick($this->submit_login_selector);
             }
+            sleep(12);
         }
     } catch (\Exception $exception) {
         $this->exts->log("Exception filling loginform " . $exception->getMessage());
@@ -125,7 +124,7 @@ function checkLogin()
     $this->exts->log("Begin checkLogin ");
     $isLoggedIn = false;
     try {
-        $this->waitFor($this->check_login_success_selector, 10);
+        $this->waitFor($this->check_login_success_selector, 12);
         if ($this->isExists($this->check_login_success_selector)) {
 
             $this->exts->log(">>>>>>>>>>>>>>>Login successful!!!!");

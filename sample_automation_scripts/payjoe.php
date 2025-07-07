@@ -97,11 +97,12 @@ class PortalScriptCDP
         if ($this->checkLogin()) {
             $this->exts->log(">>>>>>>>>>>>>>>Login successful!!!!");
             $this->exts->capture("LoginSuccess");
+            // comment due to there is not pdf format invoice found in this code.
             // $this->dateRange();
 
-            $this->exts->openUrl('https://login.payjoe.de/activities?year=2023&month=6');
-            $this->exts->waitTillPresent('table > tbody > tr');
-            $this->downloadInvoice();
+            // $this->exts->openUrl('https://login.payjoe.de/activities?year=2023&month=6');
+            // $this->exts->waitTillPresent('table > tbody > tr');
+            // $this->downloadInvoice();
 
             // Final, check no invoice
             if ($this->isNoInvoice) {
@@ -182,115 +183,115 @@ class PortalScriptCDP
 
         return $isLoggedIn;
     }
+    // comment due to there is not pdf format invoice found in this code.
+    // private function dateRange()
+    // {
+    //     $selectDate = new DateTime();
 
-    private function dateRange()
-    {
-        $selectDate = new DateTime();
+    //     $currentYear = $selectDate->format('Y');
+    //     $currentMonth = $selectDate->format('m');
 
-        $currentYear = $selectDate->format('Y');
-        $currentMonth = $selectDate->format('m');
+    //     if ($this->restrictPages == 0) {
+    //         // select date
+    //         $selectDate->modify('-3 years');
 
-        if ($this->restrictPages == 0) {
-            // select date
-            $selectDate->modify('-3 years');
+    //         $day = $selectDate->format('d');
+    //         $month = $selectDate->format('m');
+    //         $year = $selectDate->format('Y');
 
-            $day = $selectDate->format('d');
-            $month = $selectDate->format('m');
-            $year = $selectDate->format('Y');
-
-            $this->exts->log('3 years previous date:: ' . $day . '-' . $month . '-' . $year);
+    //         $this->exts->log('3 years previous date:: ' . $day . '-' . $month . '-' . $year);
 
 
-            $this->exts->capture('date-range-3-years');
-        } else {
-            // select date
-            $selectDate->modify('-3 months');
+    //         $this->exts->capture('date-range-3-years');
+    //     } else {
+    //         // select date
+    //         $selectDate->modify('-3 months');
 
-            $day = $selectDate->format('d');
-            $month = $selectDate->format('m');
-            $year = $selectDate->format('Y');
+    //         $day = $selectDate->format('d');
+    //         $month = $selectDate->format('m');
+    //         $year = $selectDate->format('Y');
 
-            $this->exts->log('3 months previous date:: ' . $day . '-' . $month . '-' . $year);
+    //         $this->exts->log('3 months previous date:: ' . $day . '-' . $month . '-' . $year);
 
-            $this->exts->capture('date-range-3-months');
-        }
-        for ($i = 1; $year <= $currentYear;) {
-            $this->exts->log('year:: ' . $year);
+    //         $this->exts->capture('date-range-3-months');
+    //     }
+    //     for ($i = 1; $year <= $currentYear;) {
+    //         $this->exts->log('year:: ' . $year);
 
-            $this->processInvoice($year);
-            $year++;
-        }
-    }
+    //         $this->processInvoice($year);
+    //         $year++;
+    //     }
+    // }
 
 
     /**
      * download invoice of current year
      * 
      */
-    private function processInvoice($year)
-    {
-        for ($i = 1; $i < 13; $i++) {
-            $this->exts->log("Download Invoice year: " . $year . "month: " . $i);
-            $openUrl = 'https://login.payjoe.de/activities?year=' . $year . '&month=' . $i;
-            $this->exts->openUrl($openUrl);
-            sleep(5);
-            $this->exts->waitTillPresent('table > tbody > tr');
-            $this->exts->capture("4-invoices-page-month " . $i);
+    // private function processInvoice($year)
+    // {
+    //     for ($i = 1; $i < 13; $i++) {
+    //         $this->exts->log("Download Invoice year: " . $year . "month: " . $i);
+    //         $openUrl = 'https://login.payjoe.de/activities?year=' . $year . '&month=' . $i;
+    //         $this->exts->openUrl($openUrl);
+    //         sleep(5);
+    //         $this->exts->waitTillPresent('table > tbody > tr');
+    //         $this->exts->capture("4-invoices-page-month " . $i);
 
-            $this->downloadInvoice();
-        }
-    }
+    //         $this->downloadInvoice();
+    //     }
+    // }
 
-    private function downloadInvoice()
-    {
-        $invoices = [];
+    // private function downloadInvoice()
+    // {
+    //     $invoices = [];
 
-        $rows = $this->exts->getElements('table > tbody > tr');
-        $this->exts->log('No of rows: ' . count($rows));
-        foreach ($rows as $row) {
-            $tags = $this->exts->getElements('td', $row);
+    //     $rows = $this->exts->getElements('table > tbody > tr');
+    //     $this->exts->log('No of rows: ' . count($rows));
+    //     foreach ($rows as $row) {
+    //         $tags = $this->exts->getElements('td', $row);
 
-            $this->exts->log('No of columns: ' . count($tags));
+    //         $this->exts->log('No of columns: ' . count($tags));
 
-            if ($this->exts->getElement('a[href*="/download"]', $tags[7]) != null) {
-                $invoiceUrl = $this->exts->getElement('a[href*="/download"]', $tags[7])->getAttribute("href");
-                $parts = explode('/', parse_url($invoiceUrl, PHP_URL_PATH));
-                $invoiceName = $parts[4];
-                $invoiceDate = trim($tags[1]->getAttribute('innerText'));
-                $invoiceAmount = trim(preg_replace('/[^\d\.\,]/', '', $tags[6]->getAttribute('innerText'))) . ' EUR';
+    //         if ($this->exts->getElement('a[href*="/download"]', $tags[7]) != null) {
+    //             $invoiceUrl = $this->exts->getElement('a[href*="/download"]', $tags[7])->getAttribute("href");
+    //             $parts = explode('/', parse_url($invoiceUrl, PHP_URL_PATH));
+    //             $invoiceName = $parts[4];
+    //             $invoiceDate = trim($tags[1]->getAttribute('innerText'));
+    //             $invoiceAmount = trim(preg_replace('/[^\d\.\,]/', '', $tags[6]->getAttribute('innerText'))) . ' EUR';
 
-                array_push($invoices, array(
-                    'invoiceName' => $invoiceName,
-                    'invoiceDate' => $invoiceDate,
-                    'invoiceAmount' => $invoiceAmount,
-                    'invoiceUrl' => $invoiceUrl
-                ));
-                $this->isNoInvoice = false;
-            }
-        }
-        // Download all invoices
-        $this->exts->log('Invoices found: ' . count($invoices));
-        foreach ($invoices as $invoice) {
-            $this->exts->log('--------------------------');
-            $this->exts->log('invoiceName: ' . $invoice['invoiceName']);
-            $this->exts->log('invoiceDate: ' . $invoice['invoiceDate']);
-            $this->exts->log('invoiceAmount: ' . $invoice['invoiceAmount']);
-            $this->exts->log('invoiceUrl: ' . $invoice['invoiceUrl']);
+    //             array_push($invoices, array(
+    //                 'invoiceName' => $invoiceName,
+    //                 'invoiceDate' => $invoiceDate,
+    //                 'invoiceAmount' => $invoiceAmount,
+    //                 'invoiceUrl' => $invoiceUrl
+    //             ));
+    //             $this->isNoInvoice = false;
+    //         }
+    //     }
+    //     // Download all invoices
+    //     $this->exts->log('Invoices found: ' . count($invoices));
+    //     foreach ($invoices as $invoice) {
+    //         $this->exts->log('--------------------------');
+    //         $this->exts->log('invoiceName: ' . $invoice['invoiceName']);
+    //         $this->exts->log('invoiceDate: ' . $invoice['invoiceDate']);
+    //         $this->exts->log('invoiceAmount: ' . $invoice['invoiceAmount']);
+    //         $this->exts->log('invoiceUrl: ' . $invoice['invoiceUrl']);
 
-            $invoiceFileName = !empty($invoice['invoiceName']) ? $invoice['invoiceName'] . '.pdf' : '';
-            $invoice['invoiceDate'] = $this->exts->parse_date($invoice['invoiceDate'], 'M d, Y', 'Y-m-d');
-            $this->exts->log('Date parsed: ' . $invoice['invoiceDate']);
+    //         $invoiceFileName = !empty($invoice['invoiceName']) ? $invoice['invoiceName'] . '.pdf' : '';
+    //         $invoice['invoiceDate'] = $this->exts->parse_date($invoice['invoiceDate'], 'M d, Y', 'Y-m-d');
+    //         $this->exts->log('Date parsed: ' . $invoice['invoiceDate']);
 
-            $downloaded_file = $this->exts->direct_download($invoice['invoiceUrl'], 'pdf', $invoiceFileName);
-            sleep(4);
-            if (trim($downloaded_file) != '' && file_exists($downloaded_file)) {
-                $this->exts->new_invoice($invoice['invoiceName'], $invoice['invoiceDate'], $invoice['invoiceAmount'], $invoiceFileName);
-                sleep(1);
-            } else {
-                $this->exts->log(__FUNCTION__ . '::No download ' . $invoiceFileName);
-            }
-        }
-    }
+    //         $downloaded_file = $this->exts->direct_download($invoice['invoiceUrl'], 'pdf', $invoiceFileName);
+    //         sleep(4);
+    //         if (trim($downloaded_file) != '' && file_exists($downloaded_file)) {
+    //             $this->exts->new_invoice($invoice['invoiceName'], $invoice['invoiceDate'], $invoice['invoiceAmount'], $invoiceFileName);
+    //             sleep(1);
+    //         } else {
+    //             $this->exts->log(__FUNCTION__ . '::No download ' . $invoiceFileName);
+    //         }
+    //     }
+    // }
 }
 
 exec("docker rm -f selenium-node-111");

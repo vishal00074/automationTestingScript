@@ -1,4 +1,4 @@
-<?php // added condition in case invoice name is empty 
+<?php // 
 
 /**
  * Chrome Remote via Chrome devtool protocol script, for specific process/portal
@@ -57,9 +57,8 @@ class PortalScriptCDP
         }
     }
 
-    // Server-Portal-ID: 129025 - Last modified: 05.05.2025 13:35:13 UTC - User: 1
+    // Server-Portal-ID: 129025 - Last modified: 15.05.2025 14:13:17 UTC - User: 1
 
-    // Script here
     public $baseUrl = 'https://service.vattenfall.de/vertragskonto';
     public $loginUrl = 'https://service.vattenfall.de/login';
     public $invoicePageUrl = 'https://service.vattenfall.de/postfach';
@@ -70,7 +69,7 @@ class PortalScriptCDP
     public $submit_login_selector = 'form.cso-login-with-password button[type="submit"]';
 
     public $check_login_failed_selector = 'input[id*="loginModel.password"]';
-    public $check_login_success_selector = 'a[href="/benutzerprofil"]';
+    public $check_login_success_selector = 'li > a[href="/kontostandinformationen"][class="link navigation--link"]';
 
     public $isNoInvoice = true;
 
@@ -100,6 +99,7 @@ class PortalScriptCDP
 
             // If it did not redirect to login page after opening baseUrl, open loginUrl and wait for login page.
             $this->checkFillLogin();
+            sleep(10);
             $this->exts->waitTillPresent($this->check_login_success_selector); // Wait for login to complete
         }
 
@@ -202,7 +202,8 @@ class PortalScriptCDP
 
     private function processInvoices($pageCount = 1, $contractNumber)
     {
-        $this->exts->waitTillPresent('div.download span:nth-child(2)');
+        sleep(10);
+        $this->exts->waitTillPresent('.cso-box .panel');
         $this->exts->capture("4-invoices-page");
         $invoices = [];
 
@@ -216,7 +217,7 @@ class PortalScriptCDP
         $rows = $this->exts->getElements('.cso-box .panel');
         $this->exts->log('invoice found: ' . count($rows));
         foreach ($rows as $row) {
-            $download_button = $this->exts->getElement('div.download span:nth-child(2)', $row);
+            $download_button = $this->exts->getElement('a:nth-child(2)', $row);
             if ($download_button != null) {
                 $invoiceDate = $this->exts->extract('div[class="date-column"]', $row);
                 $parsed_date = is_null($invoiceDate) ? null : $this->exts->parse_date($invoiceDate, 'm/d/Y', 'Y-m-d');
