@@ -62,15 +62,12 @@ class PortalScriptCDP
     public $baseUrl = 'https://service.vattenfall.de/vertragskonto';
     public $loginUrl = 'https://service.vattenfall.de/login';
     public $invoicePageUrl = 'https://service.vattenfall.de/postfach';
-
     public $username_selector = 'input[id*="loginModel.username"]';
     public $password_selector = 'input[id*="loginModel.password"]';
     public $remember_me_selector = '';
     public $submit_login_selector = 'form.cso-login-with-password button[type="submit"]';
-
     public $check_login_failed_selector = 'input[id*="loginModel.password"]';
     public $check_login_success_selector = 'li > a[href="/kontostandinformationen"][class="link navigation--link"]';
-
     public $isNoInvoice = true;
 
     private function initPortal(int $count): void
