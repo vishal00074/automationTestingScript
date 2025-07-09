@@ -1,4 +1,4 @@
-<?php //  updated download code.
+<?php //  updated download code and login code.
 
 /**
  * Chrome Remote via Chrome devtool protocol script, for specific process/portal
@@ -92,7 +92,6 @@ class PortalScriptCDP
                 $this->exts->capture('2-access-denied');
                 $this->clearChrome();
                 $this->exts->openUrl($this->loginUrl);
-                $this->exts->loginFailure(1);
                 $this->exts->type_key_by_xdotool('F5');
                 sleep(5);
                 $this->fillForm(0);
@@ -153,14 +152,17 @@ class PortalScriptCDP
                 $this->exts->type_key_by_xdotool('Ctrl+a');
                 $this->exts->type_key_by_xdotool('Delete');
                 $this->exts->type_text_by_xdotool($this->username);
-                sleep(1);
+                // $this->exts->moveToElementAndType($this->username_selector, $this->username);
+                sleep(4);
 
                 $this->exts->log("Enter Password");
                 $this->exts->click_by_xdotool($this->password_selector);
                 $this->exts->type_key_by_xdotool('Ctrl+a');
                 $this->exts->type_key_by_xdotool('Delete');
                 $this->exts->type_text_by_xdotool($this->password);
-                sleep(1);
+                // $this->exts->moveToElementAndType($this->password_selector, $this->password);
+                sleep(4);
+
 
                 $this->exts->capture_by_chromedevtool("1-login-page-filled");
                 $this->exts->click_by_xdotool($this->submit_login_selector);
@@ -252,14 +254,47 @@ class PortalScriptCDP
         // Select all the invoice items
         $invoiceItems = $this->exts->getElements('app-sort-table div.table-row');
 
-        foreach ($invoiceItems as $item) {
+        foreach ($invoiceItems as $key => $item) {
+            $handle = $this->exts->current_chrome_tab;
 
+            $j = $key + 2;
+
+            $element = $this->exts->getElement('app-sort-table > div.table-row:nth-child(' . $j . ')');
             try {
-                $item->click();
+                $element->click();
             } catch (\Exception $exception) {
-                $this->exts->execute_javascript("arguments[0].click();", [$item]);
+                $this->exts->execute_javascript("arguments[0].click();", [$element]);
             }
             sleep(10);
+            $this->isNoInvoice = false;
+
+            $this->exts->switchToNewestActiveTab();
+            sleep(2);
+            $invoiceName = $this->exts->extract('table.InvoiceDetails-table >  tbody > tr.LabeledTableRow--wide:nth-child(1) > td[style="vertical-align: top; text-align: right;"]:nth-child(2)');
+            $invoiceDate = $this->exts->extract('table.InvoiceDetails-table >  tbody > tr.LabeledTableRow--wide:nth-child(2) > td[style="vertical-align: top; text-align: right;"]:nth-child(2)');
+            $invoiceAmount = $this->exts->extract('h1[data-testid="invoice-amount-post-payment"] span.CurrencyAmount');
+
+            $this->exts->log('--------------------------');
+            $this->exts->log('invoiceName: ' . $invoiceName);
+            $this->exts->log('invoiceDate: ' . $invoiceDate);
+            $this->exts->log('invoiceAmount: ' . $invoiceAmount);
+
+            $invoiceFileName = !empty($invoiceName) ? $invoiceName . '.pdf' : '';
+            $invoiceDate = $this->exts->parse_date($invoiceDate, 'd.m.Y', 'Y-m-d');
+            $this->exts->log('Date parsed: ' . $invoiceDate);
+
+            $downloaded_file = $this->exts->click_and_download('div.InvoiceDetailsRow-Container button[data-testid="download-invoice-receipt-pdf-button"]', 'pdf', $invoiceFileName);
+            if (trim($downloaded_file) != '' && file_exists($downloaded_file)) {
+                $this->exts->new_invoice($invoiceName, $invoiceDate, $invoiceAmount, $downloaded_file);
+                sleep(1);
+            } else {
+                $this->exts->log(__FUNCTION__ . '::No download ' . $invoiceFileName);
+            }
+
+            $this->exts->switchToTab($handle);
+            sleep(2);
+            $this->exts->closeAllTabsButThis();
+            sleep(5);
         }
     }
 }

@@ -83,6 +83,12 @@ class PortalScriptCDP
      */
     private function initPortal($count)
     {
+        $this->exts->temp_keep_useragent = $this->exts->send_websocket_event(
+            $this->exts->current_context->webSocketDebuggerUrl,
+            "Network.setUserAgentOverride",
+            '',
+            ["userAgent" => "Mozilla/5.0 (Windows NT 11.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/134.0.6998.166 Safari/537.36"]
+        );
 
         $this->exts->log('Begin initPortal ' . $count);
         $this->exts->loadCookiesFromFile();
@@ -139,13 +145,20 @@ class PortalScriptCDP
 
                 $this->exts->capture("1-pre-login");
                 $this->exts->log("Enter Username");
-                $this->exts->moveToElementAndType($this->username_selector, $this->username);
+                $this->exts->click_by_xdotool($this->username_selector);
+                $this->exts->type_key_by_xdotool('Ctrl+a');
+                $this->exts->type_key_by_xdotool('Delete');
+                $this->exts->type_text_by_xdotool($this->username);
+                sleep(4);
                 $this->checkFillRecaptcha();
                 $this->exts->click_element('button[type="submit"]');
                 sleep(7);
                 $this->exts->log("Enter Password");
-                $this->exts->moveToElementAndType($this->password_selector, $this->password);
-                sleep(1);
+                $this->exts->click_by_xdotool($this->password_selector);
+                $this->exts->type_key_by_xdotool('Ctrl+a');
+                $this->exts->type_key_by_xdotool('Delete');
+                $this->exts->type_text_by_xdotool($this->password);
+                sleep(4);
 
                 if ($this->exts->exists($this->remember_me_selector)) {
                     $this->exts->click_by_xdotool($this->remember_me_selector);
@@ -185,7 +198,7 @@ class PortalScriptCDP
             $this->exts->type_text_by_xdotool($this->username);
             sleep(2);
             $this->checkFillRecaptcha();
-            $this->exts->click_element('button[type="submit"]');
+            $this->exts->click_by_xdotool('button[type="submit"]');
             sleep(7);
             $this->exts->log("Enter Password");
             $this->exts->click_by_xdotool($this->password_selector);
@@ -272,6 +285,7 @@ class PortalScriptCDP
             $this->exts->log(__FUNCTION__ . '::Not found reCaptcha');
         }
     }
+
 
     private function checkFillTwoFactor()
     {

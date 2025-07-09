@@ -135,11 +135,8 @@ class PortalScriptCDP
     }
 
     /**
- 
      * Method to Check where user is logged in or not
- 
      * return boolean true/false
- 
      */
     private function checkLogin()
     {
@@ -178,8 +175,7 @@ class PortalScriptCDP
                 $invoiceDate = '';
                 $downloadBtn = $this->exts->querySelector('li', $row);
                 $this->isNoInvoice = false;
-
-                if ($this->restrictPages != 0 && $total_invoices >= 100) break;
+                
                 $this->exts->log('--------------------------');
                 $this->exts->log('invoiceDate: ' . $invoiceDate);
                 $this->exts->log('invoiceAmount: ' . $invoiceAmount);

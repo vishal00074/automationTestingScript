@@ -10,11 +10,8 @@ public $login_tryout = 0;
 public $isNoInvoice = true;
 
 /**
-
     * Entry Method thats called for a portal
-
     * @param Integer $count Number of times portal is retried.
-
     */
 
 private function initPortal($count)
@@ -68,11 +65,93 @@ private function fillForm($count)
             sleep(1);
 
             $this->exts->click_by_xdotool($this->submit_button_selector);
-            sleep(2); // Portal itself has one second delay after showing toast
+            sleep(10); // Portal itself has one second delay after showing toast
+
+            $stop = 0;
+            while ($stop < 3) {
+                $this->checkFillRecaptcha();
+                sleep(5);
+                $stop++;
+            }
+
+            if ($this->exts->querySelector($this->submit_button_selector) != null) {
+                $this->exts->moveToElementAndClick($this->submit_button_selector);
+                sleep(5);
+            }
+
+            if ($this->exts->querySelector($this->submit_button_selector) != null) {
+                $this->exts->moveToElementAndClick($this->submit_button_selector);
+                sleep(5);
+            }
         }
     } catch (\Exception $exception) {
 
         $this->exts->log("Exception filling loginform " . $exception->getMessage());
+    }
+}
+
+private function checkFillRecaptcha($count = 1)
+{
+    $this->exts->log(__FUNCTION__);
+    $recaptcha_iframe_selector = 'iframe[src*="/recaptcha/api2/anchor?"]';
+    $recaptcha_textarea_selector = 'textarea[name="g-recaptcha-response"]';
+    $this->exts->waitTillPresent($recaptcha_iframe_selector, 20);
+    if ($this->exts->exists($recaptcha_iframe_selector)) {
+        $iframeUrl = $this->exts->extract($recaptcha_iframe_selector, null, 'src');
+        $data_siteKey = explode('&', end(explode("&k=", $iframeUrl)))[0];
+        $this->exts->log("iframe url  - " . $iframeUrl);
+        $this->exts->log("SiteKey - " . $data_siteKey);
+
+        $isCaptchaSolved = $this->exts->processRecaptcha($this->exts->getUrl(), $data_siteKey, false);
+        $this->exts->log("isCaptchaSolved - " . $isCaptchaSolved);
+
+        if ($isCaptchaSolved) {
+            // Step 1 fill answer to textarea
+            $this->exts->log(__FUNCTION__ . "::filling reCaptcha response..");
+            $recaptcha_textareas =  $this->exts->querySelectorAll($recaptcha_textarea_selector);
+            for ($i = 0; $i < count($recaptcha_textareas); $i++) {
+                $this->exts->execute_javascript("arguments[0].innerHTML = '" . $this->exts->recaptcha_answer . "';", [$recaptcha_textareas[$i]]);
+            }
+            sleep(2);
+            $this->exts->capture('recaptcha-filled');
+
+            $gcallbackFunction = $this->exts->execute_javascript('
+                    (function() {
+                        if(document.querySelector("[data-callback]") != null){
+                            return document.querySelector("[data-callback]").getAttribute("data-callback");
+                        }
+
+                        var result = ""; var found = false;
+                        function recurse (cur, prop, deep) {
+                            if(deep > 5 || found){ return;}console.log(prop);
+                            try {
+                                if(cur == undefined || cur == null || cur instanceof Element || Object(cur) !== cur || Array.isArray(cur)){ return;}
+                                if(prop.indexOf(".callback") > -1){result = prop; found = true; return;
+                                } else { deep++;
+                                    for (var p in cur) { recurse(cur[p], prop ? prop + "." + p : p, deep);}
+                                }
+                            } catch(ex) { console.log("ERROR in function: " + ex); return; }
+                        }
+
+                        recurse(___grecaptcha_cfg.clients[0], "", 0);
+                        return found ? "___grecaptcha_cfg.clients[0]." + result : null;
+                    })();
+                ');
+            $this->exts->log('Callback function: ' . $gcallbackFunction);
+            $this->exts->log('Callback function: ' . $this->exts->recaptcha_answer);
+            if ($gcallbackFunction != null) {
+                $this->exts->execute_javascript($gcallbackFunction . '("' . $this->exts->recaptcha_answer . '");');
+                sleep(10);
+            }
+        } else {
+            // try again if recaptcha expired
+            if ($count < 3) {
+                $count++;
+                $this->checkFillRecaptcha($count);
+            }
+        }
+    } else {
+        $this->exts->log(__FUNCTION__ . '::Not found reCaptcha');
     }
 }
 
