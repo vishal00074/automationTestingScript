@@ -78,7 +78,14 @@ class PortalScriptCDP
      */
     private function initPortal($count)
     {
-        $this->disable_extensions();
+        $this->exts->temp_keep_useragent = $this->exts->send_websocket_event(
+            $this->exts->current_context->webSocketDebuggerUrl,
+            "Network.setUserAgentOverride",
+            '',
+            ["userAgent" => "Mozilla/5.0 (Windows NT 11.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/134.0.6998.166 Safari/537.36"]
+        );
+
+        // $this->disable_extensions();
         $this->exts->log('Begin initPortal ' . $count);
         // Load cookies
         // $this->exts->loadCookiesFromFile();
@@ -125,10 +132,7 @@ class PortalScriptCDP
             $this->exts->log(__FUNCTION__ . '::User logged in');
             $this->exts->capture("3-login-success");
             // Open invoices url and download invoice
-            // $this->exts->moveToElementAndClick('div.snr-sn-sidebar__subnav button.snr-collapse-panel__show-action');
-            // if ($this->exts->getElement('div.modal-lg.modal-dialog button[type=submit]') != null) {
-            //     $this->exts->moveToElementAndClick('div.modal-lg.modal-dialog button[type=submit]');
-            // }
+
             sleep(5);
             $admin_console_button = $this->exts->getElementByText('button.snr-navgroup-list__control', ['Admin Console', 'Konsole'], null, false);
             sleep(15);
@@ -137,7 +141,9 @@ class PortalScriptCDP
             } else if ($this->isExists('button[data-autotest="sidebar-admin-console-nav-item-btn"]')) {
                 $this->exts->moveToElementAndClick('button[data-autotest="sidebar-admin-console-nav-item-btn"]');
             }
+            sleep(10);
             $selector = 'a[href*="billing"]';
+            $this->exts->switchToNewestActiveTab();
 
             for ($wait = 0; $wait < 5 && $this->exts->executeSafeScript("return !!document.querySelector('" . $selector . "');") != 1; $wait++) {
                 $this->exts->log('Waiting for Selectors.....');
@@ -157,6 +163,14 @@ class PortalScriptCDP
             if ($this->exts->querySelector('a[href*="billing"]') != null) {
                 sleep(5);
                 $billingUrl = $this->exts->getElement('a[href*="billing"]')->getAttribute("href");
+                $this->exts->openUrl($billingUrl);
+                $this->processInvoices();
+            } else {
+                $currentUrl = $this->exts->getUrl();
+
+                $clean_url = rtrim($currentUrl, '/');
+                $billingUrl = $clean_url . '/billing';
+
                 $this->exts->openUrl($billingUrl);
                 $this->processInvoices();
             }
@@ -179,26 +193,6 @@ class PortalScriptCDP
                 $this->exts->loginFailure();
             }
         }
-    }
-
-
-    private function disable_extensions()
-    {
-        $this->exts->openUrl('chrome://extensions/');
-        sleep(2);
-        $this->exts->execute_javascript("
-    let manager = document.querySelector('extensions-manager');
-    if (manager && manager.shadowRoot) {
-        let itemList = manager.shadowRoot.querySelector('extensions-item-list');
-        if (itemList && itemList.shadowRoot) {
-            let items = itemList.shadowRoot.querySelectorAll('extensions-item');
-            items.forEach(item => {
-                let toggle = item.shadowRoot.querySelector('#enableToggle[checked]');
-                if (toggle) toggle.click();
-            });
-        }
-    }
-");
     }
 
     private function checkFillLogin()
@@ -228,6 +222,7 @@ class PortalScriptCDP
             sleep(10);
 
             if ($this->isExists($this->password_selector) && $this->isExists('iframe[src*="/recaptcha/api2/anchor?"]')) {
+                sleep(7);
                 $this->checkFillRecaptcha(1);
                 sleep(5);
                 $this->exts->executeSafeScript("document.querySelector('button[type*=\'submit\']').disabled = false;");
@@ -285,9 +280,10 @@ class PortalScriptCDP
     private function checkFillRecaptcha($count = 1)
     {
         $this->exts->log(__FUNCTION__);
-        $recaptcha_iframe_selector = '#captcha-v2 iframe[src*="/recaptcha/api2/anchor?"]';
-        $recaptcha_textarea_selector = '#captcha-v2 textarea[name="g-recaptcha-response"]';
-        if ($this->isExists($recaptcha_iframe_selector)) {
+        $recaptcha_iframe_selector = 'iframe[src*="recaptcha/api2/anchor?ar"]';
+        $recaptcha_textarea_selector = 'textarea[name="g-recaptcha-response"]';
+        $this->exts->waitTillPresent($recaptcha_iframe_selector, 20);
+        if ($this->exts->exists($recaptcha_iframe_selector)) {
             $iframeUrl = $this->exts->extract($recaptcha_iframe_selector, null, 'src');
             $data_siteKey = explode('&', end(explode("&k=", $iframeUrl)))[0];
             $this->exts->log("iframe url  - " . $iframeUrl);
@@ -301,33 +297,41 @@ class PortalScriptCDP
                 $this->exts->log(__FUNCTION__ . "::filling reCaptcha response..");
                 $recaptcha_textareas =  $this->exts->getElements($recaptcha_textarea_selector);
                 for ($i = 0; $i < count($recaptcha_textareas); $i++) {
-                    $this->exts->executeSafeScript("arguments[0].innerHTML = '" . $this->exts->recaptcha_answer . "';", [$recaptcha_textareas[$i]]);
+                    $this->exts->execute_javascript("arguments[0].innerHTML = '" . $this->exts->recaptcha_answer . "';", [$recaptcha_textareas[$i]]);
                 }
                 sleep(2);
                 $this->exts->capture('recaptcha-filled');
+
                 // Step 2, check if callback function need executed
-                $gcallbackFunction = $this->exts->executeSafeScript('
-                    if(document.querySelector("[data-callback]") != null){
-                        return document.querySelector("[data-callback]").getAttribute("data-callback");
-                    }
-                    var result = ""; var found = false;
-                    function recurse (cur, prop, deep) {
-                        if(deep > 5 || found){ return;}console.log(prop);
-                        try {
-                            if(prop.indexOf(".callback") > -1){result = prop; found = true; return;
-                            } else { if(cur == undefined || cur == null || cur instanceof Element || Object(cur) !== cur || Array.isArray(cur)){ return;}deep++;
-                                for (var p in cur) { recurse(cur[p], prop ? prop + "." + p : p, deep);}
-                            }
-                        } catch(ex) { console.log("ERROR in function: " + ex); return; }
-                    }
-                    recurse(___grecaptcha_cfg.clients[0], "", 0);
-                    return found ? "___grecaptcha_cfg.clients[0]." + result : null;
-                ');
+                $gcallbackFunction = $this->exts->execute_javascript('
+				if(document.querySelector("[data-callback]") != null){
+					return document.querySelector("[data-callback]").getAttribute("data-callback");
+				}
+
+				var result = ""; var found = false;
+				function recurse (cur, prop, deep) {
+					if(deep > 5 || found){ return;}console.log(prop);
+					try {
+						if(cur == undefined || cur == null || cur instanceof Element || Object(cur) !== cur || Array.isArray(cur)){ return;}
+						if(prop.indexOf(".callback") > -1){result = prop; found = true; return;
+						} else { deep++;
+							for (var p in cur) { recurse(cur[p], prop ? prop + "." + p : p, deep);}
+						}
+					} catch(ex) { console.log("ERROR in function: " + ex); return; }
+				}
+
+				recurse(___grecaptcha_cfg.clients[0], "", 0);
+				return found ? "___grecaptcha_cfg.clients[0]." + result : null;
+			');
                 $this->exts->log('Callback function: ' . $gcallbackFunction);
-                $gcallbackFunction = $this->exts->executeSafeScript("return " . $gcallbackFunction);
                 if ($gcallbackFunction != null) {
-                    $this->exts->executeSafeScript($gcallbackFunction . '("' . $this->exts->recaptcha_answer . '");');
+                    $this->exts->execute_javascript($gcallbackFunction . '("' . $this->exts->recaptcha_answer . '");');
                     sleep(10);
+                }
+            } else {
+                if ($count < 3) {
+                    $count++;
+                    $this->checkFillRecaptcha($count);
                 }
             }
         } else {
@@ -389,9 +393,20 @@ class PortalScriptCDP
             }
         }
     }
+
+
+    public function waitFor($selector, $seconds = 7)
+    {
+        for ($wait = 0; $wait < 2 && $this->exts->executeSafeScript("return !!document.querySelector('" . $selector . "');") != 1; $wait++) {
+            $this->exts->log('Waiting for Selectors.....');
+            sleep($seconds);
+        }
+    }
+
     private function processInvoices($count = 0)
     {
-        sleep(25);
+        sleep(5);
+        $this->waitFor('table > tbody > tr');
         $this->exts->capture("4-invoices-page");
         $invoices = [];
         $rows = $this->exts->getElements('table > tbody > tr');

@@ -286,13 +286,13 @@ class PortalScriptCDP
             sleep(2);
 
             $this->exts->capture("2-login-page-filled");
-
             sleep(15); // Portal itself has one second delay after showing toast
 
             $this->solve_login_cloudflare();
 
             if ($this->isExists($this->submit_login_selector)) {
                 $this->exts->click_by_xdotool($this->submit_login_selector);
+                sleep(10);
             }
         } else {
             $this->exts->log(__FUNCTION__ . '::Login page not found');
@@ -303,18 +303,38 @@ class PortalScriptCDP
 
     private function solve_login_cloudflare()
     {
-        $this->exts->capture_by_chromedevtool("blocked-page-checking");
-        if ($this->exts->check_exist_by_chromedevtool('div.cf-turnstile')) {
-            $this->exts->capture_by_chromedevtool("blocked-by-cloudflare");
-            $this->exts->click_by_xdotool('div.cf-turnstile', 30, 28);
-            sleep(20);
-            if ($this->exts->check_exist_by_chromedevtool('div.cf-turnstile') && $this->exts->check_exist_by_chromedevtool('input[name="turnstile_captcha"][value=""]')) {
-                $this->exts->click_by_xdotool('div.cf-turnstile', 30, 28);
-                sleep(20);
+        $unsolved_cloudflare_input_xpath = '//input[starts-with(@name, "cf") and contains(@name, "response") and string-length(@value) <= 0]';
+        $solved_cloudflare_input_xpath = '//input[starts-with(@name, "cf") and contains(@name, "response") and string-length(@value) > 0]';
+        $this->exts->capture("cloudflare-checking");
+        if (
+            !$this->exts->oneExists([$solved_cloudflare_input_xpath, $unsolved_cloudflare_input_xpath]) &&
+            $this->exts->exists('#cf-please-wait > p:not([style*="display: none"]):not([style*="display:none"])')
+        ) {
+            for ($waiting = 0; $waiting < 10; $waiting++) {
+                sleep(2);
+                if ($this->exts->oneExists([$solved_cloudflare_input_xpath, $unsolved_cloudflare_input_xpath])) {
+                    sleep(3);
+                    break;
+                }
             }
-            if ($this->exts->check_exist_by_chromedevtool('div.cf-turnstile') && $this->exts->check_exist_by_chromedevtool('input[name="turnstile_captcha"][value=""]')) {
-                $this->exts->click_by_xdotool('div.cf-turnstile', 30, 28);
-                sleep(20);
+        }
+
+        if ($this->exts->exists($unsolved_cloudflare_input_xpath)) {
+            $this->exts->click_by_xdotool('*:has(>input[name^="cf"][name$="response"])', 30, 28);
+            sleep(5);
+            $this->exts->capture("cloudflare-clicked-1", true);
+            sleep(3);
+            if ($this->exts->exists($unsolved_cloudflare_input_xpath)) {
+                $this->exts->click_by_xdotool('*:has(>input[name^="cf"][name$="response"])', 30, 28);
+                sleep(5);
+                $this->exts->capture("cloudflare-clicked-2", true);
+                sleep(15);
+            }
+            if ($this->exts->exists($unsolved_cloudflare_input_xpath)) {
+                $this->exts->click_by_xdotool('*:has(>input[name^="cf"][name$="response"])', 30, 28);
+                sleep(5);
+                $this->exts->capture("cloudflare-clicked-3", true);
+                sleep(15);
             }
         }
     }
@@ -323,7 +343,7 @@ class PortalScriptCDP
      * Method to Check where user is logged in or not
      * return boolean true/false
      */
-    public  function checkLogin()
+    public function checkLogin()
     {
         $this->exts->log("Begin checkLogin ");
         $isLoggedIn = false;
@@ -336,6 +356,13 @@ class PortalScriptCDP
                 $this->exts->log(">>>>>>>>>>>>>>>Login successful!!!!");
                 $isLoggedIn = true;
             }
+
+            if ($this->isExists('div[data-qa="billing-account-selection"]')) {
+                $this->exts->log(">>>>>>>>>>>>>>>Login successful!!!!");
+                $isLoggedIn = true;
+            }
+
+            
         } catch (Exception $exception) {
 
             $this->exts->log("Exception checking loggedin " . $exception);
@@ -387,34 +414,23 @@ class PortalScriptCDP
         }
     }
 
-    private function changeSelectbox($select_box = '', $option_value = '')
+    private function changeSelectbox($select, $value)
     {
-        $this->exts->waitTillPresent($select_box, 10);
-        if ($this->exts->exists($select_box)) {
-            $option = $option_value;
-            $this->exts->click_by_xdotool($select_box);
-            sleep(2);
-            $optionIndex = $this->exts->executeSafeScript('
-        const selectBox = document.querySelector("' . $select_box . '");
-        const targetValue = "' . $option_value . '";
-        const optionIndex = [...selectBox.options].findIndex(option => option.value === targetValue);
-        return optionIndex;
-    ');
-            $this->exts->log($optionIndex);
-            sleep(1);
-            for ($i = 0; $i < $optionIndex; $i++) {
-                $this->exts->log('>>>>>>>>>>>>>>>>>> Down');
-                // Simulate pressing the down arrow key
-                $this->exts->type_key_by_xdotool('Down');
-                sleep(1);
+        $this->exts->execute_javascript('
+        (function() {
+            const box = document.querySelector("' . addslashes($select) . '");
+            if (box) {
+                box.value = "' . addslashes($value) . '";
+                box.dispatchEvent(new Event("change"));
             }
-            $this->exts->type_key_by_xdotool('Return');
-        } else {
-            $this->exts->log('Select box does not exist');
-        }
+        })();
+    ');
     }
 
-    private function processInvoices($count = 0)
+
+    public $totalInvoices = 0;
+
+    private function processInvoices($count = 1)
     {
         $this->exts->update_process_lock();
         sleep(5);
@@ -423,6 +439,11 @@ class PortalScriptCDP
 
         $invoice_sections = $this->exts->getElements('[dataqa="invoice-item"]');
         foreach ($invoice_sections as $invoice_section) {
+
+            if ($this->totalInvoices >= 100) {
+                return;
+            }
+
             $download_button = $this->exts->getElement('[data-qa="invoice-table-content"] [data-qa="invoice-download-pdf"]', $invoice_section);
             if ($download_button != null) {
                 $this->isNoInvoice = false;
@@ -444,6 +465,7 @@ class PortalScriptCDP
                 $this->exts->log('invoiceDate: ' . $invoiceDate);
                 $this->exts->log('invoiceAmount: ' . $invoiceAmount);
 
+
                 // Download invoice if it not exisited
                 if ($this->exts->invoice_exists($invoiceName)) {
                     $this->exts->log('Invoice existed ' . $invoiceFileName);
@@ -461,6 +483,7 @@ class PortalScriptCDP
 
                     if (trim($downloaded_file) != '' && file_exists($downloaded_file)) {
                         $this->exts->new_invoice($invoiceName, $invoiceDate, $invoiceAmount, $downloaded_file);
+                        $this->totalInvoices++;
                         sleep(1);
                     } else {
                         $this->exts->log(__FUNCTION__ . '::No pdf ' . $invoiceFileName);
@@ -470,20 +493,25 @@ class PortalScriptCDP
         }
         $restrictPages = isset($this->exts->config_array["restrictPages"]) ? (int)@$this->exts->config_array["restrictPages"] : 3;
         $this->exts->log(__FUNCTION__ . 'restrictPages:: ' . $restrictPages);
-        if ($restrictPages == 0 && $count < 3) {
+        if ($restrictPages == 0 && $count < 4) {
             $years = $this->exts->getElements('select[data-qa="period-select"] option');
-            foreach ($years as $key => $year) {
-                if ($key == 0) {
-                    continue;
-                }
-                $value  = $year->getHtmlAttribute("value");
-                $this->exts->log(__FUNCTION__ . 'Year:: ' . $value);
 
-                $this->changeSelectbox('select[data-qa="period-select"]', $value);
-                sleep(2);
-                $count++;
-                $this->processInvoices($count);
-            }
+            $value  = $years[$count]->getHtmlAttribute("value");
+            $this->exts->log(__FUNCTION__ . 'Year:: ' . $value);
+
+            $this->changeSelectbox('select[data-qa="period-select"]', $value);
+            sleep(5);
+
+            // try second time
+            $years = $this->exts->getElements('select[data-qa="period-select"] option');
+
+            $value  = $years[$count]->getHtmlAttribute("value");
+            $this->exts->log(__FUNCTION__ . 'Year:: ' . $value);
+
+            $this->changeSelectbox('select[data-qa="period-select"]', $value);
+            sleep(10);
+            $count++;
+            $this->processInvoices($count);
         }
     }
 }

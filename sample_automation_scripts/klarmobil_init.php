@@ -4,16 +4,18 @@ public $username_selector = 'input#username';
 public $password_selector = 'input#password';
 public $remember_me_selector = '';
 public $submit_login_selector = 'button[type="submit"]';
-public $check_login_success_selector = 'form#logout_form, .main-navigation a[href="/online-service/meine-daten"]';
+public $check_login_success_selector = 'form#logout_form, .main-navigation a[href="/online-service/meine-daten"], button[data-testid="logout"]';
 public $isNoInvoice = true;
 
 /**
-    * Entry Method thats called for a portal
-    * @param Integer $count Number of times portal is retried.
-    */
+ * Entry Method thats called for a portal
+ * @param Integer $count Number of times portal is retried.
+ */
 private function initPortal($count)
 {
     $this->exts->log('Begin initPortal ' . $count);
+    $this->disable_extensions();
+    sleep(5);
 
     // Load cookies
     $this->exts->openUrl($this->baseUrl);
@@ -43,44 +45,50 @@ private function initPortal($count)
 
         // $this->exts->clearCookies();// Expired cookie doern't affect to login but it make download getting error, so clear it.
         $this->exts->openUrl($this->invoicePageUrl);
+        sleep(10);
         $this->checkFillLogin();
 
-        if ($this->checkLogin()) {
-            sleep(3);
-            $this->exts->log(__FUNCTION__ . '::User logged in');
-            $this->exts->capture("3-login-success");
+        if ($this->exts->getElement($this->username_selector) != null) {
+            $this->checkFillLogin();
+        }
+    }
 
-            if (!empty($this->exts->config_array['allow_login_success_request'])) {
-                $this->exts->triggerLoginSuccess();
-            }
+    if ($this->checkLogin()) {
+        sleep(3);
+        $this->exts->log(__FUNCTION__ . '::User logged in');
+        $this->exts->capture("3-login-success");
 
-            $this->exts->success();
+        if (!empty($this->exts->config_array['allow_login_success_request'])) {
+            $this->exts->triggerLoginSuccess();
+        }
+
+        $this->exts->success();
+    } else {
+        $this->exts->log(__FUNCTION__ . '::Use login failed ' . $this->exts->getUrl());
+
+        // Aufgrund zu vieler fehlerhafter Login-Versuche wurde der Login zu Ihrer Sicherheit bis
+        if (strpos(strtolower($this->exts->extract('span.status-message__text')), 'deine eingegebene e-mail-adresse und das passwort') !== false) {
+            $this->exts->loginFailure();
+        } else if ($this->exts->urlContains('onlineservice/fehler') && $this->isExists('a[href*="logout"]') || $this->exts->urlContains('/onlineservice/benutzer-verknuepfen')) {
+            $this->exts->account_not_ready();
+        } else if (
+            $this->exts->urlContains('onlineservice/info') &&
+            (strpos($this->exts->extract('span.status-message__text'), 'Zu Ihrem Zugang konnten keine aktiven') !== false ||
+                strpos($this->exts->extract('span.status-message__text'), 'Zu Deinem Online-Konto existiert kein aktiver Vertrag') !== false ||
+                strpos($this->exts->extract('span.status-message__text'), 'Zu Ihrem Online-Account existiert kein aktiver Vertrag') !== false)
+        ) {
+            $this->exts->account_not_ready();
+        } else if ($this->exts->urlContains('benutzer-verknuepfen') || $this->exts->urlContains('user-link')) {
+            $this->exts->account_not_ready();
+        } else if ($this->isExists('div#error-cs-email-invalid') || $this->isExists('span[id*="error-element-password"]')) {
+            $this->exts->loginFailure(1);
         } else {
-            $this->exts->log(__FUNCTION__ . '::Use login failed ' . $this->exts->getUrl());
-
-            // Aufgrund zu vieler fehlerhafter Login-Versuche wurde der Login zu Ihrer Sicherheit bis
-            if (strpos(strtolower($this->exts->extract('span.status-message__text')), 'deine eingegebene e-mail-adresse und das passwort') !== false) {
-                $this->exts->loginFailure();
-            } else if ($this->exts->urlContains('onlineservice/fehler') && $this->isExists('a[href*="logout"]') || $this->exts->urlContains('/onlineservice/benutzer-verknuepfen')) {
-                $this->exts->account_not_ready();
-            } else if (
-                $this->exts->urlContains('onlineservice/info') &&
-                (strpos($this->exts->extract('span.status-message__text'), 'Zu Ihrem Zugang konnten keine aktiven') !== false ||
-                    strpos($this->exts->extract('span.status-message__text'), 'Zu Deinem Online-Konto existiert kein aktiver Vertrag') !== false ||
-                    strpos($this->exts->extract('span.status-message__text'), 'Zu Ihrem Online-Account existiert kein aktiver Vertrag') !== false)
-            ) {
-                $this->exts->account_not_ready();
-            } else if ($this->exts->urlContains('benutzer-verknuepfen') || $this->exts->urlContains('user-link')) {
-                $this->exts->account_not_ready();
-            } else if ($this->isExists('div#error-cs-email-invalid') || $this->isExists('span[id*="error-element-password"]')) {
-                $this->exts->loginFailure(1);
-            } else {
-                $this->exts->capture("else-login-failed-page");
-                $this->exts->loginFailure();
-            }
+            $this->exts->capture("else-login-failed-page");
+            $this->exts->loginFailure();
         }
     }
 }
+
 private function clearChrome()
 {
     $this->exts->log("Clearing browser history, cookie, cache");
@@ -147,6 +155,25 @@ public function waitFor($selector, $seconds = 10)
     }
 }
 
+private function disable_extensions()
+{
+    $this->exts->openUrl('chrome://extensions/'); // disable Block origin extension
+    sleep(2);
+    $this->exts->execute_javascript("
+    let manager = document.querySelector('extensions-manager');
+    if (manager && manager.shadowRoot) {
+        let itemList = manager.shadowRoot.querySelector('extensions-item-list');
+        if (itemList && itemList.shadowRoot) {
+            let items = itemList.shadowRoot.querySelectorAll('extensions-item');
+            items.forEach(item => {
+                let toggle = item.shadowRoot.querySelector('#enableToggle[checked]');
+                if (toggle) toggle.click();
+            });
+        }
+    }
+");
+}
+
 public function switchToFrame($query_string)
 {
     $this->exts->log(__FUNCTION__ . " Begin with " . $query_string);
@@ -176,23 +203,25 @@ private function checkFillLogin()
 
         $this->exts->log("Enter Username");
         $this->exts->moveToElementAndType($this->username_selector, $this->username);
-        sleep(2);
+        sleep(5);
 
         $this->exts->log("Enter Password");
         $this->exts->moveToElementAndType($this->password_selector, $this->password);
-        sleep(2);
+        sleep(5);
 
-        if ($this->remember_me_selector != '')
+        if ($this->remember_me_selector != '') {
             $this->exts->moveToElementAndClick($this->remember_me_selector);
+        }
         sleep(2);
 
         $this->exts->capture("2-login-page-filled");
+        sleep(15); // Portal itself has one second delay after showing toast
 
-        sleep(5); // Portal itself has one second delay after showing toast
         $this->solve_login_cloudflare();
 
         if ($this->isExists($this->submit_login_selector)) {
             $this->exts->click_by_xdotool($this->submit_login_selector);
+            sleep(10);
         }
     } else {
         $this->exts->log(__FUNCTION__ . '::Login page not found');
@@ -200,29 +229,50 @@ private function checkFillLogin()
     }
 }
 
+
 private function solve_login_cloudflare()
 {
-    $this->exts->capture_by_chromedevtool("blocked-page-checking");
-    if ($this->exts->check_exist_by_chromedevtool('div.cf-turnstile')) {
-        $this->exts->capture_by_chromedevtool("blocked-by-cloudflare");
-        $this->exts->click_by_xdotool('div.cf-turnstile', 30, 28);
-        sleep(20);
-        if ($this->exts->check_exist_by_chromedevtool('div.cf-turnstile') && $this->exts->check_exist_by_chromedevtool('input[name="turnstile_captcha"][value=""]')) {
-            $this->exts->click_by_xdotool('div.cf-turnstile', 30, 28);
-            sleep(20);
+    $unsolved_cloudflare_input_xpath = '//input[starts-with(@name, "cf") and contains(@name, "response") and string-length(@value) <= 0]';
+    $solved_cloudflare_input_xpath = '//input[starts-with(@name, "cf") and contains(@name, "response") and string-length(@value) > 0]';
+    $this->exts->capture("cloudflare-checking");
+    if (
+        !$this->exts->oneExists([$solved_cloudflare_input_xpath, $unsolved_cloudflare_input_xpath]) &&
+        $this->exts->exists('#cf-please-wait > p:not([style*="display: none"]):not([style*="display:none"])')
+    ) {
+        for ($waiting = 0; $waiting < 10; $waiting++) {
+            sleep(2);
+            if ($this->exts->oneExists([$solved_cloudflare_input_xpath, $unsolved_cloudflare_input_xpath])) {
+                sleep(3);
+                break;
+            }
         }
-        if ($this->exts->check_exist_by_chromedevtool('div.cf-turnstile') && $this->exts->check_exist_by_chromedevtool('input[name="turnstile_captcha"][value=""]')) {
-            $this->exts->click_by_xdotool('div.cf-turnstile', 30, 28);
-            sleep(20);
+    }
+
+    if ($this->exts->exists($unsolved_cloudflare_input_xpath)) {
+        $this->exts->click_by_xdotool('*:has(>input[name^="cf"][name$="response"])', 30, 28);
+        sleep(5);
+        $this->exts->capture("cloudflare-clicked-1", true);
+        sleep(3);
+        if ($this->exts->exists($unsolved_cloudflare_input_xpath)) {
+            $this->exts->click_by_xdotool('*:has(>input[name^="cf"][name$="response"])', 30, 28);
+            sleep(5);
+            $this->exts->capture("cloudflare-clicked-2", true);
+            sleep(15);
+        }
+        if ($this->exts->exists($unsolved_cloudflare_input_xpath)) {
+            $this->exts->click_by_xdotool('*:has(>input[name^="cf"][name$="response"])', 30, 28);
+            sleep(5);
+            $this->exts->capture("cloudflare-clicked-3", true);
+            sleep(15);
         }
     }
 }
 
 /**
-    * Method to Check where user is logged in or not
-    * return boolean true/false
-    */
-public  function checkLogin()
+ * Method to Check where user is logged in or not
+ * return boolean true/false
+ */
+public function checkLogin()
 {
     $this->exts->log("Begin checkLogin ");
     $isLoggedIn = false;
@@ -235,9 +285,17 @@ public  function checkLogin()
             $this->exts->log(">>>>>>>>>>>>>>>Login successful!!!!");
             $isLoggedIn = true;
         }
+
+        if ($this->isExists('div[data-qa="billing-account-selection"]')) {
+            $this->exts->log(">>>>>>>>>>>>>>>Login successful!!!!");
+            $isLoggedIn = true;
+        }
+
+        
     } catch (Exception $exception) {
 
         $this->exts->log("Exception checking loggedin " . $exception);
     }
     return $isLoggedIn;
 }
+
