@@ -44,8 +44,22 @@ private function initPortal($count)
         }
         $this->checkSolveCaptcha();
         $this->checkFillLogin();
-        sleep(20);
+
+        sleep(15);
         $this->checkSolveCaptcha();
+        if ($this->exts->urlContains('cprx/captcha')) {
+            $this->exts->refresh();
+            sleep(10);
+
+            $this->exts->moveToElementAndClick('a.open-overlay-my-vf');
+            sleep(10);
+            $this->checkFillLogin();
+            sleep(15);
+            $this->checkSolveCaptcha();
+        }
+
+
+
         $this->checkFillTwoFactor();
     }
 
@@ -149,7 +163,7 @@ private function checkFillTwoFactor()
 
 public function checkSolveCaptcha()
 {
-    for ($i = 0; $i < 30 && $this->exts->urlContains('/captcha'); $i++) {
+    for ($i = 0; $i < 30 && $this->exts->querySelector('form[action*="/captcha"] input#captchaField') != null && $this->exts->urlContains('/captcha');  $i++) {
         $this->exts->processCaptcha('form[action*="/captcha"] img.captcha', 'form[action*="/captcha"] input#captchaField');
         $this->exts->capture('captcha-filled');
         $this->exts->moveToElementAndClick('form[action*="/captcha"] [type="submit"]');

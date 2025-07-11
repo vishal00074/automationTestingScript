@@ -24,7 +24,7 @@ private function initPortal($count)
     $this->exts->openUrl($this->baseUrl);
     $this->acceptCookies();
     $this->solveCAPTCHA();
-    if ($this->exts->exists('button.chakra-modal__close-btn')) {
+    if ($this->isExists('button.chakra-modal__close-btn')) {
         $this->exts->moveToElementAndClick('button.chakra-modal__close-btn');
     }
     if (!$this->checkLogin()) {
@@ -45,7 +45,7 @@ private function initPortal($count)
         $this->exts->success();
     } else {
         // $this->exts->waitTillPresent($this->check_login_failed_selector, 20);
-        if ($this->exts->exists($this->check_login_failed_selector)) {
+        if ($this->isExists($this->check_login_failed_selector)) {
             $this->exts->log("Wrong credential !!!!");
             $this->exts->loginFailure(1);
         } else {
@@ -55,12 +55,12 @@ private function initPortal($count)
     }
 }
 
-function fillForm($count)
+public function fillForm($count)
 {
     $this->exts->log("Begin fillForm " . $count);
     // $this->exts->waitTillPresent($this->username_selector, 20);
     for ($i = 0; $i < 10; $i++) {
-        if ($this->exts->exists($this->username_selector)) {
+        if ($this->isExists($this->username_selector)) {
             break;
         }
         sleep(2);
@@ -75,15 +75,24 @@ function fillForm($count)
             $this->solveCAPTCHA();
             sleep(5);
             $this->exts->click_element($this->submit_button_selector);
-            sleep(5); // Portal itself has one second delay after showing toast
+            sleep(7); // Portal itself has one second delay after showing toast
         }
+
+        if ($this->exts->querySelector($this->username_selector) != null) {
+            $this->check_solve_cloudflare_page();
+
+            $this->exts->click_element($this->submit_button_selector);
+            sleep(7);
+        }
+
         // $this->exts->waitTillPresent($this->password_selector, 20);
         for ($i = 0; $i < 10; $i++) {
-            if ($this->exts->exists($this->password_selector)) {
+            if ($this->isExists($this->password_selector)) {
                 break;
             }
             sleep(2);
         }
+
         if ($this->exts->querySelector($this->password_selector) != null) {
 
             $this->exts->log("Enter Password");
@@ -91,7 +100,15 @@ function fillForm($count)
             $this->solveCAPTCHA();
             sleep(5);
             $this->exts->click_element($this->submit_button_selector);
-            sleep(2); // Portal itself has one second delay after showing toast
+            sleep(7); // Portal itself has one second delay after showing toast
+
+
+            if ($this->exts->querySelector($this->password_selector) != null) {
+                $this->check_solve_cloudflare_page();
+
+                $this->exts->click_element($this->submit_button_selector);
+                sleep(7);
+            }
         } else {
             $this->exts->log('Failed due to unknown reasons');
             $this->exts->loginFailure();
@@ -102,77 +119,21 @@ function fillForm($count)
     }
 }
 
-/**
-
-    * Method to Check where user is logged in or not
-
-    * return boolean true/false
-
-    */
-function checkLogin()
+private function isExists($selector = '')
 {
-    $this->exts->log("Begin checkLogin ");
-    $isLoggedIn = false;
-    try {
-        sleep(15);
-
-        // $this->exts->waitTillAnyPresent([$this->check_login_success_selector,$this->username_selector], 15);
-        for ($i = 0; $i < 10; $i++) {
-            if ($this->exts->exists($this->username_selector) || $this->exts->exists($this->check_login_success_selector)) {
-                break;
-            }
-            sleep(2);
-        }
-        if ($this->exts->exists($this->check_login_success_selector)) {
-
-            $this->exts->log(">>>>>>>>>>>>>>>Login successful!!!!");
-
-            $isLoggedIn = true;
-        } else {
-            if ($this->exts->exists('button[id*="menu-button"]')) {
-                $this->exts->moveToElementAndClick('button[id*="menu-button"]');
-                sleep(3);
-                if ($this->exts->exists('//p[contains(text(),"Logout")]')) {
-
-                    $this->exts->log(">>>>>>>>>>>>>>>Login successful!!!!");
-
-                    $isLoggedIn = true;
-                    $this->exts->moveToElementAndClick('button[id*="menu-button"]');
-                    sleep(1);
-                }
-            }
-        }
-    } catch (TypeError $e) {
-
-        $this->exts->log("Exception checking loggedin " . $e);
-        sleep(15);
-
-        $this->exts->waitTillAnyPresent([$this->check_login_success_selector, $this->username_selector], 15);
-        if ($this->exts->exists($this->check_login_success_selector)) {
-
-            $this->exts->log(">>>>>>>>>>>>>>>Login successful!!!!");
-
-            $isLoggedIn = true;
-        } else {
-            if ($this->exts->exists('button[id*="menu-button"]')) {
-                $this->exts->moveToElementAndClick('button[id*="menu-button"]');
-                sleep(3);
-                if ($this->exts->exists('//p[contains(text(),"Logout")]')) {
-
-                    $this->exts->log(">>>>>>>>>>>>>>>Login successful!!!!");
-
-                    $isLoggedIn = true;
-                    $this->exts->moveToElementAndClick('button[id*="menu-button"]');
-                    sleep(1);
-                }
-            }
-        }
+    $safeSelector = addslashes($selector);
+    $this->exts->log('Element:: ' . $safeSelector);
+    $isElement = $this->exts->execute_javascript('!!document.querySelector("' . $safeSelector . '")');
+    if ($isElement) {
+        $this->exts->log('Element Found');
+        return true;
+    } else {
+        $this->exts->log('Element not Found');
+        return false;
     }
-
-    return $isLoggedIn;
 }
 
-private function solveCAPTCHA()
+private function check_solve_cloudflare_page()
 {
     $unsolved_cloudflare_input_xpath = '//input[starts-with(@name, "cf") and contains(@name, "response") and string-length(@value) <= 0]';
     $solved_cloudflare_input_xpath = '//input[starts-with(@name, "cf") and contains(@name, "response") and string-length(@value) > 0]';
@@ -210,12 +171,120 @@ private function solveCAPTCHA()
     }
 }
 
+/**
+
+    * Method to Check where user is logged in or not
+
+    * return boolean true/false
+
+    */
+private function checkLogin()
+{
+    $this->exts->log("Begin checkLogin ");
+    $isLoggedIn = false;
+    try {
+        sleep(15);
+
+        // $this->exts->waitTillAnyPresent([$this->check_login_success_selector,$this->username_selector], 15);
+        for ($i = 0; $i < 10; $i++) {
+            if ($this->isExists($this->username_selector) || $this->isExists($this->check_login_success_selector)) {
+                break;
+            }
+            sleep(2);
+        }
+        if ($this->isExists($this->check_login_success_selector)) {
+
+            $this->exts->log(">>>>>>>>>>>>>>>Login successful!!!!");
+
+            $isLoggedIn = true;
+        } else {
+            if ($this->isExists('button[id*="menu-button"]')) {
+                $this->exts->moveToElementAndClick('button[id*="menu-button"]');
+                sleep(3);
+                if ($this->isExists('//p[contains(text(),"Logout")]')) {
+
+                    $this->exts->log(">>>>>>>>>>>>>>>Login successful!!!!");
+
+                    $isLoggedIn = true;
+                    $this->exts->moveToElementAndClick('button[id*="menu-button"]');
+                    sleep(1);
+                }
+            }
+        }
+    } catch (TypeError $e) {
+
+        $this->exts->log("Exception checking loggedin " . $e);
+        sleep(15);
+
+        $this->exts->waitTillAnyPresent([$this->check_login_success_selector, $this->username_selector], 15);
+        if ($this->isExists($this->check_login_success_selector)) {
+
+            $this->exts->log(">>>>>>>>>>>>>>>Login successful!!!!");
+
+            $isLoggedIn = true;
+        } else {
+            if ($this->isExists('button[id*="menu-button"]')) {
+                $this->exts->moveToElementAndClick('button[id*="menu-button"]');
+                sleep(3);
+                if ($this->isExists('//p[contains(text(),"Logout")]')) {
+
+                    $this->exts->log(">>>>>>>>>>>>>>>Login successful!!!!");
+
+                    $isLoggedIn = true;
+                    $this->exts->moveToElementAndClick('button[id*="menu-button"]');
+                    sleep(1);
+                }
+            }
+        }
+    }
+
+    return $isLoggedIn;
+}
+
+private function solveCAPTCHA()
+{
+    $unsolved_cloudflare_input_xpath = '//input[starts-with(@name, "cf") and contains(@name, "response") and string-length(@value) <= 0]';
+    $solved_cloudflare_input_xpath = '//input[starts-with(@name, "cf") and contains(@name, "response") and string-length(@value) > 0]';
+    $this->exts->capture("cloudflare-checking");
+    if (
+        !$this->exts->oneExists([$solved_cloudflare_input_xpath, $unsolved_cloudflare_input_xpath]) &&
+        $this->isExists('#cf-please-wait > p:not([style*="display: none"]):not([style*="display:none"])')
+    ) {
+        for ($waiting = 0; $waiting < 10; $waiting++) {
+            sleep(2);
+            if ($this->exts->oneExists([$solved_cloudflare_input_xpath, $unsolved_cloudflare_input_xpath])) {
+                sleep(3);
+                break;
+            }
+        }
+    }
+
+    if ($this->isExists($unsolved_cloudflare_input_xpath)) {
+        $this->exts->click_by_xdotool('*:has(>input[name^="cf"][name$="response"])', 30, 28);
+        sleep(5);
+        $this->exts->capture("cloudflare-clicked-1", true);
+        sleep(3);
+        if ($this->isExists($unsolved_cloudflare_input_xpath)) {
+            $this->exts->click_by_xdotool('*:has(>input[name^="cf"][name$="response"])', 30, 28);
+            sleep(5);
+            $this->exts->capture("cloudflare-clicked-2", true);
+            sleep(15);
+        }
+        if ($this->isExists($unsolved_cloudflare_input_xpath)) {
+            $this->exts->click_by_xdotool('*:has(>input[name^="cf"][name$="response"])', 30, 28);
+            sleep(5);
+            $this->exts->capture("cloudflare-clicked-3", true);
+            sleep(15);
+        }
+    }
+}
+
 private function acceptCookies()
 {
     sleep(2);
     // $this->exts->waitTillPresent('button[title="Accept all cookies"]', 20);
     for ($i = 0; $i < 10; $i++) {
-        if ($this->exts->exists('button[title="Accept all cookies"]')) {
+        if ($this->isExists('button[title="Accept all cookies"]')) {
             break;
         }
         sleep(2);

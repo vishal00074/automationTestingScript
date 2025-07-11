@@ -1,4 +1,4 @@
-<?php //
+<?php // change waitTillPresent to waitFor function
 
 /**
  * Chrome Remote via Chrome devtool protocol script, for specific process/portal
@@ -93,7 +93,7 @@ class PortalScriptCDP
             $this->exts->log('NOT logged via cookie');
 
             $this->fillForm(0);
-            $this->exts->waitTillPresent($this->check_login_success_selector, 50);
+            $this->waitFor($this->check_login_success_selector, 25);
         }
 
         if ($this->checkLogin()) {
@@ -113,7 +113,7 @@ class PortalScriptCDP
     function fillForm($count)
     {
         $this->exts->log("Begin fillForm " . $count);
-        $this->exts->waitTillPresent($this->username_selector, 10);
+        $this->waitFor($this->username_selector, 5);
         try {
             if ($this->exts->querySelector($this->username_selector) != null) {
 
@@ -128,7 +128,7 @@ class PortalScriptCDP
                 sleep(5); // Portal itself has one second delay after showing toast
                 $this->checkFillTwoFactor();
             }
-            $this->exts->waitTillPresent($this->password_selector, 10);
+            $this->waitFor($this->password_selector, 5);
             if ($this->exts->querySelector($this->password_selector) != null) {
                 $this->exts->log("Enter Password");
                 $this->exts->moveToElementAndType($this->password_selector, $this->password);
@@ -137,7 +137,7 @@ class PortalScriptCDP
                 $this->exts->click_by_xdotool($this->continue_2_button_selector);
                 sleep(5);
             } else {
-                $this->exts->waitTillPresent($this->check_invalid_email_address, 10);
+                $this->waitFor($this->check_invalid_email_address, 5);
                 if ($this->exts->querySelector($this->check_invalid_email_address) != null) {
                     $this->exts->log("Invalid email address !!!!");
                     $this->exts->loginFailure(1);
@@ -153,7 +153,7 @@ class PortalScriptCDP
 
     private function checkFillTwoFactor()
     {
-        $this->exts->waitTillPresent('button[data-id="Page-PrimaryButton"]', 20);
+        $this->waitFor('button[data-id="Page-PrimaryButton"]', 10);
         if ($this->exts->exists('button[data-id="Page-PrimaryButton"]')) {
             $this->exts->click_element('button[data-id="Page-PrimaryButton"]');
         }
@@ -161,7 +161,7 @@ class PortalScriptCDP
         $two_factor_selector = 'input[class="spectrum-Textfield CodeInput-Digit"]';
         $two_factor_message_selector = 'div[data-id="ChallengeCodePage-email"]';
         $two_factor_submit_selector = '';
-        $this->exts->waitTillPresent($two_factor_selector, 10);
+        $this->waitFor($two_factor_selector, 5);
         if ($this->exts->querySelector($two_factor_selector) != null && $this->exts->two_factor_attempts < 3) {
             $this->exts->log("Two factor page found.");
             $this->exts->capture("2.1-two-factor");
@@ -217,14 +217,20 @@ class PortalScriptCDP
             }
         }
     }
+
+    public function waitFor($selector, $seconds = 7)
+    {
+        for ($wait = 0; $wait < 2 && $this->exts->executeSafeScript("return !!document.querySelector('" . $selector . "');") != 1; $wait++) {
+            $this->exts->log('Waiting for Selectors.....');
+            sleep($seconds);
+        }
+    }
+
     /**
-
      * Method to Check where user is logged in or not
-
      * return boolean true/false
-
      */
-    function checkLogin()
+    public function checkLogin()
     {
         $this->exts->log("Begin checkLogin ");
         $isLoggedIn = false;
@@ -250,7 +256,7 @@ class PortalScriptCDP
     private function processInvoices($paging_count = 1)
     {
         sleep(5);
-        $this->exts->waitTillPresent('.react-spectrum-TableView-row.spectrum-Table-row', 25);
+        $this->waitFor('.react-spectrum-TableView-row.spectrum-Table-row', 12);
         $this->exts->capture("4-invoices-page");
         $invoices = [];
         $rows = $this->exts->querySelectorAll('.react-spectrum-TableView-row.spectrum-Table-row');
