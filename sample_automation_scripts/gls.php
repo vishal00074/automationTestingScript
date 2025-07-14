@@ -57,8 +57,6 @@ class PortalScriptCDP
         }
     }
 
-    // Server-Portal-ID: 653 - Last modified: 09.04.2024 13:53:43 UTC - User: 1
-
     /*Define constants used in script*/
     // Server-Portal-ID: 9892 - Last modified: 12.02.2025 06:17:57 UTC - User: 1
 

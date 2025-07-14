@@ -1,4 +1,4 @@
-<?php
+<?php // handle empty invoice name case updated login failed message
 
 /**
  * Chrome Remote via Chrome devtool protocol script, for specific process/portal
@@ -57,7 +57,7 @@ class PortalScriptCDP
         }
     }
 
-    // Server-Portal-ID: 148966 - Last modified: 08.07.2024 14:13:54 UTC - User: 1
+    // Server-Portal-ID: 148966 - Last modified: 07.07.2025 14:41:07 UTC - User: 1
 
     /*Define constants used in script*/
     public $baseUrl = 'https://www.printful.com/';
@@ -66,7 +66,6 @@ class PortalScriptCDP
 
     public $username_selector = 'input#login-email';
     public $password_selector = 'input#login-password';
-    public $remember_me_selector = '';
     public $submit_login_selector = 'form input[type="submit"]';
 
     public $check_login_failed_selector = 'div.help-block';
@@ -83,47 +82,26 @@ class PortalScriptCDP
     private function initPortal($count)
     {
         $this->exts->log('Begin initPortal ' . $count);
-
         if (isset($this->exts->config_array['login_with_google'])) {
             $this->login_with_google = trim($this->exts->config_array['login_with_google']);
         }
-
         $this->restrictPages = isset($this->exts->config_array["restrictPages"]) ? (int)@$this->exts->config_array["restrictPages"] : 3;
-        $this->exts->openUrl($this->baseUrl);
-        sleep(10);
+
         // Load cookies
         $this->exts->loadCookiesFromFile();
-        sleep(1);
+        $this->exts->openUrl($this->baseUrl);
+        sleep(10);
+        $this->exts->click_if_existed('[data-cookiefirst-action="accept"], button[data-test*="allow-all"]');
         $this->exts->capture('1-init-page');
 
-        $cookiesBtn =  $this->exts->getElements('button[data-test*="allow-all"]');
-        try {
-            // Accecpt cookies
-            if (count($cookiesBtn) > 0) {
-                $cookiesBtn[0]->click();
-                sleep(7);
-            }
-        } catch (\Exception $exception) {
-            $this->exts->log('Error in capture  cookiesBtn- ' . $exception->getMessage());
-        }
-
-        if (!$this->checkLogin()) {
+        if (!$this->isLoggedin()) {
             $this->exts->log('NOT logged via cookie');
-            $this->exts->clearCookies();
-
             $this->exts->openUrl($this->loginUrl);
-            sleep(15);
-            if ($this->exts->exists('button[data-test*="allow-all"]')) {
-                $this->exts->moveToElementAndClick('button[data-test*="allow-all"]');
-                sleep(5);
-            }
+            sleep(10);
+            $this->exts->click_if_existed('[data-cookiefirst-action="accept"], button[data-test*="allow-all"]');
             if ($this->login_with_google == '1') {
-                $googleLoginEle = $this->exts->getElements('div[class="clearfix login-box"] button');
-                try {
-                    $googleLoginEle[0]->click();
-                } catch (\Exception $exception) {
-                    $this->exts->log('Error in capture - ' . $exception->getMessage());
-                }
+                $this->exts->click_element('//button//text()[contains(., "Google")]/..');
+                sleep(2);
                 $google_tab = $this->exts->findTabMatchedUrl(['google']);
                 if ($google_tab != null) {
                     $this->exts->switchToTab($google_tab);
@@ -133,47 +111,20 @@ class PortalScriptCDP
             } else {
                 $this->checkFillLogin();
                 sleep(5);
-                if (!$this->checkLogin()) {
+                if (!$this->isLoggedin()) {
                     $this->checkFillRecaptcha();
                     sleep(5);
                 }
             }
         }
 
-        if ($this->checkLogin()) {
+        if ($this->isLoggedin()) {
             sleep(3);
             $this->exts->log(__FUNCTION__ . '::User logged in');
             $this->exts->capture("3-login-success");
 
             // Open invoices url and download invoice
             $this->exts->openUrl($this->invoicePageUrl);
-
-
-            for ($wait = 0; $wait < 2 && $this->exts->executeSafeScript("return !!document.querySelector('div.calendar__toggle span#datepicker-trigger');") != 1; $wait++) {
-                $this->exts->log('Waiting for login.....');
-                sleep(7);
-            }
-
-            if ($this->exts->exists('div.calendar__toggle span#datepicker-trigger')) {
-                $this->exts->moveToElementAndClick('div.calendar__toggle span#datepicker-trigger');
-                sleep(5);
-            }
-
-            if ($this->exts->exists('div.calendar__container button.OtherBrowser')) {
-                $this->exts->moveToElementAndClick('div.calendar__container button.OtherBrowser');
-                sleep(5);
-            }
-
-            if ($this->exts->exists('div.calendar__container li[aria-label="Alle"]')) {
-                $this->exts->moveToElementAndClick('div.calendar__container li[aria-label="Alle"]');
-                sleep(5);
-            }
-
-            if ($this->exts->exists('div.calendar__container div[class="asd__action-buttons"] button:nth-child(2)')) {
-                $this->exts->moveToElementAndClick('div.calendar__container div[class="asd__action-buttons"] button:nth-child(2)');
-                sleep(5);
-            }
-
             $this->processInvoices();
 
             // Final, check no invoice
@@ -183,13 +134,21 @@ class PortalScriptCDP
             $this->exts->success();
         } else {
             $this->exts->log(__FUNCTION__ . '::Use login failed');
-            if (stripos($this->exts->extract($this->check_login_failed_selector), 'Oops, your email or password is incorrect') !== false) {
+            if (
+                stripos($this->exts->extract($this->check_login_failed_selector), 'email or password is incorrect') !== false ||
+                stripos($this->exts->extract($this->check_login_failed_selector), 'Passwort sind inkorrekt') !== false
+            ) {
                 $this->exts->log("Wrong credential !!!!");
                 $this->exts->loginFailure(1);
             } else {
                 $this->exts->loginFailure();
             }
         }
+    }
+
+    public function isLoggedin()
+    {
+        return $this->exts->querySelector($this->check_login_success_selector) != null;
     }
 
     private function checkFillLogin()
@@ -206,14 +165,7 @@ class PortalScriptCDP
             $this->exts->moveToElementAndType($this->password_selector, $this->password);
             sleep(1);
 
-            if ($this->remember_me_selector != ''){
-                $this->exts->moveToElementAndClick($this->remember_me_selector);
-            }
-                
-            sleep(2);
-
             $this->exts->capture("2-login-page-filled");
-            $this->checkFillRecaptcha();
 
             $this->exts->moveToElementAndClick($this->submit_login_selector);
         } else {
@@ -222,28 +174,69 @@ class PortalScriptCDP
         }
     }
 
-    /**
-     * Method to Check where user is logged in or not
-     * return boolean true/false
-     */
-    public  function checkLogin()
+    private function checkFillRecaptcha()
     {
-        $this->exts->log("Begin checkLogin ");
-        $isLoggedIn = false;
-        try {
-            for ($wait = 0; $wait < 2 && $this->exts->executeSafeScript("return !!document.querySelector('" . $this->check_login_success_selector . "');") != 1; $wait++) {
-                $this->exts->log('Waiting for login.....');
-                sleep(7);
-            }
-            if ($this->exts->exists($this->check_login_success_selector)) {
-                $this->exts->log(">>>>>>>>>>>>>>>Login successful!!!!");
-                $isLoggedIn = true;
-            }
-        } catch (Exception $exception) {
+        $this->exts->log(__FUNCTION__);
+        $recaptcha_iframe_selector = 'iframe[src*="/recaptcha/api2/anchor?"]';
+        $recaptcha_textarea_selector = 'textarea[name="g-recaptcha-response"]';
+        if ($this->exts->exists($recaptcha_iframe_selector)) {
+            $iframeUrl = $this->exts->extract($recaptcha_iframe_selector, null, 'src');
+            $data_siteKey = explode('&', end(explode("&k=", $iframeUrl)))[0];
+            $this->exts->log("iframe url  - " . $iframeUrl);
+            $this->exts->log("SiteKey - " . $data_siteKey);
 
-            $this->exts->log("Exception checking loggedin " . $exception);
+            $isCaptchaSolved = $this->exts->processRecaptcha($this->exts->getUrl(), $data_siteKey, false);
+            $this->exts->log("isCaptchaSolved - " . $isCaptchaSolved);
+
+            if ($isCaptchaSolved) {
+                // Step 1 fill answer to textarea
+                $this->exts->log(__FUNCTION__ . "::filling reCaptcha response..");
+                $recaptcha_textareas =  $this->exts->getElements($recaptcha_textarea_selector);
+                for ($i = 0; $i < count($recaptcha_textareas); $i++) {
+                    $this->exts->executeSafeScript("arguments[0].innerHTML = '" . $this->exts->recaptcha_answer . "';", [$recaptcha_textareas[$i]]);
+                }
+                $this->exts->capture('recaptcha-filled');
+
+                // Step 2, check if callback function need executed
+                $gcallbackFunction = $this->exts->executeSafeScript('
+                    if(document.querySelector("[data-callback]") != null){
+                        return document.querySelector("[data-callback]").getAttribute("data-callback");
+                    }
+
+                    var result = ""; var found = false; var badge = "";
+                    function recurse (cur, prop, deep) {
+                        if(deep > 5 || found){ return;}
+                        console.log(prop);
+                        try {
+                            if(cur == undefined || cur == null || cur instanceof Element || Object(cur) !== cur || Array.isArray(cur)){ return;}
+                            for (var p in cur) { 
+                                if(p + "" == "callback" && cur["badge"] == "text") {
+                                    result = result + prop;
+                                    found = true; badge = cur["badge"]; return;
+                                } else {
+                                    recurse(cur[p], prop ? prop + "." + p : p, deep);
+                                }
+                            }
+                        } catch(ex) { console.log("ERROR in function: " + ex); return; }
+                    }
+    
+                    for (var c in ___grecaptcha_cfg.clients) {
+                        result = "___grecaptcha_cfg.clients["+c+"].";
+                        recurse(___grecaptcha_cfg.clients[c], "", 0);
+                        if(found) 
+                            return result + ".callback";
+                    }
+                    return null;
+                ');
+                $this->exts->log('Callback function: ' . $gcallbackFunction);
+                if ($gcallbackFunction != null) {
+                    $this->exts->executeSafeScript($gcallbackFunction . '("' . $this->exts->recaptcha_answer . '");');
+                    sleep(10);
+                }
+            }
+        } else {
+            $this->exts->log(__FUNCTION__ . '::Not found reCaptcha');
         }
-        return $isLoggedIn;
     }
 
     // -------------------- GOOGLE login
@@ -698,24 +691,24 @@ class PortalScriptCDP
 
                 // Step 2, check if callback function need executed
                 $gcallbackFunction = $this->exts->execute_javascript('
-                if(document.querySelector("[data-callback]") != null){
-                    document.querySelector("[data-callback]").getAttribute("data-callback");
-                } else {
-                    var result = ""; var found = false;
-                    function recurse (cur, prop, deep) {
-                        if(deep > 5 || found){ return;}console.log(prop);
-                        try {
-                            if(prop.indexOf(".callback") > -1){result = prop; found = true; return;
-                            } else { if(cur == undefined || cur == null || cur instanceof Element || Object(cur) !== cur || Array.isArray(cur)){ return;}deep++;
-                                for (var p in cur) { recurse(cur[p], prop ? prop + "." + p : p, deep);}
-                            }
-                        } catch(ex) { console.log("ERROR in function: " + ex); return; }
-                    }
+                    if(document.querySelector("[data-callback]") != null){
+                        document.querySelector("[data-callback]").getAttribute("data-callback");
+                    } else {
+                        var result = ""; var found = false;
+                        function recurse (cur, prop, deep) {
+                            if(deep > 5 || found){ return;}console.log(prop);
+                            try {
+                                if(prop.indexOf(".callback") > -1){result = prop; found = true; return;
+                                } else { if(cur == undefined || cur == null || cur instanceof Element || Object(cur) !== cur || Array.isArray(cur)){ return;}deep++;
+                                    for (var p in cur) { recurse(cur[p], prop ? prop + "." + p : p, deep);}
+                                }
+                            } catch(ex) { console.log("ERROR in function: " + ex); return; }
+                        }
 
-                    recurse(___grecaptcha_cfg.clients[0], "", 0);
-                    found ? "___grecaptcha_cfg.clients[0]." + result : null;
-                }
-            ');
+                        recurse(___grecaptcha_cfg.clients[0], "", 0);
+                        found ? "___grecaptcha_cfg.clients[0]." + result : null;
+                    }
+                ');
                 $this->exts->log('Callback function: ' . $gcallbackFunction);
                 if ($gcallbackFunction != null) {
                     $this->exts->execute_javascript($gcallbackFunction . '("' . $this->exts->recaptcha_answer . '");');
@@ -729,108 +722,65 @@ class PortalScriptCDP
     // End GOOGLE login
 
 
-    // reCatcha
-    private function checkFillRecaptcha()
+    private function processInvoices()
     {
         $this->exts->log(__FUNCTION__);
-        $recaptcha_iframe_selector = 'iframe[src*="/recaptcha/api2/anchor?"]';
-        $recaptcha_textarea_selector = 'textarea[name="g-recaptcha-response"]';
-        if ($this->exts->exists($recaptcha_iframe_selector)) {
-            $iframeUrl = $this->exts->extract($recaptcha_iframe_selector, null, 'src');
-            $data_siteKey = explode('&', end(explode("&k=", $iframeUrl)))[0];
-            $this->exts->log("iframe url  - " . $iframeUrl);
-            $this->exts->log("SiteKey - " . $data_siteKey);
+        $this->exts->waitTillPresent('div[class*=dataTables] table tbody tr');
+        $this->exts->capture("4-invoices");
+        if ($this->exts->exists('#datepicker-trigger')) {
+            $this->exts->click_element('#datepicker-trigger');
+            sleep(1);
+            $this->exts->click_element('.calendar button.dropdown-toggle');
+            sleep(1);
+            $this->exts->click_element('.calendar [role="listbox"] li:first-child');
+            sleep(1);
+            $this->exts->capture("4-invoices-date-filter");
+            $this->exts->click_element('.calendar button[style*="color: rgb(13, 106, 102);"]');
+            sleep(15);
+            $this->exts->capture("4-invoices-date-submitted");
+        }
 
-            $isCaptchaSolved = $this->exts->processRecaptcha($this->exts->getUrl(), $data_siteKey, false);
-            $this->exts->log("isCaptchaSolved - " . $isCaptchaSolved);
+        for ($page_count = 1; $page_count < 80; $page_count++) {
+            $total_rows = $this->exts->count_elements('div[class*=dataTables] table tbody tr');
+            for ($i = 0; $i < $total_rows; $i++) {
+                $row = $this->exts->getElements('div[class*=dataTables] table tbody tr')[$i];
+                $downloadBtn = $this->exts->queryXpath(".//a[contains(text(), 'Invoice') or contains(text(), 'Rechnung')]", $row);
+                if ($downloadBtn != null) {
+                    $invoiceName = $this->exts->extract('td:nth-child(5)', $row);
+                    $invoiceDate = $this->exts->executeSafeScript('return arguments[0].querySelector("[datetime]").getAttribute("datetime").split("T").shift()', [$row]);
+                    $invoiceAmount = preg_replace('/[^\d\.\,]/', '', $this->exts->extract('td:nth-child(3)', $row)) . ' EUR';
+                    $this->isNoInvoice = false;
 
-            if ($isCaptchaSolved) {
-                // Step 1 fill answer to textarea
-                $this->exts->log(__FUNCTION__ . "::filling reCaptcha response..");
-                $recaptcha_textareas =  $this->exts->getElements($recaptcha_textarea_selector);
-                for ($i = 0; $i < count($recaptcha_textareas); $i++) {
-                    $this->exts->executeSafeScript("arguments[0].innerHTML = '" . $this->exts->recaptcha_answer . "';", [$recaptcha_textareas[$i]]);
-                }
-                sleep(2);
-                $this->exts->capture('recaptcha-filled');
+                    $this->exts->log('--------------------------');
+                    $this->exts->log('invoiceName: ' . $invoiceName);
+                    $this->exts->log('invoiceDate: ' . $invoiceDate);
+                    $this->exts->log('invoiceAmount: ' . $invoiceAmount);
 
-                // Step 2, check if callback function need executed
-                $gcallbackFunction = $this->exts->executeSafeScript('
-                if(document.querySelector("[data-callback]") != null){
-                    return document.querySelector("[data-callback]").getAttribute("data-callback");
-                }
-
-                var result = ""; var found = false;
-                function recurse (cur, prop, deep) {
-                    if(deep > 5 || found){ return;}console.log(prop);
-                    try {
-                        if(cur == undefined || cur == null || cur instanceof Element || Object(cur) !== cur || Array.isArray(cur)){ return;}
-                        if(prop.indexOf(".callback") > -1){result = prop; found = true; return;
-                        } else { deep++;
-                            for (var p in cur) { recurse(cur[p], prop ? prop + "." + p : p, deep);}
-                        }
-                    } catch(ex) { console.log("ERROR in function: " + ex); return; }
-                }
-
-                recurse(___grecaptcha_cfg.clients[0], "", 0);
-                return found ? "___grecaptcha_cfg.clients[0]." + result : null;
-            ');
-                $this->exts->log('Callback function: ' . $gcallbackFunction);
-                if ($gcallbackFunction != null) {
-                    $this->exts->executeSafeScript($gcallbackFunction . '("' . $this->exts->recaptcha_answer . '");');
-                    sleep(10);
+                    $invoiceFileName = !empty($invoiceName) ? $invoiceName . '.pdf' : '';
+                    $downloaded_file = $this->exts->click_and_download($downloadBtn, 'pdf', $invoiceFileName);
+                    if (trim($downloaded_file) != '' && file_exists($downloaded_file)) {
+                        $this->exts->new_invoice($invoiceName, $invoiceDate, $invoiceAmount, $downloaded_file);
+                    } else {
+                        $this->exts->log(__FUNCTION__ . '::No download ' . $invoiceFileName);
+                    }
                 }
             }
-        } else {
-            $this->exts->log(__FUNCTION__ . '::Not found reCaptcha');
-        }
-    }
 
-    private function processInvoices($count = 0)
-    {
-        $this->exts->log(__FUNCTION__);
-
-        $this->exts->waitTillPresent('table[id="DataTables_Table_1"] tbody tr');
-        $this->exts->capture("4-invoices-classic");
-
-        $invoices = [];
-        $rows = $this->exts->getElements('table[id="DataTables_Table_1"] tbody tr');
-        foreach ($rows as $key => $row) {
-            $downloadBtn = $this->exts->getElement('td:nth-child(6) a', $row);
-            if ($downloadBtn != null) {
-                $invoiceUrl = '';
-                $invoiceName = $this->exts->extract('td:nth-child(5)', $row);
-                $invoiceDate = $this->exts->extract('td:nth-child(4)', $row);
-                $invoiceAmount = $this->exts->extract('td:nth-child(3)', $row);;
-
-                $this->isNoInvoice = false;
-
-                $this->exts->log('--------------------------');
-                $this->exts->log('invoiceName: ' . $invoiceName);
-                $this->exts->log('invoiceDate: ' . $invoiceDate);
-                $this->exts->log('invoiceAmount: ' . $invoiceAmount);
-
-                $invoiceFileName = $invoiceName . '.pdf';
-                $invoiceDate = $this->exts->parse_date($invoiceDate, 'd.m.Y', 'Y-m-d');
-                $this->exts->log('Date parsed: ' . $invoiceDate);
-
-                $downloaded_file = $this->exts->click_and_download($downloadBtn, 'pdf', $invoiceFileName);
-                sleep(5);
-                if (trim($downloaded_file) != '' && file_exists($downloaded_file)) {
-                    $this->exts->new_invoice($invoiceName, $invoiceDate, $invoiceAmount, $invoiceFileName);
-                    sleep(1);
+            if ($this->restrictPages == 0 || $page_count < 3) {
+                if ($this->exts->queryXpath('//ul[contains(@class, "pagination")]/li//a[@data-page="' . ($page_count + 1) . '"]') != null) {
+                    $this->exts->log('Process next page');
+                    $this->exts->click_element('//ul[contains(@class, "pagination")]/li//a[@data-page="' . ($page_count + 1) . '"]');
+                    sleep(7);
+                } elseif ($this->exts->queryXpath('//ul[contains(@class, "pagination")]/li//a/*[contains(@class, "pf-i-chevron-right")]/..') != null) {
+                    $this->exts->log('Process next page');
+                    $this->exts->click_element('//ul[contains(@class, "pagination")]/li//a/*[contains(@class, "pf-i-chevron-right")]/..');
+                    sleep(7);
                 } else {
-                    $this->exts->log(__FUNCTION__ . '::No download ' . $invoiceFileName);
+                    break;
                 }
+            } else {
+                break;
             }
-        }
-        $this->exts->log('restrictPages count:: ' . $this->restrictPages);
-
-        while ($count <  $this->restrictPages && $this->exts->exists('ul.pagination a.pagination__arrow-page.pf-rounded-left')) {
-            $this->exts->moveToElementAndClick('ul.pagination a.pagination__arrow-page.pf-rounded-left');
-            sleep(7);
-            $count++;
-            $this->processInvoices($count);
         }
     }
 }

@@ -1,4 +1,4 @@
-<?php // updated pagination selector in processYears function and updated order download code
+<?php // 
 /**
  * Chrome Remote via Chrome devtool protocol script, for specific process/portal
  *
@@ -55,6 +55,8 @@ class PortalScriptCDP
             echo 'Script execution failed.. ' . "\n";
         }
     }
+
+    // Server-Portal-ID: 10250 - Last modified: 16.04.2025 14:45:36 UTC - User: 1
 
     public $baseUrl = "https://www.amazon.fr";
     public $orderPageUrl = "https://www.amazon.fr/gp/css/order-history/ref=nav_youraccount_orders";
@@ -1732,19 +1734,19 @@ class PortalScriptCDP
     {
         $userAgentScript = "
 (function() {
-   if ('userAgentData' in navigator) {
-       navigator.userAgentData.getHighEntropyValues({}).then(() => {
-           Object.defineProperty(navigator, 'userAgent', { 
-               value: '{$user_agent_string}', 
-               configurable: true 
-           });
-       });
-   } else {
+if ('userAgentData' in navigator) {
+   navigator.userAgentData.getHighEntropyValues({}).then(() => {
        Object.defineProperty(navigator, 'userAgent', { 
            value: '{$user_agent_string}', 
            configurable: true 
        });
-   }
+   });
+} else {
+   Object.defineProperty(navigator, 'userAgent', { 
+       value: '{$user_agent_string}', 
+       configurable: true 
+   });
+}
 })();
 ";
         $this->exts->execute_javascript($userAgentScript);
@@ -2339,24 +2341,24 @@ class PortalScriptCDP
                         $this->download_procurment_document(1);
                         //This only needed if we need to select custom date
                         /*if($this->exts->exists('.react-datepicker__input-container input')) {
-                            $this->exts->querySelectorAll('.react-datepicker__input-container input')[0]->click();
-                            sleep(1);
+                        $this->exts->querySelectorAll('.react-datepicker__input-container input')[0]->click();
+                        sleep(1);
 
-                            $this->exts->click_by_xdotool('.react-datepicker-popper a.react-datepicker__navigation--previous');
-                            sleep(1);
+                        $this->exts->click_by_xdotool('.react-datepicker-popper a.react-datepicker__navigation--previous');
+                        sleep(1);
 
-                            $today_day = (int)date('d');
+                        $today_day = (int)date('d');
 
-                            $this->exts->click_by_xdotool('.react-datepicker-popper .react-datepicker__month .react-datepicker__week [aria-label="day-'.$today_day.'"]:not(.react-datepicker__day--outside-month)');
-                            sleep(1);
+                        $this->exts->click_by_xdotool('.react-datepicker-popper .react-datepicker__month .react-datepicker__week [aria-label="day-'.$today_day.'"]:not(.react-datepicker__day--outside-month)');
+                        sleep(1);
 
-                            $this->exts->click_by_xdotool('.submit-button');
-                            sleep(15);
+                        $this->exts->click_by_xdotool('.submit-button');
+                        sleep(15);
 
-                            if($this->exts->exists('.report-table .column:nth-child(3) [class*="cell-row-"]')) {
-                                $this->download_procurment_document();
-                            }
-                        }*/
+                        if($this->exts->exists('.report-table .column:nth-child(3) [class*="cell-row-"]')) {
+                            $this->download_procurment_document();
+                        }
+                    }*/
                     }
                 } else {
                     $this->exts->log('PROCUREMENT_ANALYSIS URL ELEMENT NOT FOUND');
@@ -2470,11 +2472,11 @@ class PortalScriptCDP
             $this->exts->click_by_xdotool($select_box);
             sleep(2);
             $optionIndex = $this->exts->executeSafeScript('
-			const selectBox = document.querySelector("' . $select_box . '");
-			const targetValue = "' . $option_value . '";
-			const optionIndex = [...selectBox.options].findIndex(option => option.value === targetValue);
-			return optionIndex;
-		');
+		const selectBox = document.querySelector("' . $select_box . '");
+		const targetValue = "' . $option_value . '";
+		const optionIndex = [...selectBox.options].findIndex(option => option.value === targetValue);
+		return optionIndex;
+	');
             $this->exts->log($optionIndex);
             sleep(1);
             for ($i = 0; $i < $optionIndex; $i++) {
@@ -2689,16 +2691,16 @@ class PortalScriptCDP
 
                                         //Stop Downloading invoice if invoice is older than 90 days. 45*24 = 1080
                                         /*if($this->last_invoice_date != "" && !empty($this->last_invoice_date)) {
-                              $last_date_timestamp = strtotime($this->last_invoice_date);
-                              $last_date_timestamp = $last_date_timestamp-(1080*60*60);
-                              $parsed_date = $this->exts->parse_date($invoice_date);
-                              if(trim($parsed_date) != "") $invoice_date = $parsed_date;
-                              if($last_date_timestamp > strtotime($invoice_date) && trim($parsed_date) != "") {
-                                  $this->exts->log("Skip invoice download as it is not newer than " . $this->last_invoice_date . " - " . $invoice_date);
-                                  $this->dateLimitReached = 1;
-                                  break;
-                              }
-                          }*/
+                          $last_date_timestamp = strtotime($this->last_invoice_date);
+                          $last_date_timestamp = $last_date_timestamp-(1080*60*60);
+                          $parsed_date = $this->exts->parse_date($invoice_date);
+                          if(trim($parsed_date) != "") $invoice_date = $parsed_date;
+                          if($last_date_timestamp > strtotime($invoice_date) && trim($parsed_date) != "") {
+                              $this->exts->log("Skip invoice download as it is not newer than " . $this->last_invoice_date . " - " . $invoice_date);
+                              $this->dateLimitReached = 1;
+                              break;
+                          }
+                      }*/
 
                                         if (trim($detailPageUrl) != "" && $this->dateLimitReached == 0) {
                                             if ($this->last_invoice_date != "" && !empty($this->last_invoice_date)) {
@@ -4476,11 +4478,11 @@ class PortalScriptCDP
                 $popups = $this->exts->querySelectorAll('.a-popover.a-popover-no-header.a-arrow-right');
                 if (count($popups) > 0) {
                     $this->exts->execute_javascript("
-                    var popups = document.querySelectorAll(\".a-popover.a-popover-no-header.a-arrow-right\");
-                    for(var i=0; i<popups.length; i++) {
-                        popups[i].remove();
-                    }
-                ");
+                var popups = document.querySelectorAll(\".a-popover.a-popover-no-header.a-arrow-right\");
+                for(var i=0; i<popups.length; i++) {
+                    popups[i].remove();
+                }
+            ");
                 }
             }
         } while ($this->exts->exists('.report-table-footer button[data-testid="next-button"]') && !$this->exts->exists('.report-table-footer button[data-testid="next-button"][disabled]') && $pageNum > 1);

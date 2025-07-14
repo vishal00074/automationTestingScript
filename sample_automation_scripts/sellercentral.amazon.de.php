@@ -1,4 +1,4 @@
-<?php // replace waitTillPresent with custom waitFor function increase sleep time after filling username
+<?php // replace waitTillPresent to wait for and optimize the script code
 
 /**
  * Chrome Remote via Chrome devtool protocol script, for specific process/portal
@@ -57,7 +57,7 @@ class PortalScriptCDP
         }
     }
 
-    // Server-Portal-ID: 916 - Last modified: 02.04.2025 14:10:16 UTC - User: 1
+    // Server-Portal-ID: 916 - Last modified: 26.06.2025 03:30:26 UTC - User: 1
 
     public $baseUrl = 'https://sellercentral.amazon.de/home';
     public $username_selector = 'form[name="signIn"] input[name="email"]:not([type="hidden"])';
@@ -65,6 +65,7 @@ class PortalScriptCDP
     public $submit_login_selector = 'form[name="signIn"] input#signInSubmit';
     public $remember_me = 'form[name="signIn"] input[name="rememberMe"]:not(:checked)';
     public $isNoInvoice = true;
+
 
     public $payment_settlements = 0;
     public $seller_invoice = 0;
@@ -217,6 +218,11 @@ class PortalScriptCDP
             }
         }
 
+        $this->waitFor('[class*="awsui_footer--stuck_"] > div >div> div:nth-child(1) button', 10);
+        if ($this->exts->exists('[class*="awsui_footer--stuck_"] > div >div> div:nth-child(1) button')) {
+            $this->exts->click_element('[class*="awsui_footer--stuck_"] > div >div> div:nth-child(1) button');
+        }
+
         // then check user logged in or not
         if ($this->isLoginSuccess()) {
             sleep(3);
@@ -311,7 +317,7 @@ class PortalScriptCDP
                 $this->exts->capture("2-login-page-filled");
                 $this->exts->moveToElementAndClick($this->submit_login_selector);
                 sleep(3);
-                $this->waitFor('#auth-error-message-box', 30);
+                $this->waitFor('#auth-error-message-box', 7);
                 if ($this->exts->exists('#auth-error-message-box')) {
                     $this->exts->loginFailure(1);
                 }
@@ -394,14 +400,16 @@ class PortalScriptCDP
 
                 if ($this->exts->exists('input[name="otpCode"]:not([type="hidden"]), input[id="input-box-otp"]')) {
                     $this->exts->moveToElementAndType('input[name="otpCode"]:not([type="hidden"]), input[id="input-box-otp"]', $two_factor_code);
+                    $this->exts->capture("2.2-two-factor-filled-" . $this->exts->two_factor_attempts);
                 } else if ($this->exts->exists('input[name="otc-1"]')) {
                     $this->exts->moveToElementAndClick('input[name="otc-1"]');
+                    $this->exts->capture("2.2-two-factor-filled-" . $this->exts->two_factor_attempts);
                     $this->exts->type_text_by_xdotool($two_factor_code);
                 }
                 if ($this->exts->exists('label[for="auth-mfa-remember-device"] input[name="rememberDevice"]:not(:checked)')) {
                     $this->exts->moveToElementAndClick('label[for="auth-mfa-remember-device"]');
                 }
-                $this->exts->capture("2.2-two-factor-filled-" . $this->exts->two_factor_attempts);
+
 
                 $this->exts->log("checkFillTwoFactor: Clicking submit button.");
                 sleep(1);
@@ -411,7 +419,7 @@ class PortalScriptCDP
                 } else {
                     $this->exts->moveToElementAndClick($two_factor_submit_selector);
                 }
-                sleep(10);
+                sleep(5);
             } else {
                 $this->exts->log("Not received two factor code");
             }
@@ -437,7 +445,7 @@ class PortalScriptCDP
                             sleep(1);
                             $this->exts->capture("2.2-two-factor-filled-" . $t);
                             $this->exts->moveToElementAndClick($two_factor_submit_selector);
-                            sleep(10);
+                            sleep(5);
                         } else {
                             $this->exts->log("Not received Retry two factor code");
                         }
@@ -553,7 +561,7 @@ class PortalScriptCDP
     }
     private function isLoginSuccess()
     {
-        $loginSuccessSelector = 'a[href="/messaging/inbox"]';
+        $loginSuccessSelector = 'a[href="/messaging/inbox"], div[data-testid="bookmarks-bar"]';
         for ($wait = 0; $wait < 2 && $this->exts->executeSafeScript("return !!document.querySelector('" . $loginSuccessSelector . "');") != 1; $wait++) {
             $this->exts->log('Waiting for login.....');
             sleep(10);
@@ -580,7 +588,7 @@ class PortalScriptCDP
             if ($this->exts->config_array["restrictPages"] == '0') {
                 $date_range = strtotime('-30 months') . '000' . '-' . strtotime('now') . '000';
             } else {
-                $date_range = strtotime('-3 months') . '000' . '-' . strtotime('now') . '000';
+                $date_range = strtotime('-1 months') . '000' . '-' . strtotime('now') . '000';
             }
             $mfn_order_url = "https://sellercentral.amazon.de/orders-v3/mfn/shipped?page=1&sort=order_date_desc&date-range=$date_range";
             $fba_order_url = "https://sellercentral.amazon.de/orders-v3/fba/all?page=1&sort=order_date_desc&date-range=$date_range";
@@ -589,13 +597,15 @@ class PortalScriptCDP
             sleep(10);
             $this->exts->capture('mfn-order-page');
             $this->exts->update_process_lock();
-            $this->downloadOrderInvoices();
-            // 2. Download fba order
-            $this->exts->openUrl($fba_order_url);
-            sleep(10);
-            $this->exts->capture('fba-order-page');
-            $this->exts->update_process_lock();
-            $this->downloadOrderInvoices();
+            if ($this->exts->config_array["restrictPages"] == '0') {
+                $this->downloadOrderInvoices();
+                // 2. Download fba order
+                $this->exts->openUrl($fba_order_url);
+                sleep(10);
+                $this->exts->capture('fba-order-page');
+                $this->exts->update_process_lock();
+                $this->downloadOrderInvoices();
+            }
         }
 
         // Download from seller-fee-invoices
@@ -620,8 +630,8 @@ class PortalScriptCDP
                 sleep(15);
                 //$this->exts->changeSelectbox('select#sc-mkt-picker-switcher-select', $marketplace_option);
                 $this->exts->execute_javascript('
-                    $("select#sc-mkt-picker-switcher-select").val("' . $marketplace_option . '");
-                    $("select#sc-mkt-picker-switcher-select").change();');
+                $("select#sc-mkt-picker-switcher-select").val("' . $marketplace_option . '");
+                $("select#sc-mkt-picker-switcher-select").change();');
                 sleep(15);
 
                 if ($this->exts->getElement($this->password_selector) == null) {
@@ -995,11 +1005,11 @@ class PortalScriptCDP
                 }
                 sleep(5);
                 $this->exts->executeSafeScript('
-        document.querySelectorAll(\'div#container div#predictive-help\')[0].remove();
-        document.querySelectorAll(\'div#sc-top-nav\')[0].remove();
-        document.querySelectorAll(\'div#sc-footer-container\')[0].remove();
-        document.querySelectorAll(\'div#left-side\')[0].setAttribute("style","float:left; text-align:left; width:100%;");
-    ');
+    document.querySelectorAll(\'div#container div#predictive-help\')[0].remove();
+    document.querySelectorAll(\'div#sc-top-nav\')[0].remove();
+    document.querySelectorAll(\'div#sc-footer-container\')[0].remove();
+    document.querySelectorAll(\'div#left-side\')[0].setAttribute("style","float:left; text-align:left; width:100%;");
+');
 
                 $downloaded_file = $this->exts->download_current($invoiceFileName, 3);
                 if (trim($downloaded_file) != '' && file_exists($downloaded_file)) {
@@ -1028,8 +1038,8 @@ class PortalScriptCDP
                 }
                 $pageCount++;
                 $this->exts->executeSafeScript('
-        document.querySelectorAll(\'.currentpagination + a\')[0].click();
-    ');
+    document.querySelectorAll(\'.currentpagination + a\')[0].click();
+');
                 //$this->exts->moveToElementAndClick('.currentpagination + a');
                 sleep(5);
                 $this->downloadTransaction($pageCount);
@@ -1091,20 +1101,20 @@ class PortalScriptCDP
                             if ($this->exts->exists('#sc-content-container .transaction-details-body-section .event-details-body')) {
                                 // Clear some alert, popup..etc
                                 $this->exts->executeSafeScript('
-                        if(document.querySelector("kat-alert") != null){
-                        document.querySelector("kat-alert").shadowRoot.querySelector("[part=alert-dismiss-button]").click();
-                        }
-                    ');
+                    if(document.querySelector("kat-alert") != null){
+                    document.querySelector("kat-alert").shadowRoot.querySelector("[part=alert-dismiss-button]").click();
+                    }
+                ');
                                 $this->exts->moveToElementAndClick('.katHmdCancelBtn');
                                 // END clearing alert..
 
                                 // Capture page if detail displayed
                                 $this->exts->executeSafeScript('
-                        var divs = document.querySelectorAll("body > div > *:not(#sc-content-container)");
-                        for( var i = 0; i < divs.length; i++){
-                            divs[i].style.display = "none";
-                        }
-                    ');
+                    var divs = document.querySelectorAll("body > div > *:not(#sc-content-container)");
+                    for( var i = 0; i < divs.length; i++){
+                        divs[i].style.display = "none";
+                    }
+                ');
 
                                 $downloaded_file = $this->exts->download_current($invoiceFileName, 0);
                                 if (trim($downloaded_file) != '' && file_exists($downloaded_file)) {
@@ -1127,13 +1137,13 @@ class PortalScriptCDP
                 // Process next page
                 // This page using shadow element, We must process via JS
                 $is_next = $this->exts->executeSafeScript('
-        try {
-        document.querySelector("kat-pagination").shadowRoot.querySelector("[part=pagination-nav-right]:not(.end)").click();
-        return true;
-        } catch(ex){
-        return false;
-        }
-    ');
+                    try {
+                    document.querySelector("kat-pagination").shadowRoot.querySelector("[part=pagination-nav-right]:not(.end)").click();
+                    return true;
+                    } catch(ex){
+                    return false;
+                    }
+                ');
                 if ($is_next && $this->exts->config_array["restrictPages"] == '0') {
                     sleep(7);
                 } else {
@@ -1194,7 +1204,7 @@ class PortalScriptCDP
                 $total_fee_downloaded++;
                 $this->isNoInvoice = false;
             }
-            // if($total_fee_downloaded >= 50) break; // Huy removed this
+            if ($total_fee_downloaded >= 50 && $this->exts->config_array["restrictPages"] != '0') break; // Added this because we need to restrict download based on restritpages
         }
     }
     private function downloadSellerVATInvoice($pageCount = 1)
@@ -1206,8 +1216,8 @@ class PortalScriptCDP
         if ($this->exts->exists('select[name="reportType"]') && $pageCount == 1) {
             //$this->exts->changeSelectbox('select[name="reportType"]', "VAT Invoices");
             $this->exts->execute_javascript('
-                    $("select[name=\'reportType\']").val("VAT Invoices");
-                    $("select[name=\'reportType\']").change();');
+                $("select[name=\'reportType\']").val("VAT Invoices");
+                $("select[name=\'reportType\']").change();');
             sleep(10);
             if ($this->exts->exists('li#vtr-start-date2 input#vtr-start-date-calendar2')) {
                 $currentStart_date = $this->exts->getElement('li#vtr-start-date2 input#vtr-start-date-calendar2')->getAttribute('aria-label');
@@ -1436,14 +1446,14 @@ class PortalScriptCDP
 
                 if (count($this->exts->getElements('#printableSections')) > 0) {
                     $this->exts->executeSafeScript('
-            var printableView = document.getElementById("printableSections");
-            var allLinks = document.getElementsByTagName("link");
-            var allStyles = document.getElementsByTagName("style");
-            var printableHTML = Array.from(allLinks).map(link => link.outerHTML).join("")
-                                + Array.from(allStyles).map(link => link.outerHTML).join("")
-                                + printableView.outerHTML;
-            document.body.innerHTML = printableHTML;
-        ');
+                    var printableView = document.getElementById("printableSections");
+                    var allLinks = document.getElementsByTagName("link");
+                    var allStyles = document.getElementsByTagName("style");
+                    var printableHTML = Array.from(allLinks).map(link => link.outerHTML).join("")
+                                        + Array.from(allStyles).map(link => link.outerHTML).join("")
+                                        + printableView.outerHTML;
+                    document.body.innerHTML = printableHTML;
+                ');
 
                     $downloaded_file = $this->exts->download_current($invoiceFileName, 3);
                     if (trim($downloaded_file) != '' && file_exists($downloaded_file)) {
@@ -1454,10 +1464,10 @@ class PortalScriptCDP
                     }
                 } else if (count($this->exts->getElements('#sc-navbar-container')) > 0) {
                     $this->exts->executeSafeScript('
-            document.querySelectorAll("#sc-navbar-container")[0].remove();
-            document.querySelectorAll("article.dashboard-header")[0].remove();
-            document.querySelectorAll(".sc-footer")[0].remove();
-        ');
+                    document.querySelectorAll("#sc-navbar-container")[0].remove();
+                    document.querySelectorAll("article.dashboard-header")[0].remove();
+                    document.querySelectorAll(".sc-footer")[0].remove();
+                ');
 
                     $downloaded_file = $this->exts->download_current($invoiceFileName, 3);
                     if (trim($downloaded_file) != '' && file_exists($downloaded_file)) {
@@ -1487,8 +1497,8 @@ class PortalScriptCDP
                 $pageCount++;
                 //$this->exts->moveToElementAndClick('.currentpagination + a');
                 $this->exts->executeSafeScript('
-        document.querySelectorAll(\'.currentpagination + a\')[0].click();
-    ');
+    document.querySelectorAll(\'.currentpagination + a\')[0].click();
+');
                 sleep(15);
                 $this->downloadStatements($pageCount);
             }
@@ -1507,23 +1517,23 @@ class PortalScriptCDP
 
             // It using shadow root, so collect invoice detail by JS
             $invoices = $this->exts->executeSafeScript('
-    var data = [];
-    var trs = document.querySelectorAll("kat-data-table tbody tr .dashboard-link kat-link[href*=groupId]");
+                var data = [];
+                var trs = document.querySelectorAll("kat-data-table tbody tr .dashboard-link kat-link[href*=groupId]");
 
-    // Skip first row because it is current period, do not get it
-    for (var i = 1; i < trs.length; i ++) {
-    var link = trs[i].shadowRoot.querySelector("a");
-    var url = link.href;
+                // Skip first row because it is current period, do not get it
+                for (var i = 1; i < trs.length; i ++) {
+                var link = trs[i].shadowRoot.querySelector("a");
+                var url = link.href;
 
-    data.push({
-    invoiceName: url.split("groupId=").pop().split("&")[0],
-    invoiceDate: "",
-    invoiceAmount: "",
-    invoiceUrl: url
-    });
-    }
-    return data;
-');
+                data.push({
+                invoiceName: url.split("groupId=").pop().split("&")[0],
+                invoiceDate: "",
+                invoiceAmount: "",
+                invoiceUrl: url
+                });
+                }
+                return data;
+                ');
             // Download all invoices
             $this->exts->log('Statements found: ' . count($invoices));
             foreach ($invoices as $invoice) {
@@ -1551,10 +1561,10 @@ class PortalScriptCDP
                     if ($this->exts->exists('.dashboard-content #print-this-page-link')) {
                         // Clear some alert, popup..etc
                         $this->exts->executeSafeScript('
-                if(document.querySelector("kat-alert") != null){
-                document.querySelector("kat-alert").shadowRoot.querySelector("[part=alert-dismiss-button]").click();
-                }
-            ');
+                    if(document.querySelector("kat-alert") != null){
+                    document.querySelector("kat-alert").shadowRoot.querySelector("[part=alert-dismiss-button]").click();
+                    }
+                ');
                         $this->exts->moveToElementAndClick('.katHmdCancelBtn');
                         // END clearing alert..
 
@@ -1686,8 +1696,8 @@ class PortalScriptCDP
         $current_domain_country = end(explode('amazon.', $temp_paths[2]));
         //$this->exts->changeSelectbox('select[name="myo-table-results-per-page"]', '100', 15);
         $this->exts->execute_javascript('
-    $("select[name=\'myo-table-results-per-page\']").val("100");
-    $("select[name=\'myo-table-results-per-page\']").change();');
+$("select[name=\'myo-table-results-per-page\']").val("100");
+$("select[name=\'myo-table-results-per-page\']").change();');
         sleep(3);
         $this->waitFor('#orders-table tbody tr [data-test-id="manage-idu-invoice-button"]:not(.a-button-primary) input[type="submit"]', 40);
         //This is needed because sometime there is no invoice on page 1 and browser get closed because of inactivity

@@ -118,8 +118,6 @@ class PortalScriptCDP
                 $this->checkSolveCaptcha();
             }
 
-
-
             $this->checkFillTwoFactor();
         }
 

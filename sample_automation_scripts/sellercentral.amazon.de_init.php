@@ -5,6 +5,7 @@ public $submit_login_selector = 'form[name="signIn"] input#signInSubmit';
 public $remember_me = 'form[name="signIn"] input[name="rememberMe"]:not(:checked)';
 public $isNoInvoice = true;
 
+
 public $payment_settlements = 0;
 public $seller_invoice = 0;
 public $transaction_invoices = 0;
@@ -156,6 +157,11 @@ private function initPortal($count)
         }
     }
 
+    $this->waitFor('[class*="awsui_footer--stuck_"] > div >div> div:nth-child(1) button', 10);
+    if ($this->exts->exists('[class*="awsui_footer--stuck_"] > div >div> div:nth-child(1) button')) {
+        $this->exts->click_element('[class*="awsui_footer--stuck_"] > div >div> div:nth-child(1) button');
+    }
+
     // then check user logged in or not
     if ($this->isLoginSuccess()) {
         sleep(3);
@@ -189,7 +195,6 @@ private function initPortal($count)
         if (!empty($this->exts->config_array['allow_login_success_request'])) {
             $this->exts->triggerLoginSuccess();
         }
-
         $this->exts->success();
     } else {
         $this->exts->log(__FUNCTION__ . '::Use login failed ' . $this->exts->getUrl());
@@ -249,7 +254,7 @@ private function checkFillLogin()
             $this->exts->capture("2-login-page-filled");
             $this->exts->moveToElementAndClick($this->submit_login_selector);
             sleep(3);
-            $this->waitFor('#auth-error-message-box', 30);
+            $this->waitFor('#auth-error-message-box', 7);
             if ($this->exts->exists('#auth-error-message-box')) {
                 $this->exts->loginFailure(1);
             }
@@ -332,14 +337,16 @@ private function checkFillTwoFactor()
 
             if ($this->exts->exists('input[name="otpCode"]:not([type="hidden"]), input[id="input-box-otp"]')) {
                 $this->exts->moveToElementAndType('input[name="otpCode"]:not([type="hidden"]), input[id="input-box-otp"]', $two_factor_code);
+                $this->exts->capture("2.2-two-factor-filled-" . $this->exts->two_factor_attempts);
             } else if ($this->exts->exists('input[name="otc-1"]')) {
                 $this->exts->moveToElementAndClick('input[name="otc-1"]');
+                $this->exts->capture("2.2-two-factor-filled-" . $this->exts->two_factor_attempts);
                 $this->exts->type_text_by_xdotool($two_factor_code);
             }
             if ($this->exts->exists('label[for="auth-mfa-remember-device"] input[name="rememberDevice"]:not(:checked)')) {
                 $this->exts->moveToElementAndClick('label[for="auth-mfa-remember-device"]');
             }
-            $this->exts->capture("2.2-two-factor-filled-" . $this->exts->two_factor_attempts);
+
 
             $this->exts->log("checkFillTwoFactor: Clicking submit button.");
             sleep(1);
@@ -349,7 +356,7 @@ private function checkFillTwoFactor()
             } else {
                 $this->exts->moveToElementAndClick($two_factor_submit_selector);
             }
-            sleep(10);
+            sleep(5);
         } else {
             $this->exts->log("Not received two factor code");
         }
@@ -375,7 +382,7 @@ private function checkFillTwoFactor()
                         sleep(1);
                         $this->exts->capture("2.2-two-factor-filled-" . $t);
                         $this->exts->moveToElementAndClick($two_factor_submit_selector);
-                        sleep(10);
+                        sleep(5);
                     } else {
                         $this->exts->log("Not received Retry two factor code");
                     }
@@ -491,7 +498,7 @@ private function captcha_required()
 }
 private function isLoginSuccess()
 {
-    $loginSuccessSelector = 'a[href="/messaging/inbox"]';
+    $loginSuccessSelector = 'a[href="/messaging/inbox"], div[data-testid="bookmarks-bar"]';
     for ($wait = 0; $wait < 2 && $this->exts->executeSafeScript("return !!document.querySelector('" . $loginSuccessSelector . "');") != 1; $wait++) {
         $this->exts->log('Waiting for login.....');
         sleep(10);
