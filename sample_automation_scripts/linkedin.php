@@ -1,14 +1,10 @@
 <?php
 
 /**
- * I have updated the login code to retry logging in if the user 
- * is redirected back to the login page after submitting the form. 
- * I have also replaced the exists and waitTillPresent functions 
- * with custom JavaScript functions. The script has been successfully
- *  tested on the test engine.
+ * I have updated captcha code and added tirggerloginfailedConfirm in case wrong cred
  * 
  * 
- * test with this hassmannitforensikgmbh
+ * 
  */
 
 /**
@@ -68,7 +64,7 @@ class PortalScriptCDP
         }
     }
 
-    // Server-Portal-ID: 331 - Last modified: 26.03.2025 14:23:38 UTC - User: 1
+    // Server-Portal-ID: 331 - Last modified: 08.05.2025 10:53:16 UTC - User: 1
 
     public $baseUrl = 'https://www.linkedin.com';
     public $loginUrl = 'https://www.linkedin.com/login?fromSignIn=true&trk=guest_homepage-basic_nav-header-signin';
@@ -140,6 +136,8 @@ class PortalScriptCDP
                     $this->checkFillLogin();
                     sleep(10);
                 }
+
+
                 $this->checkTwoFactorAuth(1);
 
                 // Some time this site showed a form to confirm email and phone number, just simple click DONE
@@ -182,9 +180,9 @@ class PortalScriptCDP
             sleep(10);
 
             $this->exts->execute_javascript('let selectBox = document.querySelector("select#customDateOption-purchaseHistoryForm");
-            selectBox.value = "custom";
-            selectBox.dispatchEvent(new Event("change"));
-        ');
+        selectBox.value = "custom";
+        selectBox.dispatchEvent(new Event("change"));
+    ');
 
             $this->processInvoices();
 
@@ -243,6 +241,13 @@ class PortalScriptCDP
             if ($this->exts->exists('a[id="try-another-way"]')) {
                 $this->exts->moveToElementAndClick('a[id="try-another-way"]');
                 sleep(5);
+            }
+
+            $error_text = strtolower($this->exts->extract('div#error-for-password'));
+
+            $this->exts->log(__FUNCTION__ . '::Error text: ' . $error_text);
+            if (stripos($error_text, strtolower('password')) !== false) {
+                $this->exts->loginFailure(1);
             }
         } else {
             $this->exts->log(__FUNCTION__ . '::Login page not found');
@@ -303,8 +308,6 @@ class PortalScriptCDP
             sleep(1);
         }
 
-        $this->exts->log('>>>>>>>>>>>>>>>>>>>>> Start Solving Captcha <<<<<<<<<<<<');
-
         if ($this->exts->querySelector('iframe#captcha-internal') != null) {
             $this->switchToFrame('iframe#captcha-internal');
             sleep(3);
@@ -317,13 +320,13 @@ class PortalScriptCDP
                 sleep(1);
             }
 
-            // if ($this->exts->querySelector('iframe[id="game-core-frame"]') != null) {
-            //     $this->switchToFrame('iframe[id="game-core-frame"]');
-            //     sleep(1);
-            // }
+            if ($this->exts->querySelector('iframe[id="game-core-frame"]') != null) {
+                $this->switchToFrame('iframe[id="game-core-frame"]');
+                sleep(1);
+            }
 
             sleep(3);
-            if ($this->exts->querySelector($input) != null) {
+            if ($this->exts->exists($input)) {
                 $value = $this->exts->getElement($input)->getAttribute("value");
                 $this->exts->log("value " . $value);
                 $params = explode("|", $value);
@@ -379,8 +382,8 @@ class PortalScriptCDP
                 $this->switchToFrame("iframe#arkoseframe");
                 sleep(1);
             }
-            if ($this->exts->exists("iframe[data-e2e='enforcement-frame'].show.active")) {
-                $this->switchToFrame("iframe[data-e2e='enforcement-frame'].show.active");
+            if ($this->exts->exists('iframe[data-e2e="enforcement-frame"]')) {
+                $this->switchToFrame('iframe[data-e2e="enforcement-frame"]');
                 sleep(1);
             } else {
                 $this->exts->log("funcaptcha without content - reload iframe");
@@ -394,13 +397,13 @@ class PortalScriptCDP
                 }
 
                 $javascript_expression = '
-                (function() {
-                    var captcha_iframe = document.querySelector("iframe#arkoseframe");
-                    if (captcha_iframe) {
-                        captcha_iframe.contentWindow.location.reload();
-                    }
-                })();
-            ';
+            (function() {
+                var captcha_iframe = document.querySelector("iframe#arkoseframe");
+                if (captcha_iframe) {
+                    captcha_iframe.contentWindow.location.reload();
+                }
+            })();
+        ';
 
                 $this->exts->execute_javascript(
                     'Runtime.evaluate',
@@ -473,6 +476,7 @@ class PortalScriptCDP
                     sleep(1);
                 }
                 $this->exts->switchToDefault();
+                sleep(5);
                 $captcha_wraper_selector = 'iframe#captcha-internal';
                 if ($this->exts->exists($captcha_wraper_selector)) {
                     $this->exts->log('before cordinates');
@@ -489,6 +493,42 @@ class PortalScriptCDP
                             }
                             sleep(5);
                         }
+                    }
+                }
+            }
+            sleep(5);
+
+            $captcha_instruction = 'Pick the image that is the correct way up';
+            $this->exts->log('language_code: ' . $language_code . ' Instruction: ' . $captcha_instruction);
+            $this->exts->switchToDefault();
+            if ($this->exts->exists('iframe.iframe--authentication')) {
+                $this->switchToFrame('iframe.iframe--authentication');
+                sleep(1);
+            }
+            if ($this->exts->exists("iframe#captcha-internal")) {
+                $this->switchToFrame("iframe#captcha-internal");
+            }
+            if ($this->exts->exists("iframe#arkoseframe")) {
+                $this->switchToFrame("iframe#arkoseframe");
+                sleep(1);
+            }
+            $this->exts->switchToDefault();
+            sleep(5);
+            $captcha_wraper_selector = 'iframe#captcha-internal';
+            if ($this->exts->exists($captcha_wraper_selector)) {
+                $this->exts->log('before cordinates');
+                $coordinates = $this->getCoordinates($captcha_wraper_selector, $captcha_instruction, '', $json_result = true); // use $language_code and $captcha_instruction if they changed captcha content
+                $this->exts->log('after cordinates');
+                if ($coordinates == '') {
+                    $coordinates = $this->getCoordinates($captcha_wraper_selector, $captcha_instruction, '', $json_result = true);
+                }
+                if ($coordinates != '') {
+                    $wraper = $this->exts->getElement($captcha_wraper_selector);
+                    if ($wraper != null) {
+                        foreach ($coordinates as $coordinate) {
+                            $this->exts->click_by_xdotool($captcha_wraper_selector, (int) $coordinate['x'], (int) $coordinate['y']);
+                        }
+                        sleep(5);
                     }
                 }
             }
@@ -989,22 +1029,22 @@ class PortalScriptCDP
     private function overwrite_user_agent($user_agent_string = 'DN')
     {
         $userAgentScript = "
-        (function() {
-            if ('userAgentData' in navigator) {
-                navigator.userAgentData.getHighEntropyValues({}).then(() => {
-                    Object.defineProperty(navigator, 'userAgent', { 
-                        value: '{$user_agent_string}', 
-                        configurable: true 
-                    });
-                });
-            } else {
+    (function() {
+        if ('userAgentData' in navigator) {
+            navigator.userAgentData.getHighEntropyValues({}).then(() => {
                 Object.defineProperty(navigator, 'userAgent', { 
                     value: '{$user_agent_string}', 
                     configurable: true 
                 });
-            }
-        })();
-    ";
+            });
+        } else {
+            Object.defineProperty(navigator, 'userAgent', { 
+                value: '{$user_agent_string}', 
+                configurable: true 
+            });
+        }
+    })();
+";
         $this->exts->execute_javascript($userAgentScript);
     }
 

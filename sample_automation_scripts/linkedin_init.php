@@ -100,16 +100,10 @@ private function initPortal($count)
         sleep(3);
         $this->exts->log(__FUNCTION__ . '::User logged in');
 
-        if ($this->exts->exists('[type="COOKIE_CONSENT"] [action-type="ACCEPT"]')) {
-            $this->exts->moveToElementAndClick('[type="COOKIE_CONSENT"] [action-type="ACCEPT"]');
-            sleep(3);
-        }
-        $this->exts->capture("3-login-success");
-
         if (!empty($this->exts->config_array['allow_login_success_request'])) {
             $this->exts->triggerLoginSuccess();
         }
-        
+
         $this->exts->success();
     } else {
         $this->exts->log(__FUNCTION__ . '::Use login failed: ' . $this->exts->getUrl());
@@ -158,6 +152,13 @@ private function checkFillLogin()
         if ($this->exts->exists('a[id="try-another-way"]')) {
             $this->exts->moveToElementAndClick('a[id="try-another-way"]');
             sleep(5);
+        }
+
+        $error_text = strtolower($this->exts->extract('div#error-for-password'));
+
+        $this->exts->log(__FUNCTION__ . '::Error text: ' . $error_text);
+        if (stripos($error_text, strtolower('password')) !== false) {
+            $this->exts->loginFailure(1);
         }
     } else {
         $this->exts->log(__FUNCTION__ . '::Login page not found');
@@ -217,7 +218,7 @@ private function checkAndSolveFunCaptcha($count = 0)
         $this->exts->switchToDefault();
         sleep(1);
     }
-    
+
     if ($this->exts->querySelector('iframe#captcha-internal') != null) {
         $this->switchToFrame('iframe#captcha-internal');
         sleep(3);
@@ -307,13 +308,13 @@ private function processFunCaptchaByClicking()
             }
 
             $javascript_expression = '
-            (function() {
-                var captcha_iframe = document.querySelector("iframe#arkoseframe");
-                if (captcha_iframe) {
-                    captcha_iframe.contentWindow.location.reload();
-                }
-            })();
-        ';
+        (function() {
+            var captcha_iframe = document.querySelector("iframe#arkoseframe");
+            if (captcha_iframe) {
+                captcha_iframe.contentWindow.location.reload();
+            }
+        })();
+    ';
 
             $this->exts->execute_javascript(
                 'Runtime.evaluate',
@@ -386,6 +387,7 @@ private function processFunCaptchaByClicking()
                 sleep(1);
             }
             $this->exts->switchToDefault();
+            sleep(5);
             $captcha_wraper_selector = 'iframe#captcha-internal';
             if ($this->exts->exists($captcha_wraper_selector)) {
                 $this->exts->log('before cordinates');
@@ -402,6 +404,42 @@ private function processFunCaptchaByClicking()
                         }
                         sleep(5);
                     }
+                }
+            }
+        }
+        sleep(5);
+
+        $captcha_instruction = 'Pick the image that is the correct way up';
+        $this->exts->log('language_code: ' . $language_code . ' Instruction: ' . $captcha_instruction);
+        $this->exts->switchToDefault();
+        if ($this->exts->exists('iframe.iframe--authentication')) {
+            $this->switchToFrame('iframe.iframe--authentication');
+            sleep(1);
+        }
+        if ($this->exts->exists("iframe#captcha-internal")) {
+            $this->switchToFrame("iframe#captcha-internal");
+        }
+        if ($this->exts->exists("iframe#arkoseframe")) {
+            $this->switchToFrame("iframe#arkoseframe");
+            sleep(1);
+        }
+        $this->exts->switchToDefault();
+        sleep(5);
+        $captcha_wraper_selector = 'iframe#captcha-internal';
+        if ($this->exts->exists($captcha_wraper_selector)) {
+            $this->exts->log('before cordinates');
+            $coordinates = $this->getCoordinates($captcha_wraper_selector, $captcha_instruction, '', $json_result = true); // use $language_code and $captcha_instruction if they changed captcha content
+            $this->exts->log('after cordinates');
+            if ($coordinates == '') {
+                $coordinates = $this->getCoordinates($captcha_wraper_selector, $captcha_instruction, '', $json_result = true);
+            }
+            if ($coordinates != '') {
+                $wraper = $this->exts->getElement($captcha_wraper_selector);
+                if ($wraper != null) {
+                    foreach ($coordinates as $coordinate) {
+                        $this->exts->click_by_xdotool($captcha_wraper_selector, (int) $coordinate['x'], (int) $coordinate['y']);
+                    }
+                    sleep(5);
                 }
             }
         }
@@ -460,85 +498,6 @@ private function getCoordinates(
         $this->exts->log("Can not get result from API");
     }
     return $response;
-}
-
-private function checkFillRecaptcha($count = 1)
-{
-    $this->exts->log(__FUNCTION__);
-    $this->switchToFrame('iframe#captcha-internal');
-    $recaptcha_iframe_selector = 'iframe[src*="/recaptcha/api2/anchor?"]';
-    $recaptcha_textarea_selector = 'textarea[name="g-recaptcha-response"]';
-    if ($this->exts->exists($recaptcha_iframe_selector)) {
-        $iframeUrl = $this->exts->extract($recaptcha_iframe_selector, null, 'src');
-        $data_siteKey = explode('&', end(explode("&k=", $iframeUrl)))[0];
-        $this->exts->log("iframe url  - " . $iframeUrl);
-        $this->exts->log("SiteKey - " . $data_siteKey);
-
-        $isCaptchaSolved = $this->exts->processRecaptcha($this->exts->getUrl(), $data_siteKey, false);
-        $this->exts->log("isCaptchaSolved - " . $isCaptchaSolved);
-
-        if ($isCaptchaSolved) {
-            // Step 1 fill answer to textarea
-            $this->exts->log(__FUNCTION__ . "::filling reCaptcha response..");
-            $recaptcha_textareas = $this->exts->getElements($recaptcha_textarea_selector);
-            for ($i = 0; $i < count($recaptcha_textareas); $i++) {
-                $this->exts->execute_javascript("arguments[0].innerHTML = '" . $this->exts->recaptcha_answer . "';", [$recaptcha_textareas[$i]]);
-            }
-            sleep(2);
-            $this->exts->capture('recaptcha-filled');
-
-            // Step 2, check if callback function need executed
-            $gcallbackFunction = $this->exts->execute_javascript('
-            if(document.querySelector("[data-callback]") != null){
-                document.querySelector("[data-callback]").getAttribute("data-callback");
-            } else {
-                var result = ""; var found = false;
-                function recurse (cur, prop, deep) {
-                    if(deep > 5 || found){ 
-                        return;
-                    }
-                    console.log(prop);
-                    try {
-                        if(prop.indexOf(".callback") > -1){
-                            result = prop; 
-                            found = true; 
-                            return;
-                        } else { 
-                            if(cur == undefined || cur == null || cur instanceof Element || Object(cur) !== cur || Array.isArray(cur)){ 
-                                return;
-                            }
-                            deep++;
-                            for (var p in cur) { 
-                                recurse(cur[p], prop ? prop + "." + p : p, deep);
-                            }
-                        }
-                    } catch(ex) { 
-                        console.log("ERROR in function: " + ex); 
-                        return; 
-                    }
-                }
-
-                recurse(___grecaptcha_cfg.clients[0], "", 0);
-                found ? "___grecaptcha_cfg.clients[0]." + result : null;
-            }
-        ');
-            $this->exts->log('Callback function: ' . $gcallbackFunction);
-            if ($gcallbackFunction != null) {
-                $this->exts->execute_javascript($gcallbackFunction . '("' . $this->exts->recaptcha_answer . '");');
-                sleep(10);
-            }
-        } else {
-            // Only call this if recaptcha service expired.
-            if ($count < 5) {
-                $count++;
-                $this->checkFillRecaptcha($count);
-            }
-        }
-        return true;
-    } else {
-        $this->exts->log(__FUNCTION__ . '::Not found reCaptcha');
-        return false;
-    }
 }
 
 public function switchToFrame($query_string)
@@ -981,21 +940,21 @@ private function check_solve_rejected_browser()
 private function overwrite_user_agent($user_agent_string = 'DN')
 {
     $userAgentScript = "
-    (function() {
-        if ('userAgentData' in navigator) {
-            navigator.userAgentData.getHighEntropyValues({}).then(() => {
-                Object.defineProperty(navigator, 'userAgent', { 
-                    value: '{$user_agent_string}', 
-                    configurable: true 
-                });
-            });
-        } else {
+(function() {
+    if ('userAgentData' in navigator) {
+        navigator.userAgentData.getHighEntropyValues({}).then(() => {
             Object.defineProperty(navigator, 'userAgent', { 
                 value: '{$user_agent_string}', 
                 configurable: true 
             });
-        }
-    })();
+        });
+    } else {
+        Object.defineProperty(navigator, 'userAgent', { 
+            value: '{$user_agent_string}', 
+            configurable: true 
+        });
+    }
+})();
 ";
     $this->exts->execute_javascript($userAgentScript);
 }
@@ -1429,4 +1388,3 @@ public function waitFor($selector, $seconds = 10)
         sleep($seconds);
     }
 }
-
