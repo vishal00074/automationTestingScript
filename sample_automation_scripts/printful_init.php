@@ -82,6 +82,7 @@ private function initPortal($count)
 
 public function isLoggedin()
 {
+    $this->waitFor($this->check_login_success_selector);
     return $this->exts->querySelector($this->check_login_success_selector) != null;
 }
 
@@ -133,35 +134,35 @@ private function checkFillRecaptcha()
 
             // Step 2, check if callback function need executed
             $gcallbackFunction = $this->exts->executeSafeScript('
-                if(document.querySelector("[data-callback]") != null){
-                    return document.querySelector("[data-callback]").getAttribute("data-callback");
-                }
+            if(document.querySelector("[data-callback]") != null){
+                return document.querySelector("[data-callback]").getAttribute("data-callback");
+            }
 
-                var result = ""; var found = false; var badge = "";
-                function recurse (cur, prop, deep) {
-                    if(deep > 5 || found){ return;}
-                    console.log(prop);
-                    try {
-                        if(cur == undefined || cur == null || cur instanceof Element || Object(cur) !== cur || Array.isArray(cur)){ return;}
-                        for (var p in cur) { 
-                            if(p + "" == "callback" && cur["badge"] == "text") {
-                                result = result + prop;
-                                found = true; badge = cur["badge"]; return;
-                            } else {
-                                recurse(cur[p], prop ? prop + "." + p : p, deep);
-                            }
+            var result = ""; var found = false; var badge = "";
+            function recurse (cur, prop, deep) {
+                if(deep > 5 || found){ return;}
+                console.log(prop);
+                try {
+                    if(cur == undefined || cur == null || cur instanceof Element || Object(cur) !== cur || Array.isArray(cur)){ return;}
+                    for (var p in cur) { 
+                        if(p + "" == "callback" && cur["badge"] == "text") {
+                            result = result + prop;
+                            found = true; badge = cur["badge"]; return;
+                        } else {
+                            recurse(cur[p], prop ? prop + "." + p : p, deep);
                         }
-                    } catch(ex) { console.log("ERROR in function: " + ex); return; }
-                }
+                    }
+                } catch(ex) { console.log("ERROR in function: " + ex); return; }
+            }
 
-                for (var c in ___grecaptcha_cfg.clients) {
-                    result = "___grecaptcha_cfg.clients["+c+"].";
-                    recurse(___grecaptcha_cfg.clients[c], "", 0);
-                    if(found) 
-                        return result + ".callback";
-                }
-                return null;
-            ');
+            for (var c in ___grecaptcha_cfg.clients) {
+                result = "___grecaptcha_cfg.clients["+c+"].";
+                recurse(___grecaptcha_cfg.clients[c], "", 0);
+                if(found) 
+                    return result + ".callback";
+            }
+            return null;
+        ');
             $this->exts->log('Callback function: ' . $gcallbackFunction);
             if ($gcallbackFunction != null) {
                 $this->exts->executeSafeScript($gcallbackFunction . '("' . $this->exts->recaptcha_answer . '");');
@@ -625,24 +626,24 @@ private function googlecheckFillRecaptcha()
 
             // Step 2, check if callback function need executed
             $gcallbackFunction = $this->exts->execute_javascript('
-                if(document.querySelector("[data-callback]") != null){
-                    document.querySelector("[data-callback]").getAttribute("data-callback");
-                } else {
-                    var result = ""; var found = false;
-                    function recurse (cur, prop, deep) {
-                        if(deep > 5 || found){ return;}console.log(prop);
-                        try {
-                            if(prop.indexOf(".callback") > -1){result = prop; found = true; return;
-                            } else { if(cur == undefined || cur == null || cur instanceof Element || Object(cur) !== cur || Array.isArray(cur)){ return;}deep++;
-                                for (var p in cur) { recurse(cur[p], prop ? prop + "." + p : p, deep);}
-                            }
-                        } catch(ex) { console.log("ERROR in function: " + ex); return; }
-                    }
-
-                    recurse(___grecaptcha_cfg.clients[0], "", 0);
-                    found ? "___grecaptcha_cfg.clients[0]." + result : null;
+            if(document.querySelector("[data-callback]") != null){
+                document.querySelector("[data-callback]").getAttribute("data-callback");
+            } else {
+                var result = ""; var found = false;
+                function recurse (cur, prop, deep) {
+                    if(deep > 5 || found){ return;}console.log(prop);
+                    try {
+                        if(prop.indexOf(".callback") > -1){result = prop; found = true; return;
+                        } else { if(cur == undefined || cur == null || cur instanceof Element || Object(cur) !== cur || Array.isArray(cur)){ return;}deep++;
+                            for (var p in cur) { recurse(cur[p], prop ? prop + "." + p : p, deep);}
+                        }
+                    } catch(ex) { console.log("ERROR in function: " + ex); return; }
                 }
-            ');
+
+                recurse(___grecaptcha_cfg.clients[0], "", 0);
+                found ? "___grecaptcha_cfg.clients[0]." + result : null;
+            }
+        ');
             $this->exts->log('Callback function: ' . $gcallbackFunction);
             if ($gcallbackFunction != null) {
                 $this->exts->execute_javascript($gcallbackFunction . '("' . $this->exts->recaptcha_answer . '");');
@@ -654,3 +655,11 @@ private function googlecheckFillRecaptcha()
     }
 }
 // End GOOGLE login
+
+public function waitFor($selector, $seconds = 7)
+{
+    for ($wait = 0; $wait < 2 && $this->exts->executeSafeScript("return !!document.querySelector('" . $selector . "');") != 1; $wait++) {
+        $this->exts->log('Waiting for Selectors.....');
+        sleep($seconds);
+    }
+}

@@ -1,4 +1,4 @@
-<?php // handle empty invoice name case updated login failed message
+<?php // replace waitTillPresent to waitFor and updated download code
 
 /**
  * Chrome Remote via Chrome devtool protocol script, for specific process/portal
@@ -57,9 +57,8 @@ class PortalScriptCDP
         }
     }
 
-    // Server-Portal-ID: 148966 - Last modified: 07.07.2025 14:41:07 UTC - User: 1
+    // Server-Portal-ID: 148966 - Last modified: 14.07.2025 14:22:50 UTC - User: 1
 
-    /*Define constants used in script*/
     public $baseUrl = 'https://www.printful.com/';
     public $loginUrl = 'https://www.printful.com/de/auth/login';
     public $invoicePageUrl = 'https://www.printful.com/dashboard/billing/payment-history';
@@ -125,6 +124,8 @@ class PortalScriptCDP
 
             // Open invoices url and download invoice
             $this->exts->openUrl($this->invoicePageUrl);
+            sleep(10);
+
             $this->processInvoices();
 
             // Final, check no invoice
@@ -148,6 +149,7 @@ class PortalScriptCDP
 
     public function isLoggedin()
     {
+        $this->waitFor($this->check_login_success_selector);
         return $this->exts->querySelector($this->check_login_success_selector) != null;
     }
 
@@ -199,35 +201,35 @@ class PortalScriptCDP
 
                 // Step 2, check if callback function need executed
                 $gcallbackFunction = $this->exts->executeSafeScript('
-                    if(document.querySelector("[data-callback]") != null){
-                        return document.querySelector("[data-callback]").getAttribute("data-callback");
-                    }
+                if(document.querySelector("[data-callback]") != null){
+                    return document.querySelector("[data-callback]").getAttribute("data-callback");
+                }
 
-                    var result = ""; var found = false; var badge = "";
-                    function recurse (cur, prop, deep) {
-                        if(deep > 5 || found){ return;}
-                        console.log(prop);
-                        try {
-                            if(cur == undefined || cur == null || cur instanceof Element || Object(cur) !== cur || Array.isArray(cur)){ return;}
-                            for (var p in cur) { 
-                                if(p + "" == "callback" && cur["badge"] == "text") {
-                                    result = result + prop;
-                                    found = true; badge = cur["badge"]; return;
-                                } else {
-                                    recurse(cur[p], prop ? prop + "." + p : p, deep);
-                                }
+                var result = ""; var found = false; var badge = "";
+                function recurse (cur, prop, deep) {
+                    if(deep > 5 || found){ return;}
+                    console.log(prop);
+                    try {
+                        if(cur == undefined || cur == null || cur instanceof Element || Object(cur) !== cur || Array.isArray(cur)){ return;}
+                        for (var p in cur) { 
+                            if(p + "" == "callback" && cur["badge"] == "text") {
+                                result = result + prop;
+                                found = true; badge = cur["badge"]; return;
+                            } else {
+                                recurse(cur[p], prop ? prop + "." + p : p, deep);
                             }
-                        } catch(ex) { console.log("ERROR in function: " + ex); return; }
-                    }
-    
-                    for (var c in ___grecaptcha_cfg.clients) {
-                        result = "___grecaptcha_cfg.clients["+c+"].";
-                        recurse(___grecaptcha_cfg.clients[c], "", 0);
-                        if(found) 
-                            return result + ".callback";
-                    }
-                    return null;
-                ');
+                        }
+                    } catch(ex) { console.log("ERROR in function: " + ex); return; }
+                }
+
+                for (var c in ___grecaptcha_cfg.clients) {
+                    result = "___grecaptcha_cfg.clients["+c+"].";
+                    recurse(___grecaptcha_cfg.clients[c], "", 0);
+                    if(found) 
+                        return result + ".callback";
+                }
+                return null;
+            ');
                 $this->exts->log('Callback function: ' . $gcallbackFunction);
                 if ($gcallbackFunction != null) {
                     $this->exts->executeSafeScript($gcallbackFunction . '("' . $this->exts->recaptcha_answer . '");');
@@ -691,24 +693,24 @@ class PortalScriptCDP
 
                 // Step 2, check if callback function need executed
                 $gcallbackFunction = $this->exts->execute_javascript('
-                    if(document.querySelector("[data-callback]") != null){
-                        document.querySelector("[data-callback]").getAttribute("data-callback");
-                    } else {
-                        var result = ""; var found = false;
-                        function recurse (cur, prop, deep) {
-                            if(deep > 5 || found){ return;}console.log(prop);
-                            try {
-                                if(prop.indexOf(".callback") > -1){result = prop; found = true; return;
-                                } else { if(cur == undefined || cur == null || cur instanceof Element || Object(cur) !== cur || Array.isArray(cur)){ return;}deep++;
-                                    for (var p in cur) { recurse(cur[p], prop ? prop + "." + p : p, deep);}
-                                }
-                            } catch(ex) { console.log("ERROR in function: " + ex); return; }
-                        }
-
-                        recurse(___grecaptcha_cfg.clients[0], "", 0);
-                        found ? "___grecaptcha_cfg.clients[0]." + result : null;
+                if(document.querySelector("[data-callback]") != null){
+                    document.querySelector("[data-callback]").getAttribute("data-callback");
+                } else {
+                    var result = ""; var found = false;
+                    function recurse (cur, prop, deep) {
+                        if(deep > 5 || found){ return;}console.log(prop);
+                        try {
+                            if(prop.indexOf(".callback") > -1){result = prop; found = true; return;
+                            } else { if(cur == undefined || cur == null || cur instanceof Element || Object(cur) !== cur || Array.isArray(cur)){ return;}deep++;
+                                for (var p in cur) { recurse(cur[p], prop ? prop + "." + p : p, deep);}
+                            }
+                        } catch(ex) { console.log("ERROR in function: " + ex); return; }
                     }
-                ');
+
+                    recurse(___grecaptcha_cfg.clients[0], "", 0);
+                    found ? "___grecaptcha_cfg.clients[0]." + result : null;
+                }
+            ');
                 $this->exts->log('Callback function: ' . $gcallbackFunction);
                 if ($gcallbackFunction != null) {
                     $this->exts->execute_javascript($gcallbackFunction . '("' . $this->exts->recaptcha_answer . '");');
@@ -721,6 +723,15 @@ class PortalScriptCDP
     }
     // End GOOGLE login
 
+    public function waitFor($selector, $seconds = 7)
+    {
+        for ($wait = 0; $wait < 2 && $this->exts->executeSafeScript("return !!document.querySelector('" . $selector . "');") != 1; $wait++) {
+            $this->exts->log('Waiting for Selectors.....');
+            sleep($seconds);
+        }
+    }
+
+    public $totalInvoices = 0;
 
     private function processInvoices()
     {
@@ -735,7 +746,7 @@ class PortalScriptCDP
             $this->exts->click_element('.calendar [role="listbox"] li:first-child');
             sleep(1);
             $this->exts->capture("4-invoices-date-filter");
-            $this->exts->click_element('.calendar button[style*="color: rgb(13, 106, 102);"]');
+            $this->exts->click_element('div.asd__action-buttons button:nth-child(2)');
             sleep(15);
             $this->exts->capture("4-invoices-date-submitted");
         }
@@ -743,6 +754,11 @@ class PortalScriptCDP
         for ($page_count = 1; $page_count < 80; $page_count++) {
             $total_rows = $this->exts->count_elements('div[class*=dataTables] table tbody tr');
             for ($i = 0; $i < $total_rows; $i++) {
+
+                if ($this->totalInvoices >= 100) {
+                    return;
+                }
+
                 $row = $this->exts->getElements('div[class*=dataTables] table tbody tr')[$i];
                 $downloadBtn = $this->exts->queryXpath(".//a[contains(text(), 'Invoice') or contains(text(), 'Rechnung')]", $row);
                 if ($downloadBtn != null) {
@@ -760,6 +776,7 @@ class PortalScriptCDP
                     $downloaded_file = $this->exts->click_and_download($downloadBtn, 'pdf', $invoiceFileName);
                     if (trim($downloaded_file) != '' && file_exists($downloaded_file)) {
                         $this->exts->new_invoice($invoiceName, $invoiceDate, $invoiceAmount, $downloaded_file);
+                        $this->totalInvoices++;
                     } else {
                         $this->exts->log(__FUNCTION__ . '::No download ' . $invoiceFileName);
                     }
