@@ -1,4 +1,4 @@
-<?php // replace waitTillpresent with custom js waitFor function 
+<?php // optimized the code increase sleep time to check login success selector
 
 /**
  * Chrome Remote via Chrome devtool protocol script, for specific process/portal
@@ -56,7 +56,7 @@ class PortalScriptCDP
             echo 'Script execution failed.. ' . "\n";
         }
     }
-    // Server-Portal-ID: 210991 - Last modified: 02.05.2025 13:43:31 UTC - User: 1
+    // Server-Portal-ID: 210991 - Last modified: 27.06.2025 14:11:54 UTC - User: 1
 
     public $baseUrl = 'https://join.com/dashboard';
     public $loginUrl = 'https://join.com/auth/login';
@@ -92,6 +92,7 @@ class PortalScriptCDP
         if ($this->exts->querySelector($this->check_login_success_selector) == null) {
             $this->exts->log('NOT logged via cookie');
             $this->checkFillLogin();
+            sleep(5);
             $this->waitFor($this->check_login_success_selector, 20);
         }
 
@@ -188,25 +189,25 @@ class PortalScriptCDP
 
                 // Step 2, check if callback function need executed
                 $gcallbackFunction = $this->exts->execute_javascript('
-            if(document.querySelector("[data-callback]") != null){
-                return document.querySelector("[data-callback]").getAttribute("data-callback");
-            }
+        if(document.querySelector("[data-callback]") != null){
+            return document.querySelector("[data-callback]").getAttribute("data-callback");
+        }
 
-            var result = ""; var found = false;
-            function recurse (cur, prop, deep) {
-                if(deep > 5 || found){ return;}console.log(prop);
-                try {
-                    if(cur == undefined || cur == null || cur instanceof Element || Object(cur) !== cur || Array.isArray(cur)){ return;}
-                    if(prop.indexOf(".callback") > -1){result = prop; found = true; return;
-                    } else { deep++;
-                        for (var p in cur) { recurse(cur[p], prop ? prop + "." + p : p, deep);}
-                    }
-                } catch(ex) { console.log("ERROR in function: " + ex); return; }
-            }
+        var result = ""; var found = false;
+        function recurse (cur, prop, deep) {
+            if(deep > 5 || found){ return;}console.log(prop);
+            try {
+                if(cur == undefined || cur == null || cur instanceof Element || Object(cur) !== cur || Array.isArray(cur)){ return;}
+                if(prop.indexOf(".callback") > -1){result = prop; found = true; return;
+                } else { deep++;
+                    for (var p in cur) { recurse(cur[p], prop ? prop + "." + p : p, deep);}
+                }
+            } catch(ex) { console.log("ERROR in function: " + ex); return; }
+        }
 
-            recurse(___grecaptcha_cfg.clients[0], "", 0);
-            return found ? "___grecaptcha_cfg.clients[0]." + result : null;
-        ');
+        recurse(___grecaptcha_cfg.clients[0], "", 0);
+        return found ? "___grecaptcha_cfg.clients[0]." + result : null;
+    ');
                 $this->exts->log('Callback function: ' . $gcallbackFunction);
                 if ($gcallbackFunction != null) {
                     $this->exts->execute_javascript($gcallbackFunction . '("' . $this->exts->recaptcha_answer . '");');
@@ -557,11 +558,11 @@ class PortalScriptCDP
 
         while ($attempt < $maxAttempts && $this->exts->exists('button[data-testid="view-more-button"]') && $this->exts->config_array["restrictPages"] == 0) {
             $this->exts->execute_javascript('
-        var btn = document.querySelector("button[data-testid=\'view-more-button\']");
-        if(btn){
-            btn.click();
-        }
-    ');
+    var btn = document.querySelector("button[data-testid=\'view-more-button\']");
+    if(btn){
+        btn.click();
+    }
+');
             $attempt++;
             sleep(5);
         }

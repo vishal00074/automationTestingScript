@@ -11,7 +11,7 @@ public $password_selector = 'form.auth-form input#password';
 public $remember_me_selector = "b.checkbox__button";
 public $login_error_msg_selector = "div.errorbox";
 
-public $logout_link = "button[data-testid='organization-switcher-toggle'],button.c-user__button, button.c-user__button, a[href*='/logout'], a[href*='payments']";
+public $logout_link = 'a[href*="reports"][data-testid="navigation-reports"]';
 public $login_tryout = 0;
 public $restrictPages = 0;
 public $last_state = array();
@@ -53,7 +53,7 @@ private function initPortal($count)
             $this->solve_captcha_by_clicking();
             $this->solve_captcha_by_clicking();
             $this->solve_captcha_by_clicking();
-            if ($this->exts->exists($this->submit_btn)) {
+            if ($this->isExists($this->submit_btn)) {
                 $this->fillForm(0);
                 sleep(5);
                 if ($this->exts->querySelector('form.js-two-factor-authentication-form') != null || $this->exts->urlContains('twofactorauthentication')) {
@@ -76,7 +76,7 @@ private function initPortal($count)
     if ($this->checkLogin()) {
         $this->exts->log(">>>>>>>>>>>>>>>Login successful!!!!");
         $this->exts->capture("3-LoginSuccess");
-        
+
         if (!empty($this->exts->config_array['allow_login_success_request'])) {
             $this->exts->triggerLoginSuccess();
         }
@@ -100,9 +100,9 @@ private function initPortal($count)
     }
 }
 
-function fillForm($count)
+public function fillForm($count)
 {
-    if ($this->exts->exists($this->password_selector)) {
+    if ($this->isExists($this->password_selector)) {
 
         $this->exts->capture("1-pre-login");
         $this->exts->log("Enter Username");
@@ -113,7 +113,7 @@ function fillForm($count)
         $this->exts->moveToElementAndType($this->password_selector, $this->password);
         sleep(2);
 
-        if ($this->exts->exists($this->remember_me_selector)) {
+        if ($this->isExists($this->remember_me_selector)) {
             $this->exts->click_element($this->remember_me_selector);
             sleep(2);
         }
@@ -127,6 +127,13 @@ function fillForm($count)
             $this->exts->click_by_xdotool('div.errorbox button');
             sleep(7);
         }
+
+        $error_text = strtolower($this->exts->extract('div.errorbox'));
+
+        $this->exts->log(__FUNCTION__ . '::Error text: ' . $error_text);
+        if (stripos($error_text, strtolower('password')) !== false) {
+            $this->exts->loginFailure(1);
+        }
     } else {
         $this->exts->log(__FUNCTION__ . '::Login page not found');
         $this->exts->capture("2-login-page-not-found");
@@ -137,21 +144,27 @@ private function solve_captcha_by_clicking($count = 1)
 {
     $this->exts->log("Checking captcha");
     $language_code = '';
-    $hcaptcha_challenger_wraper_selector = 'div[style*="visibility: visible;"]  iframe[title="recaptcha challenge expires in two minutes"]';
-    $this->exts->waitTillPresent($hcaptcha_challenger_wraper_selector, 20);
-    if ($this->exts->exists($hcaptcha_challenger_wraper_selector)) {
-
-        $this->exts->capture("re-captcha");
+    $unsolved_hcaptcha_submit_selector = 'div.g-recaptcha iframe';
+    $hcaptcha_challenger_wraper_selector = 'div[style*="visible"] iframe[src*="hcaptcha"][title*="hallenge"]';
+    $this->exts->waitTillAnyPresent([$unsolved_hcaptcha_submit_selector, $hcaptcha_challenger_wraper_selector], 20);
+    if ($this->exts->check_exist_by_chromedevtool($unsolved_hcaptcha_submit_selector) || $this->isExists($hcaptcha_challenger_wraper_selector)) {
+        // Check if challenge images hasn't showed yet, Click checkbox to show images challenge
+        if (!$this->exts->check_exist_by_chromedevtool($hcaptcha_challenger_wraper_selector)) {
+            $this->exts->click_by_xdotool($unsolved_hcaptcha_submit_selector);
+            $this->exts->waitTillPresent($hcaptcha_challenger_wraper_selector, 20);
+        }
+        $this->exts->capture("tesla-captcha");
 
         $captcha_instruction = '';
 
         //$captcha_instruction = $this->exts->extract($iframeElement_instartion,null, 'innerText');
         $this->exts->log('language_code: ' . $language_code . ' Instruction: ' . $captcha_instruction);
         sleep(5);
-        $captcha_wraper_selector = 'div[style*="visibility: visible;"]  iframe[title="recaptcha challenge expires in two minutes"]';
+        $captcha_wraper_selector = 'div[style*="visible"] iframe[src*="hcaptcha"][title*="hallenge"]';
 
-        if ($this->exts->exists($captcha_wraper_selector)) {
+        if ($this->isExists($captcha_wraper_selector)) {
             $coordinates = $this->getCoordinates($captcha_wraper_selector, $captcha_instruction, '', $json_result = false);
+
 
             // if($coordinates == '' || count($coordinates) < 2){
             //  $coordinates = $this->exts->processClickCaptcha($captcha_wraper_selector, $captcha_instruction, '', $json_result=false);
@@ -163,8 +176,8 @@ private function solve_captcha_by_clicking($count = 1)
                     $this->click_captcha_point($captcha_wraper_selector, (int)$coordinate['x'], (int)$coordinate['y']);
                 }
 
-                $this->exts->capture("re-captcha-selected " . $count);
-                $this->exts->makeFrameExecutable('div[style*="visibility: visible;"]  iframe[title="recaptcha challenge expires in two minutes"]')->click_element('button[id="recaptcha-verify-button"]');
+                $this->exts->capture("tesla-captcha-selected " . $count);
+                $this->exts->makeFrameExecutable('div[style*="visible"] iframe[src*="hcaptcha"][title*="hallenge"]')->click_element('div.button-submit');
                 sleep(10);
                 return true;
             }
@@ -179,17 +192,17 @@ private function click_captcha_point($selector = '', $x_on_element = 0, $y_on_el
     $this->exts->log(__FUNCTION__ . " $selector $x_on_element $y_on_element");
     $selector = base64_encode($selector);
     $element_coo = $this->exts->execute_javascript('
-        var x_on_element = ' . $x_on_element . ';
-        var y_on_element = ' . $y_on_element . ';
-        var coo = document.querySelector(atob("' . $selector . '")).getBoundingClientRect();
-        // Default get center point in element, if offset inputted, out put them
-        if(x_on_element > 0 || y_on_element > 0) {
-            Math.round(coo.x + x_on_element) + "|" + Math.round(coo.y + y_on_element);
-        } else {
-            Math.round(coo.x + coo.width/2) + "|" + Math.round(coo.y + coo.height/2);
-        }
-        
-    ');
+    var x_on_element = ' . $x_on_element . ';
+    var y_on_element = ' . $y_on_element . ';
+    var coo = document.querySelector(atob("' . $selector . '")).getBoundingClientRect();
+    // Default get center point in element, if offset inputted, out put them
+    if(x_on_element > 0 || y_on_element > 0) {
+        Math.round(coo.x + x_on_element) + "|" + Math.round(coo.y + y_on_element);
+    } else {
+        Math.round(coo.x + coo.width/2) + "|" + Math.round(coo.y + coo.height/2);
+    }
+    
+');
     // sleep(1);
     $this->exts->log("Browser clicking position: $element_coo");
     $element_coo = explode('|', $element_coo);
@@ -266,7 +279,7 @@ private function getCoordinates(
 private function chooseMethodTwoFactor()
 {
     $this->exts->capture('2.1-two-factor-page');
-    if ($this->exts->exists('form.js-two-factor-authentication-form input.js-char-input')) {
+    if ($this->isExists('form.js-two-factor-authentication-form input.js-char-input')) {
         $this->checkFillTwoFactorOTP();
     } else {
         // choose other methord
@@ -304,7 +317,7 @@ private function chooseMethodTwoFactor()
 
 public function checkFillTwoFactorOTP($type = "Authenticator App")
 {
-    if ($this->exts->exists('form.js-two-factor-authentication-form input.js-char-input')) {
+    if ($this->isExists('form.js-two-factor-authentication-form input.js-char-input')) {
         $two_factor_selector = 'form.js-two-factor-authentication-form input.js-char-input';
         $two_factor_message_selector = 'form.js-two-factor-authentication-form p.auth-form__verify-paragraph, .auth-form-title';
         $two_factor_submit_selector = 'form.js-two-factor-authentication-form button[type="submit"]';
@@ -387,14 +400,15 @@ private function checkFillTwoFactorPush()
     }
 }
 
-function checkLogin()
+private function checkLogin()
 {
     $this->exts->log("Begin checkLogin ");
     $isLoggedIn = false;
     try {
-        $isLoginForm = $this->exts->exists($this->username_selector);
-        if (!$isLoginForm) {
-            if ($this->exts->exists($this->logout_link)) {
+        sleep(10); 
+        $isLoginForm = $this->exts->querySelector($this->logout_link);
+        if ($isLoginForm != null) {
+            if ($this->exts->querySelector($this->logout_link) != null) {
                 $this->exts->log(">>>>>>>>>>>>>>>Login successful 1!!!!");
                 $isLoggedIn = true;
             }
@@ -404,4 +418,18 @@ function checkLogin()
     }
 
     return $isLoggedIn;
+}
+
+private function isExists($selector = '')
+{
+    $safeSelector = addslashes($selector);
+    $this->exts->log('Element:: ' . $safeSelector);
+    $isElement = $this->exts->execute_javascript('!!document.querySelector("' . $safeSelector . '")');
+    if ($isElement) {
+        $this->exts->log('Element Found');
+        return true;
+    } else {
+        $this->exts->log('Element not Found');
+        return false;
+    }
 }

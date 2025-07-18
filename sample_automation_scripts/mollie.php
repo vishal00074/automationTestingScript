@@ -1,4 +1,4 @@
-<?php /// updated filllform function 
+<?php // updated login code.
 
 /**
  * Chrome Remote via Chrome devtool protocol script, for specific process/portal
@@ -56,7 +56,7 @@ class PortalScriptCDP
             echo 'Script execution failed.. ' . "\n";
         }
     }
-    // Server-Portal-ID: 19864 - Last modified: 05.05.2025 13:17:41 UTC - User: 1
+    // Server-Portal-ID: 19864 - Last modified: 10.06.2025 08:27:36 UTC - User: 1
 
     public $baseUrl = "https://www.mollie.com";
     public $loginUrl = "https://www.mollie.com/dashboard/login?lang=en";
@@ -71,7 +71,7 @@ class PortalScriptCDP
     public $remember_me_selector = "b.checkbox__button";
     public $login_error_msg_selector = "div.errorbox";
 
-    public $logout_link = "button[data-testid='organization-switcher-toggle'],button.c-user__button, button.c-user__button, a[href*='/logout'], a[href*='payments']";
+    public $logout_link = 'a[href*="reports"][data-testid="navigation-reports"]';
     public $login_tryout = 0;
     public $restrictPages = 0;
     public $last_state = array();
@@ -113,7 +113,7 @@ class PortalScriptCDP
                 $this->solve_captcha_by_clicking();
                 $this->solve_captcha_by_clicking();
                 $this->solve_captcha_by_clicking();
-                if ($this->exts->exists($this->submit_btn)) {
+                if ($this->isExists($this->submit_btn)) {
                     $this->fillForm(0);
                     sleep(5);
                     if ($this->exts->querySelector('form.js-two-factor-authentication-form') != null || $this->exts->urlContains('twofactorauthentication')) {
@@ -137,6 +137,7 @@ class PortalScriptCDP
             $this->exts->log(">>>>>>>>>>>>>>>Login successful!!!!");
             $this->exts->capture("3-LoginSuccess");
             $this->processAfterLogin($count);
+
             if ($this->isNoInvoice) {
                 $this->exts->no_invoice();
             }
@@ -159,9 +160,9 @@ class PortalScriptCDP
         }
     }
 
-    function fillForm($count)
+    public function fillForm($count)
     {
-        if ($this->exts->exists($this->password_selector)) {
+        if ($this->isExists($this->password_selector)) {
 
             $this->exts->capture("1-pre-login");
             $this->exts->log("Enter Username");
@@ -172,7 +173,7 @@ class PortalScriptCDP
             $this->exts->moveToElementAndType($this->password_selector, $this->password);
             sleep(2);
 
-            if ($this->exts->exists($this->remember_me_selector)) {
+            if ($this->isExists($this->remember_me_selector)) {
                 $this->exts->click_element($this->remember_me_selector);
                 sleep(2);
             }
@@ -186,6 +187,13 @@ class PortalScriptCDP
                 $this->exts->click_by_xdotool('div.errorbox button');
                 sleep(7);
             }
+
+            $error_text = strtolower($this->exts->extract('div.errorbox'));
+
+            $this->exts->log(__FUNCTION__ . '::Error text: ' . $error_text);
+            if (stripos($error_text, strtolower('password')) !== false) {
+                $this->exts->loginFailure(1);
+            }
         } else {
             $this->exts->log(__FUNCTION__ . '::Login page not found');
             $this->exts->capture("2-login-page-not-found");
@@ -196,21 +204,27 @@ class PortalScriptCDP
     {
         $this->exts->log("Checking captcha");
         $language_code = '';
-        $hcaptcha_challenger_wraper_selector = 'div[style*="visibility: visible;"]  iframe[title="recaptcha challenge expires in two minutes"]';
-        $this->exts->waitTillPresent($hcaptcha_challenger_wraper_selector, 20);
-        if ($this->exts->exists($hcaptcha_challenger_wraper_selector)) {
-
-            $this->exts->capture("re-captcha");
+        $unsolved_hcaptcha_submit_selector = 'div.g-recaptcha iframe';
+        $hcaptcha_challenger_wraper_selector = 'div[style*="visible"] iframe[src*="hcaptcha"][title*="hallenge"]';
+        $this->exts->waitTillAnyPresent([$unsolved_hcaptcha_submit_selector, $hcaptcha_challenger_wraper_selector], 20);
+        if ($this->exts->check_exist_by_chromedevtool($unsolved_hcaptcha_submit_selector) || $this->isExists($hcaptcha_challenger_wraper_selector)) {
+            // Check if challenge images hasn't showed yet, Click checkbox to show images challenge
+            if (!$this->exts->check_exist_by_chromedevtool($hcaptcha_challenger_wraper_selector)) {
+                $this->exts->click_by_xdotool($unsolved_hcaptcha_submit_selector);
+                $this->exts->waitTillPresent($hcaptcha_challenger_wraper_selector, 20);
+            }
+            $this->exts->capture("tesla-captcha");
 
             $captcha_instruction = '';
 
             //$captcha_instruction = $this->exts->extract($iframeElement_instartion,null, 'innerText');
             $this->exts->log('language_code: ' . $language_code . ' Instruction: ' . $captcha_instruction);
             sleep(5);
-            $captcha_wraper_selector = 'div[style*="visibility: visible;"]  iframe[title="recaptcha challenge expires in two minutes"]';
+            $captcha_wraper_selector = 'div[style*="visible"] iframe[src*="hcaptcha"][title*="hallenge"]';
 
-            if ($this->exts->exists($captcha_wraper_selector)) {
+            if ($this->isExists($captcha_wraper_selector)) {
                 $coordinates = $this->getCoordinates($captcha_wraper_selector, $captcha_instruction, '', $json_result = false);
+
 
                 // if($coordinates == '' || count($coordinates) < 2){
                 //  $coordinates = $this->exts->processClickCaptcha($captcha_wraper_selector, $captcha_instruction, '', $json_result=false);
@@ -222,8 +236,8 @@ class PortalScriptCDP
                         $this->click_captcha_point($captcha_wraper_selector, (int)$coordinate['x'], (int)$coordinate['y']);
                     }
 
-                    $this->exts->capture("re-captcha-selected " . $count);
-                    $this->exts->makeFrameExecutable('div[style*="visibility: visible;"]  iframe[title="recaptcha challenge expires in two minutes"]')->click_element('button[id="recaptcha-verify-button"]');
+                    $this->exts->capture("tesla-captcha-selected " . $count);
+                    $this->exts->makeFrameExecutable('div[style*="visible"] iframe[src*="hcaptcha"][title*="hallenge"]')->click_element('div.button-submit');
                     sleep(10);
                     return true;
                 }
@@ -238,17 +252,17 @@ class PortalScriptCDP
         $this->exts->log(__FUNCTION__ . " $selector $x_on_element $y_on_element");
         $selector = base64_encode($selector);
         $element_coo = $this->exts->execute_javascript('
-            var x_on_element = ' . $x_on_element . ';
-            var y_on_element = ' . $y_on_element . ';
-            var coo = document.querySelector(atob("' . $selector . '")).getBoundingClientRect();
-            // Default get center point in element, if offset inputted, out put them
-            if(x_on_element > 0 || y_on_element > 0) {
-                Math.round(coo.x + x_on_element) + "|" + Math.round(coo.y + y_on_element);
-            } else {
-                Math.round(coo.x + coo.width/2) + "|" + Math.round(coo.y + coo.height/2);
-            }
-           
-        ');
+        var x_on_element = ' . $x_on_element . ';
+        var y_on_element = ' . $y_on_element . ';
+        var coo = document.querySelector(atob("' . $selector . '")).getBoundingClientRect();
+        // Default get center point in element, if offset inputted, out put them
+        if(x_on_element > 0 || y_on_element > 0) {
+            Math.round(coo.x + x_on_element) + "|" + Math.round(coo.y + y_on_element);
+        } else {
+            Math.round(coo.x + coo.width/2) + "|" + Math.round(coo.y + coo.height/2);
+        }
+       
+    ');
         // sleep(1);
         $this->exts->log("Browser clicking position: $element_coo");
         $element_coo = explode('|', $element_coo);
@@ -325,7 +339,7 @@ class PortalScriptCDP
     private function chooseMethodTwoFactor()
     {
         $this->exts->capture('2.1-two-factor-page');
-        if ($this->exts->exists('form.js-two-factor-authentication-form input.js-char-input')) {
+        if ($this->isExists('form.js-two-factor-authentication-form input.js-char-input')) {
             $this->checkFillTwoFactorOTP();
         } else {
             // choose other methord
@@ -363,7 +377,7 @@ class PortalScriptCDP
 
     public function checkFillTwoFactorOTP($type = "Authenticator App")
     {
-        if ($this->exts->exists('form.js-two-factor-authentication-form input.js-char-input')) {
+        if ($this->isExists('form.js-two-factor-authentication-form input.js-char-input')) {
             $two_factor_selector = 'form.js-two-factor-authentication-form input.js-char-input';
             $two_factor_message_selector = 'form.js-two-factor-authentication-form p.auth-form__verify-paragraph, .auth-form-title';
             $two_factor_submit_selector = 'form.js-two-factor-authentication-form button[type="submit"]';
@@ -446,14 +460,15 @@ class PortalScriptCDP
         }
     }
 
-    function checkLogin()
+    private function checkLogin()
     {
         $this->exts->log("Begin checkLogin ");
         $isLoggedIn = false;
         try {
-            $isLoginForm = $this->exts->exists($this->username_selector);
-            if (!$isLoginForm) {
-                if ($this->exts->exists($this->logout_link)) {
+            sleep(10);
+            $isLoginForm = $this->exts->querySelector($this->logout_link);
+            if ($isLoginForm != null) {
+                if ($this->exts->querySelector($this->logout_link) != null) {
                     $this->exts->log(">>>>>>>>>>>>>>>Login successful 1!!!!");
                     $isLoggedIn = true;
                 }
@@ -465,11 +480,25 @@ class PortalScriptCDP
         return $isLoggedIn;
     }
 
+    private function isExists($selector = '')
+    {
+        $safeSelector = addslashes($selector);
+        $this->exts->log('Element:: ' . $safeSelector);
+        $isElement = $this->exts->execute_javascript('!!document.querySelector("' . $safeSelector . '")');
+        if ($isElement) {
+            $this->exts->log('Element Found');
+            return true;
+        } else {
+            $this->exts->log('Element not Found');
+            return false;
+        }
+    }
+
     function processAfterLogin($count)
     {
         $this->exts->log("processAfterLogin:: Begin " . $count);
 
-        if ($this->exts->exists('button.c-feature-modal__close')) {
+        if ($this->isExists('button.c-feature-modal__close')) {
             $popups = $this->exts->querySelectorAll('button.c-feature-modal__close');
             foreach ($popups as $popup) {
                 try {
@@ -482,7 +511,7 @@ class PortalScriptCDP
         }
 
         $accounURLs = array();
-        if ($this->exts->exists('button[data-testid="organization-switcher-toggle"]')) {
+        if ($this->isExists('button[data-testid="organization-switcher-toggle"]')) {
             $this->exts->moveToElementAndClick('button[data-testid="organization-switcher-toggle"]');
             sleep(10);
             $accounts = $this->exts->querySelectorAll('button[data-testid="organization-item"]');
@@ -525,7 +554,7 @@ class PortalScriptCDP
                             $this->processDownloadInvoiceslatest(0, date("Y"));
                         }
                         sleep(10);
-                    } else if ($this->download_settlements == 1 && $this->exts->exists('a[href*="/administration/settlements"]')) {
+                    } else if ($this->download_settlements == 1 && $this->isExists('a[href*="/administration/settlements"]')) {
                         $this->exts->moveToElementAndClick('a[href*="/administration/settlements"]');
                         sleep(10);
 
@@ -557,7 +586,7 @@ class PortalScriptCDP
                     $this->processDownloadInvoicesNew(0, date("Y"));
                     $this->processDownloadInvoiceslatest(0, date("Y"));
                 }
-            } else if ($this->download_settlements == 1 && $this->exts->exists('a[href*="/reports/settlements"]')) {
+            } else if ($this->download_settlements == 1 && $this->isExists('a[href*="/reports/settlements"]')) {
                 $this->exts->moveToElementAndClick('a[href*="/reports/settlements"]');
                 sleep(10);
 
@@ -670,7 +699,7 @@ class PortalScriptCDP
                             $this->exts->log("processDownloadInvoices:: Exception processing record " . $ex1);
                         }
 
-                        if ($this->exts->exists('button.c-feature-modal__close')) {
+                        if ($this->isExists('button.c-feature-modal__close')) {
                             $popups = $this->exts->querySelectorAll('button.c-feature-modal__close');
                             foreach ($popups as $popup) {
                                 try {
@@ -918,7 +947,7 @@ class PortalScriptCDP
                                         } else {
                                             $this->exts->log("processDownloadSettlement :: Not Valid PDF - " . $filename);
                                         }
-                                    } else if ($this->exts->exists('.ReactModalPortal button[data-testid="cancel-btn"]')) {
+                                    } else if ($this->isExists('.ReactModalPortal button[data-testid="cancel-btn"]')) {
                                         $this->exts->moveToElementAndClick('.ReactModalPortal button[data-testid="cancel-btn"]');
                                         sleep(5);
                                         $this->exts->wait_and_check_download('pdf');
