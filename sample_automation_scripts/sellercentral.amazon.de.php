@@ -1,4 +1,4 @@
-<?php // replace waitTillPresent to wait for and optimize the script code
+<?php // replace exists to isExists function and updated region select selector
 
 /**
  * Chrome Remote via Chrome devtool protocol script, for specific process/portal
@@ -57,7 +57,7 @@ class PortalScriptCDP
         }
     }
 
-    // Server-Portal-ID: 916 - Last modified: 26.06.2025 03:30:26 UTC - User: 1
+    // Server-Portal-ID: 916 - Last modified: 14.07.2025 14:28:56 UTC - User: 1
 
     public $baseUrl = 'https://sellercentral.amazon.de/home';
     public $username_selector = 'form[name="signIn"] input[name="email"]:not([type="hidden"])';
@@ -114,13 +114,13 @@ class PortalScriptCDP
             // $this->exts->clearCookies();
             $this->exts->openUrl($this->baseUrl);
             sleep(10);
-            if (!$this->exts->exists($this->password_selector)) {
+            if (!$this->isExists($this->password_selector)) {
                 $this->exts->capture("2-login-exception");
                 $this->exts->clearCookies();
                 $this->exts->openUrl($this->baseUrl);
                 sleep(10);
             }
-            if ($this->exts->exists('input#auth-captcha-guess, input[name="cvf_captcha_input"], input[name="field-keywords"]')) {
+            if ($this->isExists('input#auth-captcha-guess, input[name="cvf_captcha_input"], input[name="field-keywords"]')) {
                 $captcha_inputted = $this->processCaptcha('img#auth-captcha-image, img[alt="captcha"], img[src*="captcha"]', 'input#auth-captcha-guess, input[name="cvf_captcha_input"], input[name="field-keywords"]');
                 if ($captcha_inputted == false) {
                     $this->processCaptcha('img#auth-captcha-image', 'input#auth-captcha-guess');
@@ -187,13 +187,13 @@ class PortalScriptCDP
 
 
 
-            if ($this->exts->exists('form#auth-account-fixup-phone-form a#ap-account-fixup-phone-skip-link')) {
+            if ($this->isExists('form#auth-account-fixup-phone-form a#ap-account-fixup-phone-skip-link')) {
                 $this->exts->moveToElementAndClick('form#auth-account-fixup-phone-form a#ap-account-fixup-phone-skip-link');
                 sleep(2);
             }
         }
 
-        if ($this->exts->exists('button.full-page-account-switcher-account-details')) {
+        if ($this->isExists('button.full-page-account-switcher-account-details')) {
             // This portal is for Germany so select UK first, else select default
             $target_selection = $this->exts->getElementByText('button.full-page-account-switcher-account-details', ['Germany', 'Deutschland', 'Allemagne'], null, true);
             if ($target_selection == null) {
@@ -209,9 +209,9 @@ class PortalScriptCDP
             if ($target_selection != null) {
                 $this->exts->click_element($target_selection);
             }
-            sleep(1);
-            if ($this->exts->exists('button.kat-button--primary:not([disabled])')) {
-                $this->exts->moveToElementAndClick('button.kat-button--primary:not([disabled])');
+            sleep(4);
+            if ($this->isExists('kat-button:not([disabled])')) {
+                $this->exts->moveToElementAndClick('kat-button:not([disabled])');
                 sleep(10);
             } else {
                 $this->exts->account_not_ready();
@@ -219,7 +219,7 @@ class PortalScriptCDP
         }
 
         $this->waitFor('[class*="awsui_footer--stuck_"] > div >div> div:nth-child(1) button', 10);
-        if ($this->exts->exists('[class*="awsui_footer--stuck_"] > div >div> div:nth-child(1) button')) {
+        if ($this->isExists('[class*="awsui_footer--stuck_"] > div >div> div:nth-child(1) button')) {
             $this->exts->click_element('[class*="awsui_footer--stuck_"] > div >div> div:nth-child(1) button');
         }
 
@@ -228,7 +228,7 @@ class PortalScriptCDP
             sleep(3);
             $this->exts->log(__FUNCTION__ . '::User logged in');
             $this->exts->capture("3-login-success");
-            if ($this->exts->exists('button.full-page-account-switcher-account-details')) {
+            if ($this->isExists('button.full-page-account-switcher-account-details')) {
                 // This portal is for Germany so select UK first, else select default
                 $target_selection = $this->exts->getElementByText('button.full-page-account-switcher-account-details', ['Germany', 'Deutschland', 'Allemagne'], null, true);
                 if ($target_selection == null) {
@@ -245,7 +245,7 @@ class PortalScriptCDP
                     $this->exts->click_element($target_selection);
                 }
                 sleep(1);
-                if ($this->exts->exists('button.kat-button--primary:not([disabled])')) {
+                if ($this->isExists('button.kat-button--primary:not([disabled])')) {
                     $this->exts->moveToElementAndClick('button.kat-button--primary:not([disabled])');
                     sleep(10);
                 } else {
@@ -280,7 +280,7 @@ class PortalScriptCDP
                 stripos($OtpPageError, strtolower("Your One Time Password (OTP) has expired. Please request another from the ‘Didn't receive the One Time Password?’ link below.")) !== false
             ) {
                 $this->exts->loginFailure(1);
-            } else if ($this->exts->exists('form[name="forgotPassword"]')) {
+            } else if ($this->isExists('form[name="forgotPassword"]')) {
                 $this->exts->account_not_ready();
             } else if ($this->exts->urlContains('/forgotpassword/reverification')) {
                 $this->exts->account_not_ready();
@@ -291,7 +291,7 @@ class PortalScriptCDP
     }
     private function checkFillLogin()
     {
-        if ($this->exts->exists($this->password_selector)) {
+        if ($this->isExists($this->password_selector)) {
             sleep(3);
             $this->exts->capture("2-login-page");
 
@@ -302,13 +302,13 @@ class PortalScriptCDP
             $this->exts->moveToElementAndClick('input#continue');
             sleep(10);
 
-            if ($this->exts->exists($this->password_selector)) {
+            if ($this->isExists($this->password_selector)) {
                 $this->exts->log("Enter Password");
                 $this->exts->moveToElementAndType($this->password_selector, $this->password);
                 sleep(1);
                 $this->exts->moveToElementAndClick('form[name="signIn"] input[name="rememberMe"]:not(:checked)');
 
-                if ($this->exts->exists('input#auth-captcha-guess, input[name="cvf_captcha_input"], input[name="field-keywords"]')) {
+                if ($this->isExists('input#auth-captcha-guess, input[name="cvf_captcha_input"], input[name="field-keywords"]')) {
                     $captcha_inputted = $this->processCaptcha('img#auth-captcha-image, img[alt="captcha"], img[src*="captcha"]', 'input#auth-captcha-guess, input[name="cvf_captcha_input"], input[name="field-keywords"]');
                     if ($captcha_inputted == false) {
                         $this->processCaptcha('img#auth-captcha-image', 'input#auth-captcha-guess');
@@ -318,12 +318,12 @@ class PortalScriptCDP
                 $this->exts->moveToElementAndClick($this->submit_login_selector);
                 sleep(3);
                 $this->waitFor('#auth-error-message-box', 7);
-                if ($this->exts->exists('#auth-error-message-box')) {
+                if ($this->isExists('#auth-error-message-box')) {
                     $this->exts->loginFailure(1);
                 }
             }
 
-            if ($this->exts->exists('input#auth-captcha-guess, input[name="cvf_captcha_input"], input[name="field-keywords"]')) {
+            if ($this->isExists('input#auth-captcha-guess, input[name="cvf_captcha_input"], input[name="field-keywords"]')) {
                 $captcha_inputted = $this->processCaptcha('img#auth-captcha-image, img[alt="captcha"], img[src*="captcha"]', 'input#auth-captcha-guess, input[name="cvf_captcha_input"], input[name="field-keywords"]');
                 if ($captcha_inputted == false) {
                     $this->processCaptcha('img#auth-captcha-image', 'input#auth-captcha-guess');
@@ -343,20 +343,34 @@ class PortalScriptCDP
         }
     }
 
+    private function isExists($selector = '')
+    {
+        $safeSelector = addslashes($selector);
+        $this->exts->log('Element:: ' . $safeSelector);
+        $isElement = $this->exts->execute_javascript('!!document.querySelector("' . $safeSelector . '")');
+        if ($isElement) {
+            $this->exts->log('Element Found');
+            return true;
+        } else {
+            $this->exts->log('Element not Found');
+            return false;
+        }
+    }
+
     private function checkFillTwoFactor()
     {
         $this->exts->capture("2.0-two-factor-checking");
-        if ($this->exts->exists('#auth-select-device-form .auth-TOTP [name="otpDeviceContext"]')) { // Authenticator
+        if ($this->isExists('#auth-select-device-form .auth-TOTP [name="otpDeviceContext"]')) { // Authenticator
             $this->exts->moveToElementAndClick('#auth-select-device-form .auth-TOTP [name="otpDeviceContext"]');
             sleep(2);
             $this->exts->moveToElementAndClick('input#auth-send-code');
             sleep(5);
-        } else if ($this->exts->exists('div.auth-SMS input[type="radio"]')) {
+        } else if ($this->isExists('div.auth-SMS input[type="radio"]')) {
             $this->exts->moveToElementAndClick('div.auth-SMS input[type="radio"]:not(:checked)');
             sleep(2);
             $this->exts->moveToElementAndClick('input#auth-send-code');
             sleep(5);
-        } else if ($this->exts->exists('div.auth-TOTP input[type="radio"]')) {
+        } else if ($this->isExists('div.auth-TOTP input[type="radio"]')) {
             $this->exts->moveToElementAndClick('div.auth-TOTP input[type="radio"]:not(:checked)');
             sleep(2);
             $this->exts->moveToElementAndClick('input#auth-send-code');
@@ -368,7 +382,7 @@ class PortalScriptCDP
             sleep(5);
         }
 
-        if ($this->exts->exists('input[name="otpCode"]:not([type="hidden"]), input[name="code"], input#input-box-otp')) {
+        if ($this->isExists('input[name="otpCode"]:not([type="hidden"]), input[name="code"], input#input-box-otp')) {
             $two_factor_selector = 'input[name="otpCode"]:not([type="hidden"]), input[name="code"], input#input-box-otp';
             $two_factor_message_selector = '#auth-mfa-form h1 + p, #verification-code-form > .a-spacing-small > .a-spacing-none, #channelDetailsForOtp';
             $two_factor_submit_selector = '#auth-signin-button, #verification-code-form input[type="submit"]';
@@ -398,15 +412,15 @@ class PortalScriptCDP
                 $this->exts->type_key_by_xdotool('Return');
                 sleep(8);
 
-                if ($this->exts->exists('input[name="otpCode"]:not([type="hidden"]), input[id="input-box-otp"]')) {
+                if ($this->isExists('input[name="otpCode"]:not([type="hidden"]), input[id="input-box-otp"]')) {
                     $this->exts->moveToElementAndType('input[name="otpCode"]:not([type="hidden"]), input[id="input-box-otp"]', $two_factor_code);
                     $this->exts->capture("2.2-two-factor-filled-" . $this->exts->two_factor_attempts);
-                } else if ($this->exts->exists('input[name="otc-1"]')) {
+                } else if ($this->isExists('input[name="otc-1"]')) {
                     $this->exts->moveToElementAndClick('input[name="otc-1"]');
                     $this->exts->capture("2.2-two-factor-filled-" . $this->exts->two_factor_attempts);
                     $this->exts->type_text_by_xdotool($two_factor_code);
                 }
-                if ($this->exts->exists('label[for="auth-mfa-remember-device"] input[name="rememberDevice"]:not(:checked)')) {
+                if ($this->isExists('label[for="auth-mfa-remember-device"] input[name="rememberDevice"]:not(:checked)')) {
                     $this->exts->moveToElementAndClick('label[for="auth-mfa-remember-device"]');
                 }
 
@@ -414,7 +428,7 @@ class PortalScriptCDP
                 $this->exts->log("checkFillTwoFactor: Clicking submit button.");
                 sleep(1);
 
-                if ($this->exts->exists('#cvf-submit-otp-button input[type="submit"]')) {
+                if ($this->isExists('#cvf-submit-otp-button input[type="submit"]')) {
                     $this->exts->moveToElementAndClick('#cvf-submit-otp-button input[type="submit"]');
                 } else {
                     $this->exts->moveToElementAndClick($two_factor_submit_selector);
@@ -425,7 +439,7 @@ class PortalScriptCDP
             }
 
             // Huy added this 2022-12 Retry if incorrect code inputted
-            if ($this->exts->exists($two_factor_selector)) {
+            if ($this->isExists($two_factor_selector)) {
                 if (
                     stripos($this->exts->extract('#auth-error-message-box .a-alert-content', null, 'innerText'), 'Der eingegebene Code ist ung') !== false ||
                     stripos($this->exts->extract('#auth-error-message-box .a-alert-content', null, 'innerText'), 'you entered is not valid') !== false
@@ -439,7 +453,7 @@ class PortalScriptCDP
                         if (!empty($two_factor_code)) {
                             $this->exts->log("Retry 2FA: Entering two_factor_code: " . $two_factor_code);
                             $this->exts->moveToElementAndType($two_factor_selector, $two_factor_code);
-                            if ($this->exts->exists('label[for="auth-mfa-remember-device"] input[name="rememberDevice"]:not(:checked)')) {
+                            if ($this->isExists('label[for="auth-mfa-remember-device"] input[name="rememberDevice"]:not(:checked)')) {
                                 $this->exts->moveToElementAndClick('label[for="auth-mfa-remember-device"]');
                             }
                             sleep(1);
@@ -452,7 +466,7 @@ class PortalScriptCDP
                     }
                 }
             }
-        } else if ($this->exts->exists('[name="transactionApprovalStatus"], form[action*="/approval/poll"]')) {
+        } else if ($this->isExists('[name="transactionApprovalStatus"], form[action*="/approval/poll"]')) {
             $this->exts->log("Two factor page found.");
             $this->exts->capture("2.1-two-factor");
             $message_selector = '.transaction-approval-word-break, #channelDetails, #channelDetailsWithImprovedLayout';
@@ -501,7 +515,7 @@ class PortalScriptCDP
     {
         $this->waitFor('img#auth-captcha-image, img[alt="captcha"], img[src*="captcha"]', 50);
         $this->exts->log("--IMAGE CAPTCHA--");
-        if ($this->exts->exists($captcha_image_selector)) {
+        if ($this->isExists($captcha_image_selector)) {
             $image_path = $this->exts->captureElement($this->exts->process_uid, $captcha_image_selector);
             $source_image = imagecreatefrompng($image_path);
             imagejpeg($source_image, $this->exts->screen_capture_location . $this->exts->process_uid . '.jpg', 90);
@@ -566,12 +580,12 @@ class PortalScriptCDP
             $this->exts->log('Waiting for login.....');
             sleep(10);
         }
-        return $this->exts->exists($loginSuccessSelector);
+        return $this->isExists($loginSuccessSelector);
     }
 
     private function doAfterLogin()
     {
-        if ($this->exts->exists('#remind-me-later span.a-button')) {
+        if ($this->isExists('#remind-me-later span.a-button')) {
             $this->exts->moveToElementAndClick('#remind-me-later span.a-button');
             sleep(10);
         }
@@ -630,8 +644,8 @@ class PortalScriptCDP
                 sleep(15);
                 //$this->exts->changeSelectbox('select#sc-mkt-picker-switcher-select', $marketplace_option);
                 $this->exts->execute_javascript('
-                $("select#sc-mkt-picker-switcher-select").val("' . $marketplace_option . '");
-                $("select#sc-mkt-picker-switcher-select").change();');
+            $("select#sc-mkt-picker-switcher-select").val("' . $marketplace_option . '");
+            $("select#sc-mkt-picker-switcher-select").change();');
                 sleep(15);
 
                 if ($this->exts->getElement($this->password_selector) == null) {
@@ -694,7 +708,7 @@ class PortalScriptCDP
                             sleep(15);
                         }
 
-                        if ($this->exts->exists('a[href*="/gp/advertiser/transactions/transactions.html"]')) {
+                        if ($this->isExists('a[href*="/gp/advertiser/transactions/transactions.html"]')) {
                             $this->exts->moveToElementAndClick('a[href*="/gp/advertiser/transactions/transactions.html"]');
                             $this->downloadAdvertiserInvoices();
                         } else {
@@ -706,7 +720,7 @@ class PortalScriptCDP
                     $this->exts->capture("login-page-after-marketplace-change-" . $marketplace_option);
                 }
             }
-        } else if ($this->exts->exists('#partner-switcher button.dropdown-button, button.partner-dropdown-button')) {
+        } else if ($this->isExists('#partner-switcher button.dropdown-button, button.partner-dropdown-button')) {
             $merchant_links = array();
             $this->exts->moveToElementAndClick('#partner-switcher button.dropdown-button, button.partner-dropdown-button');
             sleep(1);
@@ -749,14 +763,14 @@ class PortalScriptCDP
                 $this->exts->update_process_lock();
                 $partner_arrow_selector = '#partner-switcher .partner-level label.dropdown-arrow[for="' . $merchant['partner_id'] . '"]';
                 $merchant_selector = '#partner-switcher .partner-level label.partner-label[for="' . $merchant['partner_id'] . '"] + ul li a#' . $merchant['merchant_id'];
-                if (!$this->exts->exists('#partner-switcher button.dropdown-button, button.partner-dropdown-button')) {
+                if (!$this->isExists('#partner-switcher button.dropdown-button, button.partner-dropdown-button')) {
                     $this->exts->openUrl('https://sellercentral.amazon.de/home');
                     sleep(10);
                 }
                 $this->exts->log('SWITCH to Merchant Selector - ' . $merchant_selector);
                 $this->exts->moveToElementAndClick('#partner-switcher button.dropdown-button, button.partner-dropdown-button');
                 sleep(1);
-                if (!$this->exts->exists($merchant_selector)) {
+                if (!$this->isExists($merchant_selector)) {
                     // If expanding needed, click partner to expand all sub-merchants
                     $this->exts->moveToElementAndClick($partner_arrow_selector);
                     sleep(3);
@@ -820,14 +834,14 @@ class PortalScriptCDP
                 if ((int)@$this->no_advertising_bills != 1) {
                     $this->exts->openUrl('https://' . $Urldomain . '/payments/dashboard/index.html');
                     sleep(10);
-                    if ($this->exts->exists('a[href*="/advertiser/transactions/"][role="tab"], [tab-id="ADS"]')) {
+                    if ($this->isExists('a[href*="/advertiser/transactions/"][role="tab"], [tab-id="ADS"]')) {
                         $this->exts->log('GO TO Advertising..');
                         $this->exts->moveToElementAndClick('a[href*="/advertiser/transactions/"][role="tab"], [tab-id="ADS"]');
                         sleep(5);
                         if ($this->exts->getElement($this->username_selector) != null || $this->exts->getElement($this->password_selector) != null) {
                             $this->checkFillLogin();
                             $this->checkFillTwoFactor();
-                            if ($this->exts->exists('form#auth-account-fixup-phone-form a#ap-account-fixup-phone-skip-link')) {
+                            if ($this->isExists('form#auth-account-fixup-phone-form a#ap-account-fixup-phone-skip-link')) {
                                 $this->exts->moveToElementAndClick('form#auth-account-fixup-phone-form a#ap-account-fixup-phone-skip-link');
                                 sleep(2);
                             }
@@ -841,7 +855,7 @@ class PortalScriptCDP
                 }
 
                 sleep(5);
-                if (!$this->exts->exists('#partner-switcher button.dropdown-button, button.partner-dropdown-button')) {
+                if (!$this->isExists('#partner-switcher button.dropdown-button, button.partner-dropdown-button')) {
                     $this->exts->openUrl($market_place_homepage);
                     sleep(10);
                 }
@@ -867,7 +881,7 @@ class PortalScriptCDP
             }
 
             $advertDocsExists = false;
-            if ($this->exts->exists('a[href*="/gp/advertiser/transactions/transactions.html"]')) {
+            if ($this->isExists('a[href*="/gp/advertiser/transactions/transactions.html"]')) {
                 $advertDocsExists = true;
             }
             if ((int)@$this->transaction_invoices == 1) {
@@ -906,12 +920,12 @@ class PortalScriptCDP
         $this->exts->log(__FUNCTION__);
         sleep(3);
         $this->exts->waitTillAnyPresent(['table > tbody > tr a[href*="/transaction-details.html?"]', '.transactions-table-content [role="row"]']);
-        if ($this->exts->exists('[aria-modal="true"] button[data-action="close"]')) {
+        if ($this->isExists('[aria-modal="true"] button[data-action="close"]')) {
             $this->exts->moveToElementAndClick('[aria-modal="true"] button[data-action="close"]');
         }
         $this->exts->capture("4-transaction-page");
         // 2021-12, maybe code in below if block is no longer work since this site changed, but still keep it as Mukesh request.
-        if ($this->exts->exists('table > tbody > tr a[href*="/transaction-details.html?"]')) {
+        if ($this->isExists('table > tbody > tr a[href*="/transaction-details.html?"]')) {
             $invoices = [];
             $rows = $this->exts->getElements('table > tbody > tr');
             $this->exts->log("Number of transactions rows - " . count($rows));
@@ -1005,10 +1019,10 @@ class PortalScriptCDP
                 }
                 sleep(5);
                 $this->exts->executeSafeScript('
-    document.querySelectorAll(\'div#container div#predictive-help\')[0].remove();
-    document.querySelectorAll(\'div#sc-top-nav\')[0].remove();
-    document.querySelectorAll(\'div#sc-footer-container\')[0].remove();
-    document.querySelectorAll(\'div#left-side\')[0].setAttribute("style","float:left; text-align:left; width:100%;");
+document.querySelectorAll(\'div#container div#predictive-help\')[0].remove();
+document.querySelectorAll(\'div#sc-top-nav\')[0].remove();
+document.querySelectorAll(\'div#sc-footer-container\')[0].remove();
+document.querySelectorAll(\'div#left-side\')[0].setAttribute("style","float:left; text-align:left; width:100%;");
 ');
 
                 $downloaded_file = $this->exts->download_current($invoiceFileName, 3);
@@ -1038,13 +1052,13 @@ class PortalScriptCDP
                 }
                 $pageCount++;
                 $this->exts->executeSafeScript('
-    document.querySelectorAll(\'.currentpagination + a\')[0].click();
+document.querySelectorAll(\'.currentpagination + a\')[0].click();
 ');
                 //$this->exts->moveToElementAndClick('.currentpagination + a');
                 sleep(5);
                 $this->downloadTransaction($pageCount);
             }
-        } else if ($this->exts->exists('.transactions-table-content [role="row"]')) {
+        } else if ($this->isExists('.transactions-table-content [role="row"]')) {
             // Huy added 2021-12
             for ($paging_count = 1; $paging_count < 100; $paging_count++) {
                 $invoices = [];
@@ -1098,23 +1112,23 @@ class PortalScriptCDP
                             }
                             sleep(1);
                             $this->waitFor('#sc-content-container .transaction-details-body-section .event-details-body');
-                            if ($this->exts->exists('#sc-content-container .transaction-details-body-section .event-details-body')) {
+                            if ($this->isExists('#sc-content-container .transaction-details-body-section .event-details-body')) {
                                 // Clear some alert, popup..etc
                                 $this->exts->executeSafeScript('
-                    if(document.querySelector("kat-alert") != null){
-                    document.querySelector("kat-alert").shadowRoot.querySelector("[part=alert-dismiss-button]").click();
-                    }
-                ');
+                if(document.querySelector("kat-alert") != null){
+                document.querySelector("kat-alert").shadowRoot.querySelector("[part=alert-dismiss-button]").click();
+                }
+            ');
                                 $this->exts->moveToElementAndClick('.katHmdCancelBtn');
                                 // END clearing alert..
 
                                 // Capture page if detail displayed
                                 $this->exts->executeSafeScript('
-                    var divs = document.querySelectorAll("body > div > *:not(#sc-content-container)");
-                    for( var i = 0; i < divs.length; i++){
-                        divs[i].style.display = "none";
-                    }
-                ');
+                var divs = document.querySelectorAll("body > div > *:not(#sc-content-container)");
+                for( var i = 0; i < divs.length; i++){
+                    divs[i].style.display = "none";
+                }
+            ');
 
                                 $downloaded_file = $this->exts->download_current($invoiceFileName, 0);
                                 if (trim($downloaded_file) != '' && file_exists($downloaded_file)) {
@@ -1137,13 +1151,13 @@ class PortalScriptCDP
                 // Process next page
                 // This page using shadow element, We must process via JS
                 $is_next = $this->exts->executeSafeScript('
-                    try {
-                    document.querySelector("kat-pagination").shadowRoot.querySelector("[part=pagination-nav-right]:not(.end)").click();
-                    return true;
-                    } catch(ex){
-                    return false;
-                    }
-                ');
+                try {
+                document.querySelector("kat-pagination").shadowRoot.querySelector("[part=pagination-nav-right]:not(.end)").click();
+                return true;
+                } catch(ex){
+                return false;
+                }
+            ');
                 if ($is_next && $this->exts->config_array["restrictPages"] == '0') {
                     sleep(7);
                 } else {
@@ -1213,13 +1227,13 @@ class PortalScriptCDP
         sleep(10);
         $date_format = "m.d.Y";
         $startDate = date($date_format, strtotime('-7 days'));
-        if ($this->exts->exists('select[name="reportType"]') && $pageCount == 1) {
+        if ($this->isExists('select[name="reportType"]') && $pageCount == 1) {
             //$this->exts->changeSelectbox('select[name="reportType"]', "VAT Invoices");
             $this->exts->execute_javascript('
-                $("select[name=\'reportType\']").val("VAT Invoices");
-                $("select[name=\'reportType\']").change();');
+            $("select[name=\'reportType\']").val("VAT Invoices");
+            $("select[name=\'reportType\']").change();');
             sleep(10);
-            if ($this->exts->exists('li#vtr-start-date2 input#vtr-start-date-calendar2')) {
+            if ($this->isExists('li#vtr-start-date2 input#vtr-start-date-calendar2')) {
                 $currentStart_date = $this->exts->getElement('li#vtr-start-date2 input#vtr-start-date-calendar2')->getAttribute('aria-label');
 
                 if (stripos($currentStart_date, "m/d") !== false || stripos($currentStart_date, "d/y") !== false) {
@@ -1355,11 +1369,11 @@ class PortalScriptCDP
         $this->exts->log(__FUNCTION__);
         sleep(3);
         $this->exts->waitTillAnyPresent(['table > tbody > tr a[href*="/settlement-summary"] a[href*="/payments/reports/download?"]', 'kat-data-table tbody tr kat-link[href*="/detail"], kat-data-table tbody tr .dashboard-link kat-link[href*="/"]']);
-        if ($this->exts->exists('[aria-modal="true"] button[data-action="close"]')) {
+        if ($this->isExists('[aria-modal="true"] button[data-action="close"]')) {
             $this->exts->moveToElementAndClick('[aria-modal="true"] button[data-action="close"]');
         }
         $this->exts->capture("4-statements-page");
-        if ($this->exts->exists('table > tbody > tr a[href*="/settlement-summary"]')) {
+        if ($this->isExists('table > tbody > tr a[href*="/settlement-summary"]')) {
             $invoices = [];
             $rows = $this->exts->getElements('table > tbody > tr');
             foreach ($rows as $row) {
@@ -1446,14 +1460,14 @@ class PortalScriptCDP
 
                 if (count($this->exts->getElements('#printableSections')) > 0) {
                     $this->exts->executeSafeScript('
-                    var printableView = document.getElementById("printableSections");
-                    var allLinks = document.getElementsByTagName("link");
-                    var allStyles = document.getElementsByTagName("style");
-                    var printableHTML = Array.from(allLinks).map(link => link.outerHTML).join("")
-                                        + Array.from(allStyles).map(link => link.outerHTML).join("")
-                                        + printableView.outerHTML;
-                    document.body.innerHTML = printableHTML;
-                ');
+                var printableView = document.getElementById("printableSections");
+                var allLinks = document.getElementsByTagName("link");
+                var allStyles = document.getElementsByTagName("style");
+                var printableHTML = Array.from(allLinks).map(link => link.outerHTML).join("")
+                                    + Array.from(allStyles).map(link => link.outerHTML).join("")
+                                    + printableView.outerHTML;
+                document.body.innerHTML = printableHTML;
+            ');
 
                     $downloaded_file = $this->exts->download_current($invoiceFileName, 3);
                     if (trim($downloaded_file) != '' && file_exists($downloaded_file)) {
@@ -1464,10 +1478,10 @@ class PortalScriptCDP
                     }
                 } else if (count($this->exts->getElements('#sc-navbar-container')) > 0) {
                     $this->exts->executeSafeScript('
-                    document.querySelectorAll("#sc-navbar-container")[0].remove();
-                    document.querySelectorAll("article.dashboard-header")[0].remove();
-                    document.querySelectorAll(".sc-footer")[0].remove();
-                ');
+                document.querySelectorAll("#sc-navbar-container")[0].remove();
+                document.querySelectorAll("article.dashboard-header")[0].remove();
+                document.querySelectorAll(".sc-footer")[0].remove();
+            ');
 
                     $downloaded_file = $this->exts->download_current($invoiceFileName, 3);
                     if (trim($downloaded_file) != '' && file_exists($downloaded_file)) {
@@ -1497,12 +1511,12 @@ class PortalScriptCDP
                 $pageCount++;
                 //$this->exts->moveToElementAndClick('.currentpagination + a');
                 $this->exts->executeSafeScript('
-    document.querySelectorAll(\'.currentpagination + a\')[0].click();
+document.querySelectorAll(\'.currentpagination + a\')[0].click();
 ');
                 sleep(15);
                 $this->downloadStatements($pageCount);
             }
-        } else if ($this->exts->exists('kat-data-table tbody tr kat-link[href*="/detail"], kat-data-table tbody tr .dashboard-link kat-link[href*="/"]')) { // updated 202203
+        } else if ($this->isExists('kat-data-table tbody tr kat-link[href*="/detail"], kat-data-table tbody tr .dashboard-link kat-link[href*="/"]')) { // updated 202203
             // Huy added this 2021-12
             if ($this->exts->config_array["restrictPages"] == '0') {
                 $currentPageHeight = 0;
@@ -1517,23 +1531,23 @@ class PortalScriptCDP
 
             // It using shadow root, so collect invoice detail by JS
             $invoices = $this->exts->executeSafeScript('
-                var data = [];
-                var trs = document.querySelectorAll("kat-data-table tbody tr .dashboard-link kat-link[href*=groupId]");
+            var data = [];
+            var trs = document.querySelectorAll("kat-data-table tbody tr .dashboard-link kat-link[href*=groupId]");
 
-                // Skip first row because it is current period, do not get it
-                for (var i = 1; i < trs.length; i ++) {
-                var link = trs[i].shadowRoot.querySelector("a");
-                var url = link.href;
+            // Skip first row because it is current period, do not get it
+            for (var i = 1; i < trs.length; i ++) {
+            var link = trs[i].shadowRoot.querySelector("a");
+            var url = link.href;
 
-                data.push({
-                invoiceName: url.split("groupId=").pop().split("&")[0],
-                invoiceDate: "",
-                invoiceAmount: "",
-                invoiceUrl: url
-                });
-                }
-                return data;
-                ');
+            data.push({
+            invoiceName: url.split("groupId=").pop().split("&")[0],
+            invoiceDate: "",
+            invoiceAmount: "",
+            invoiceUrl: url
+            });
+            }
+            return data;
+            ');
             // Download all invoices
             $this->exts->log('Statements found: ' . count($invoices));
             foreach ($invoices as $invoice) {
@@ -1558,13 +1572,13 @@ class PortalScriptCDP
                         $this->checkFillTwoFactor();
                     }
 
-                    if ($this->exts->exists('.dashboard-content #print-this-page-link')) {
+                    if ($this->isExists('.dashboard-content #print-this-page-link')) {
                         // Clear some alert, popup..etc
                         $this->exts->executeSafeScript('
-                    if(document.querySelector("kat-alert") != null){
-                    document.querySelector("kat-alert").shadowRoot.querySelector("[part=alert-dismiss-button]").click();
-                    }
-                ');
+                if(document.querySelector("kat-alert") != null){
+                document.querySelector("kat-alert").shadowRoot.querySelector("[part=alert-dismiss-button]").click();
+                }
+            ');
                         $this->exts->moveToElementAndClick('.katHmdCancelBtn');
                         // END clearing alert..
 
@@ -1592,7 +1606,7 @@ class PortalScriptCDP
         $this->exts->log(__FUNCTION__);
         sleep(15); // button not found for few users
         $this->waitFor('button[value="paid"]');
-        if ($this->exts->exists('button[class*="CloseButton"]')) {
+        if ($this->isExists('button[class*="CloseButton"]')) {
             $this->exts->moveToElementAndClick('button[class*="CloseButton"]');
             sleep(2);
         }
@@ -1681,7 +1695,7 @@ class PortalScriptCDP
             }
 
             // Process next page
-            if ($this->exts->exists('button#bi-nav-table-next-btn:not([disabled])')) {
+            if ($this->isExists('button#bi-nav-table-next-btn:not([disabled])')) {
                 $this->exts->moveToElementAndClick('button#bi-nav-table-next-btn:not([disabled])');
                 sleep(10);
             } else {
@@ -1769,7 +1783,7 @@ $("select[name=\'myo-table-results-per-page\']").change();');
             }
 
             // Next page
-            if ($this->exts->exists('.footer .pagination-controls .a-pagination .a-last:not(.a-disabled) a')) {
+            if ($this->isExists('.footer .pagination-controls .a-pagination .a-last:not(.a-disabled) a')) {
                 $this->exts->moveToElementAndClick('.footer .pagination-controls .a-pagination .a-last:not(.a-disabled) a');
                 sleep(15);
             } else {

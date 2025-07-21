@@ -53,13 +53,13 @@ private function initPortal($count)
         // $this->exts->clearCookies();
         $this->exts->openUrl($this->baseUrl);
         sleep(10);
-        if (!$this->exts->exists($this->password_selector)) {
+        if (!$this->isExists($this->password_selector)) {
             $this->exts->capture("2-login-exception");
             $this->exts->clearCookies();
             $this->exts->openUrl($this->baseUrl);
             sleep(10);
         }
-        if ($this->exts->exists('input#auth-captcha-guess, input[name="cvf_captcha_input"], input[name="field-keywords"]')) {
+        if ($this->isExists('input#auth-captcha-guess, input[name="cvf_captcha_input"], input[name="field-keywords"]')) {
             $captcha_inputted = $this->processCaptcha('img#auth-captcha-image, img[alt="captcha"], img[src*="captcha"]', 'input#auth-captcha-guess, input[name="cvf_captcha_input"], input[name="field-keywords"]');
             if ($captcha_inputted == false) {
                 $this->processCaptcha('img#auth-captcha-image', 'input#auth-captcha-guess');
@@ -126,13 +126,13 @@ private function initPortal($count)
 
 
 
-        if ($this->exts->exists('form#auth-account-fixup-phone-form a#ap-account-fixup-phone-skip-link')) {
+        if ($this->isExists('form#auth-account-fixup-phone-form a#ap-account-fixup-phone-skip-link')) {
             $this->exts->moveToElementAndClick('form#auth-account-fixup-phone-form a#ap-account-fixup-phone-skip-link');
             sleep(2);
         }
     }
 
-    if ($this->exts->exists('button.full-page-account-switcher-account-details')) {
+    if ($this->isExists('button.full-page-account-switcher-account-details')) {
         // This portal is for Germany so select UK first, else select default
         $target_selection = $this->exts->getElementByText('button.full-page-account-switcher-account-details', ['Germany', 'Deutschland', 'Allemagne'], null, true);
         if ($target_selection == null) {
@@ -148,9 +148,9 @@ private function initPortal($count)
         if ($target_selection != null) {
             $this->exts->click_element($target_selection);
         }
-        sleep(1);
-        if ($this->exts->exists('button.kat-button--primary:not([disabled])')) {
-            $this->exts->moveToElementAndClick('button.kat-button--primary:not([disabled])');
+        sleep(4);
+        if ($this->isExists('kat-button:not([disabled])')) {
+            $this->exts->moveToElementAndClick('kat-button:not([disabled])');
             sleep(10);
         } else {
             $this->exts->account_not_ready();
@@ -158,7 +158,7 @@ private function initPortal($count)
     }
 
     $this->waitFor('[class*="awsui_footer--stuck_"] > div >div> div:nth-child(1) button', 10);
-    if ($this->exts->exists('[class*="awsui_footer--stuck_"] > div >div> div:nth-child(1) button')) {
+    if ($this->isExists('[class*="awsui_footer--stuck_"] > div >div> div:nth-child(1) button')) {
         $this->exts->click_element('[class*="awsui_footer--stuck_"] > div >div> div:nth-child(1) button');
     }
 
@@ -167,7 +167,7 @@ private function initPortal($count)
         sleep(3);
         $this->exts->log(__FUNCTION__ . '::User logged in');
         $this->exts->capture("3-login-success");
-        if ($this->exts->exists('button.full-page-account-switcher-account-details')) {
+        if ($this->isExists('button.full-page-account-switcher-account-details')) {
             // This portal is for Germany so select UK first, else select default
             $target_selection = $this->exts->getElementByText('button.full-page-account-switcher-account-details', ['Germany', 'Deutschland', 'Allemagne'], null, true);
             if ($target_selection == null) {
@@ -184,7 +184,7 @@ private function initPortal($count)
                 $this->exts->click_element($target_selection);
             }
             sleep(1);
-            if ($this->exts->exists('button.kat-button--primary:not([disabled])')) {
+            if ($this->isExists('button.kat-button--primary:not([disabled])')) {
                 $this->exts->moveToElementAndClick('button.kat-button--primary:not([disabled])');
                 sleep(10);
             } else {
@@ -195,6 +195,7 @@ private function initPortal($count)
         if (!empty($this->exts->config_array['allow_login_success_request'])) {
             $this->exts->triggerLoginSuccess();
         }
+
         $this->exts->success();
     } else {
         $this->exts->log(__FUNCTION__ . '::Use login failed ' . $this->exts->getUrl());
@@ -217,7 +218,7 @@ private function initPortal($count)
             stripos($OtpPageError, strtolower("Your One Time Password (OTP) has expired. Please request another from the ‘Didn't receive the One Time Password?’ link below.")) !== false
         ) {
             $this->exts->loginFailure(1);
-        } else if ($this->exts->exists('form[name="forgotPassword"]')) {
+        } else if ($this->isExists('form[name="forgotPassword"]')) {
             $this->exts->account_not_ready();
         } else if ($this->exts->urlContains('/forgotpassword/reverification')) {
             $this->exts->account_not_ready();
@@ -228,7 +229,7 @@ private function initPortal($count)
 }
 private function checkFillLogin()
 {
-    if ($this->exts->exists($this->password_selector)) {
+    if ($this->isExists($this->password_selector)) {
         sleep(3);
         $this->exts->capture("2-login-page");
 
@@ -239,13 +240,13 @@ private function checkFillLogin()
         $this->exts->moveToElementAndClick('input#continue');
         sleep(10);
 
-        if ($this->exts->exists($this->password_selector)) {
+        if ($this->isExists($this->password_selector)) {
             $this->exts->log("Enter Password");
             $this->exts->moveToElementAndType($this->password_selector, $this->password);
             sleep(1);
             $this->exts->moveToElementAndClick('form[name="signIn"] input[name="rememberMe"]:not(:checked)');
 
-            if ($this->exts->exists('input#auth-captcha-guess, input[name="cvf_captcha_input"], input[name="field-keywords"]')) {
+            if ($this->isExists('input#auth-captcha-guess, input[name="cvf_captcha_input"], input[name="field-keywords"]')) {
                 $captcha_inputted = $this->processCaptcha('img#auth-captcha-image, img[alt="captcha"], img[src*="captcha"]', 'input#auth-captcha-guess, input[name="cvf_captcha_input"], input[name="field-keywords"]');
                 if ($captcha_inputted == false) {
                     $this->processCaptcha('img#auth-captcha-image', 'input#auth-captcha-guess');
@@ -255,12 +256,12 @@ private function checkFillLogin()
             $this->exts->moveToElementAndClick($this->submit_login_selector);
             sleep(3);
             $this->waitFor('#auth-error-message-box', 7);
-            if ($this->exts->exists('#auth-error-message-box')) {
+            if ($this->isExists('#auth-error-message-box')) {
                 $this->exts->loginFailure(1);
             }
         }
 
-        if ($this->exts->exists('input#auth-captcha-guess, input[name="cvf_captcha_input"], input[name="field-keywords"]')) {
+        if ($this->isExists('input#auth-captcha-guess, input[name="cvf_captcha_input"], input[name="field-keywords"]')) {
             $captcha_inputted = $this->processCaptcha('img#auth-captcha-image, img[alt="captcha"], img[src*="captcha"]', 'input#auth-captcha-guess, input[name="cvf_captcha_input"], input[name="field-keywords"]');
             if ($captcha_inputted == false) {
                 $this->processCaptcha('img#auth-captcha-image', 'input#auth-captcha-guess');
@@ -280,20 +281,34 @@ public function waitFor($selector, $seconds = 7)
     }
 }
 
+private function isExists($selector = '')
+{
+    $safeSelector = addslashes($selector);
+    $this->exts->log('Element:: ' . $safeSelector);
+    $isElement = $this->exts->execute_javascript('!!document.querySelector("' . $safeSelector . '")');
+    if ($isElement) {
+        $this->exts->log('Element Found');
+        return true;
+    } else {
+        $this->exts->log('Element not Found');
+        return false;
+    }
+}
+
 private function checkFillTwoFactor()
 {
     $this->exts->capture("2.0-two-factor-checking");
-    if ($this->exts->exists('#auth-select-device-form .auth-TOTP [name="otpDeviceContext"]')) { // Authenticator
+    if ($this->isExists('#auth-select-device-form .auth-TOTP [name="otpDeviceContext"]')) { // Authenticator
         $this->exts->moveToElementAndClick('#auth-select-device-form .auth-TOTP [name="otpDeviceContext"]');
         sleep(2);
         $this->exts->moveToElementAndClick('input#auth-send-code');
         sleep(5);
-    } else if ($this->exts->exists('div.auth-SMS input[type="radio"]')) {
+    } else if ($this->isExists('div.auth-SMS input[type="radio"]')) {
         $this->exts->moveToElementAndClick('div.auth-SMS input[type="radio"]:not(:checked)');
         sleep(2);
         $this->exts->moveToElementAndClick('input#auth-send-code');
         sleep(5);
-    } else if ($this->exts->exists('div.auth-TOTP input[type="radio"]')) {
+    } else if ($this->isExists('div.auth-TOTP input[type="radio"]')) {
         $this->exts->moveToElementAndClick('div.auth-TOTP input[type="radio"]:not(:checked)');
         sleep(2);
         $this->exts->moveToElementAndClick('input#auth-send-code');
@@ -305,7 +320,7 @@ private function checkFillTwoFactor()
         sleep(5);
     }
 
-    if ($this->exts->exists('input[name="otpCode"]:not([type="hidden"]), input[name="code"], input#input-box-otp')) {
+    if ($this->isExists('input[name="otpCode"]:not([type="hidden"]), input[name="code"], input#input-box-otp')) {
         $two_factor_selector = 'input[name="otpCode"]:not([type="hidden"]), input[name="code"], input#input-box-otp';
         $two_factor_message_selector = '#auth-mfa-form h1 + p, #verification-code-form > .a-spacing-small > .a-spacing-none, #channelDetailsForOtp';
         $two_factor_submit_selector = '#auth-signin-button, #verification-code-form input[type="submit"]';
@@ -335,15 +350,15 @@ private function checkFillTwoFactor()
             $this->exts->type_key_by_xdotool('Return');
             sleep(8);
 
-            if ($this->exts->exists('input[name="otpCode"]:not([type="hidden"]), input[id="input-box-otp"]')) {
+            if ($this->isExists('input[name="otpCode"]:not([type="hidden"]), input[id="input-box-otp"]')) {
                 $this->exts->moveToElementAndType('input[name="otpCode"]:not([type="hidden"]), input[id="input-box-otp"]', $two_factor_code);
                 $this->exts->capture("2.2-two-factor-filled-" . $this->exts->two_factor_attempts);
-            } else if ($this->exts->exists('input[name="otc-1"]')) {
+            } else if ($this->isExists('input[name="otc-1"]')) {
                 $this->exts->moveToElementAndClick('input[name="otc-1"]');
                 $this->exts->capture("2.2-two-factor-filled-" . $this->exts->two_factor_attempts);
                 $this->exts->type_text_by_xdotool($two_factor_code);
             }
-            if ($this->exts->exists('label[for="auth-mfa-remember-device"] input[name="rememberDevice"]:not(:checked)')) {
+            if ($this->isExists('label[for="auth-mfa-remember-device"] input[name="rememberDevice"]:not(:checked)')) {
                 $this->exts->moveToElementAndClick('label[for="auth-mfa-remember-device"]');
             }
 
@@ -351,7 +366,7 @@ private function checkFillTwoFactor()
             $this->exts->log("checkFillTwoFactor: Clicking submit button.");
             sleep(1);
 
-            if ($this->exts->exists('#cvf-submit-otp-button input[type="submit"]')) {
+            if ($this->isExists('#cvf-submit-otp-button input[type="submit"]')) {
                 $this->exts->moveToElementAndClick('#cvf-submit-otp-button input[type="submit"]');
             } else {
                 $this->exts->moveToElementAndClick($two_factor_submit_selector);
@@ -362,7 +377,7 @@ private function checkFillTwoFactor()
         }
 
         // Huy added this 2022-12 Retry if incorrect code inputted
-        if ($this->exts->exists($two_factor_selector)) {
+        if ($this->isExists($two_factor_selector)) {
             if (
                 stripos($this->exts->extract('#auth-error-message-box .a-alert-content', null, 'innerText'), 'Der eingegebene Code ist ung') !== false ||
                 stripos($this->exts->extract('#auth-error-message-box .a-alert-content', null, 'innerText'), 'you entered is not valid') !== false
@@ -376,7 +391,7 @@ private function checkFillTwoFactor()
                     if (!empty($two_factor_code)) {
                         $this->exts->log("Retry 2FA: Entering two_factor_code: " . $two_factor_code);
                         $this->exts->moveToElementAndType($two_factor_selector, $two_factor_code);
-                        if ($this->exts->exists('label[for="auth-mfa-remember-device"] input[name="rememberDevice"]:not(:checked)')) {
+                        if ($this->isExists('label[for="auth-mfa-remember-device"] input[name="rememberDevice"]:not(:checked)')) {
                             $this->exts->moveToElementAndClick('label[for="auth-mfa-remember-device"]');
                         }
                         sleep(1);
@@ -389,7 +404,7 @@ private function checkFillTwoFactor()
                 }
             }
         }
-    } else if ($this->exts->exists('[name="transactionApprovalStatus"], form[action*="/approval/poll"]')) {
+    } else if ($this->isExists('[name="transactionApprovalStatus"], form[action*="/approval/poll"]')) {
         $this->exts->log("Two factor page found.");
         $this->exts->capture("2.1-two-factor");
         $message_selector = '.transaction-approval-word-break, #channelDetails, #channelDetailsWithImprovedLayout';
@@ -438,7 +453,7 @@ private function processCaptcha($captcha_image_selector, $captcha_input_selector
 {
     $this->waitFor('img#auth-captcha-image, img[alt="captcha"], img[src*="captcha"]', 50);
     $this->exts->log("--IMAGE CAPTCHA--");
-    if ($this->exts->exists($captcha_image_selector)) {
+    if ($this->isExists($captcha_image_selector)) {
         $image_path = $this->exts->captureElement($this->exts->process_uid, $captcha_image_selector);
         $source_image = imagecreatefrompng($image_path);
         imagejpeg($source_image, $this->exts->screen_capture_location . $this->exts->process_uid . '.jpg', 90);
@@ -503,5 +518,5 @@ private function isLoginSuccess()
         $this->exts->log('Waiting for login.....');
         sleep(10);
     }
-    return $this->exts->exists($loginSuccessSelector);
+    return $this->isExists($loginSuccessSelector);
 }

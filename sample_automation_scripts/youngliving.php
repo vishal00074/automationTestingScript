@@ -1,4 +1,4 @@
-<?php // 
+<?php // updated download code
 
 /**
  * Chrome Remote via Chrome devtool protocol script, for specific process/portal
@@ -96,7 +96,7 @@ class PortalScriptCDP
             $this->exts->clearCookies();
             $this->exts->openUrl($this->loginUrl);
             sleep(10);
-            $this->exts->waitTillPresent($this->continue_login_selector, 20);
+            $this->waitFor($this->continue_login_selector, 10);
             if ($this->exts->querySelector($this->continue_login_selector) != null) {
                 $this->exts->click_element($this->continue_login_selector);
             }
@@ -125,6 +125,16 @@ class PortalScriptCDP
         }
     }
 
+    public function waitFor($selector, $seconds = 7)
+    {
+        for ($wait = 0; $wait < 2 && $this->exts->executeSafeScript("return !!document.querySelector('" . $selector . "');") != 1; $wait++) {
+            $this->exts->log('Waiting for Selectors.....');
+            sleep($seconds);
+        }
+    }
+
+    public $totalInvoices = 0;
+
 
     private function processInvoices($paging_count = 1)
     {
@@ -141,89 +151,88 @@ class PortalScriptCDP
 
         $terminateLoop = false;
 
-
-        $this->exts->waitTillPresent('div.panel', 30);
+        $this->waitFor('div.panel', 15);
         $this->exts->capture("4-invoices-page");
 
-        do {
 
-            $pagingCount++;
+        $this->waitFor('div.panel', 15);
+        $rows = $this->exts->querySelectorAll('div.panel');
 
-            $this->exts->waitTillPresent('div.panel', 30);
-            $rows = $this->exts->querySelectorAll('div.panel');
+        foreach ($rows as $index => $row) {
 
-            foreach ($rows as $index => $row) {
-                $this->exts->waitTillPresent('div.panel', 30);
-
-                $invoiceCount++;
-
-                $this->isNoInvoice = false;
-
-                $invoiceDate = trim($this->exts->querySelectorAll('div.panel')[$index]?->querySelector('.date')?->getText());
-
-                $this->exts->log('invoice date: ' . $invoiceDate);
-
-                $parsedDate = $this->exts->parse_date($invoiceDate, 'd.m.Y', 'Y-m-d');
-                $this->exts->log('Parsed date: ' . $parsedDate);
-
-                $this->exts->querySelectorAll('div.panel')[$index]?->querySelector('a[ng-click*="showDe"]')?->click();
-                sleep(2);
-                $this->exts->waitTillPresent('.currency-amount');
-                $invoiceAmount = $this->exts->querySelector('.currency-amount')?->getText();
-                $this->exts->log('invoice amount: ' . $invoiceAmount);
-
-                $this->exts->waitTillPresent('a[ng-click*="print"]');
-                $this->exts->click_element('a[ng-click*="print"]');
-
-                $this->exts->wait_and_check_download('pdf');
-                $downloaded_file = $this->exts->find_saved_file('pdf');
-                $invoiceFileName = basename($downloaded_file);
-
-                $invoiceName = substr($invoiceFileName, 0, strrpos($invoiceFileName, '.'));
-
-                $this->exts->log('invoiceName: ' . $invoiceName);
-
-                if (trim($downloaded_file) != '' && file_exists($downloaded_file)) {
-                    $this->exts->new_invoice($invoiceName, $parsedDate, $invoiceAmount, $invoiceFileName);
-                    sleep(1);
-                } else {
-                    $this->exts->log(__FUNCTION__ . '::No download ' . $invoiceFileName);
-                }
-                $this->exts->log(' ');
-                $this->exts->log('---------------------------INVOICE ITERATION END-------------------------');
-                $this->exts->log(' ');
-
-
-                $lastDate = !empty($parsedDate) && $parsedDate <= $restrictDate;
-
-                if ($restrictPages != 0 && ($invoiceCount == $maxInvoices || ($dateRestriction && $lastDate))) {
-                    $terminateLoop = true;
-                    break;
-                } elseif ($restrictPages == 0 && $dateRestriction && $lastDate) {
-                    $terminateLoop = true;
-                    break;
-                }
-                $this->exts->click_element('a[ng-click*="navigateBack"]');
-                sleep(5);
+            if ($this->totalInvoices >= 50) {
+                return;
             }
+            $this->waitFor('div.panel', 15);
+            $invoiceCount++;
 
+            $this->isNoInvoice = false;
 
-            if ($restrictPages != 0 && $pagingCount == $restrictPages) {
-                break;
-            } elseif ($terminateLoop) {
-                break;
-            }
+            $invoiceDate = trim($this->exts->querySelectorAll('div.panel')[$index]?->querySelector('.date')?->getText());
+            $this->exts->log('invoice date: ' . $invoiceDate);
 
-            // pagination handle			
-            if ($this->exts->exists('li.ant-pagination-next:not(.ant-pagination-disabled) > button:not([disabled])')) {
-                $this->exts->log('Click Next Page in Pagination!');
-                $this->exts->click_element('li.ant-pagination-next:not(.ant-pagination-disabled) > button:not([disabled])');
-                sleep(5);
+            $parsedDate = $this->exts->parse_date($invoiceDate, 'd.m.Y', 'Y-m-d');
+            $this->exts->log('Parsed date: ' . $parsedDate);
+
+            $this->exts->querySelectorAll('div.panel')[$index]?->querySelector('a[ng-click*="showDe"]')?->click();
+            sleep(2);
+            $this->waitFor('.currency-amount');
+            $invoiceAmount = $this->exts->querySelector('.currency-amount')?->getText();
+            $this->exts->log('invoice amount: ' . $invoiceAmount);
+
+            $this->waitFor('a[ng-click*="print"]');
+            $this->exts->click_element('a[ng-click*="print"]');
+
+            $newTab = $this->exts->switchToNewestActiveTab();
+            sleep(2);
+
+            $this->exts->wait_and_check_download('pdf');
+            $downloaded_file = $this->exts->find_saved_file('pdf');
+            $invoiceFileName = basename($downloaded_file);
+
+            $invoiceName = substr($invoiceFileName, 0, strrpos($invoiceFileName, '.'));
+
+            $this->exts->log('invoiceName: ' . $invoiceName);
+
+            if (trim($downloaded_file) != '' && file_exists($downloaded_file)) {
+                $this->exts->new_invoice($invoiceName, $parsedDate, $invoiceAmount, $invoiceFileName);
+                sleep(1);
+                $this->totalInvoices++;
             } else {
-                $this->exts->log('Last Page!');
+                $this->exts->log(__FUNCTION__ . '::No download ' . $invoiceFileName);
+            }
+            $this->exts->log(' ');
+            $this->exts->log('---------------------------INVOICE ITERATION END-------------------------');
+            $this->exts->log(' ');
+
+            $this->exts->switchToOldestActiveTab();
+            sleep(2);
+            $this->exts->closeAllTabsButThis();
+            sleep(5);
+
+
+            $lastDate = !empty($parsedDate) && $parsedDate <= $restrictDate;
+
+            if ($restrictPages != 0 && ($invoiceCount == $maxInvoices || ($dateRestriction && $lastDate))) {
+                $terminateLoop = true;
+                break;
+            } elseif ($restrictPages == 0 && $dateRestriction && $lastDate) {
+                $terminateLoop = true;
                 break;
             }
-        } while (true);
+            $this->exts->click_element('a[ng-click*="navigateBack"]');
+            sleep(7);
+        }
+
+        // pagination handle			
+        if ($this->exts->exists('li.ant-pagination-next:not(.ant-pagination-disabled) > button:not([disabled])')) {
+            $this->exts->log('Click Next Page in Pagination!');
+            $this->exts->click_element('li.ant-pagination-next:not(.ant-pagination-disabled) > button:not([disabled])');
+            sleep(5);
+        } else {
+            $this->exts->log('Last Page!');
+        }
+
 
         // Download all invoices
         $this->exts->log('Invoices found: ' . $invoiceCount);
@@ -233,7 +242,7 @@ class PortalScriptCDP
     public function fillForm($count)
     {
         $this->exts->log("Begin fillForm " . $count);
-        $this->exts->waitTillPresent($this->username_selector, 20);
+        $this->waitFor($this->username_selector, 10);
         try {
             if ($this->exts->querySelector($this->username_selector) != null) {
 
@@ -244,7 +253,7 @@ class PortalScriptCDP
                     $this->exts->click_element($this->submit_login_selector);
                     sleep(2);
                 }
-                $this->exts->waitTillPresent($this->password_selector, 20);
+                $this->waitFor($this->password_selector, 10);
 
                 $this->exts->log("Enter Password");
                 $this->exts->moveToElementAndType($this->password_selector, $this->password);
@@ -275,7 +284,7 @@ class PortalScriptCDP
         $this->exts->log("Begin checkLogin ");
         $isLoggedIn = false;
         try {
-            $this->exts->waitTillPresent($this->check_login_success_selector, 20);
+            $this->waitFor($this->check_login_success_selector, 10);
             if ($this->exts->exists($this->check_login_success_selector)) {
 
                 $this->exts->log(">>>>>>>>>>>>>>>Login successful!!!!");
