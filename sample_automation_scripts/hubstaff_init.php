@@ -43,6 +43,8 @@ private function initPortal($count)
         sleep(20);
         $this->check_solve_blocked_page();
         $this->checkFillHcaptcha(0);
+
+        $this->checkFillTwoFactor();
     }
 
     if ($this->exts->getElement($this->check_login_success_selector) != null) {
@@ -57,7 +59,10 @@ private function initPortal($count)
         $this->exts->success();
     } else {
         $this->exts->log(__FUNCTION__ . '::Use login failed');
-        if (strpos(strtolower($this->exts->extract($this->check_login_failed_selector, null, 'innerText')), 'passwor') !== false) {
+        if (
+            strpos(strtolower($this->exts->extract($this->check_login_failed_selector, null, 'innerText')), 'passwor') !== false ||
+            strpos(strtolower($this->exts->extract('span.help-block', null, 'innerText')), 'invalid') !== false
+        ) {
             $this->exts->loginFailure(1);
         } else {
             $this->exts->loginFailure();
@@ -91,6 +96,61 @@ private function checkFillLogin()
     }
 }
 
+
+private function checkFillTwoFactor()
+{
+    $two_factor_selector = 'input[id="user_otp"]';
+    $two_factor_message_selector = 'span.help-block';
+    $two_factor_submit_selector = 'button.submit-otp.confirm';
+
+    if ($this->exts->querySelector($two_factor_selector) != null && $this->exts->two_factor_attempts < 3) {
+        $this->exts->log("Two factor page found.");
+        $this->exts->capture("2.1-two-factor");
+
+        $this->exts->type_key_by_xdotool('Return');
+        sleep(5);
+
+        if ($this->exts->querySelector($two_factor_message_selector) != null) {
+            $this->exts->two_factor_notif_msg_en = "";
+            for ($i = 0; $i < count($this->exts->querySelectorAll($two_factor_message_selector)); $i++) {
+                $this->exts->two_factor_notif_msg_en = $this->exts->two_factor_notif_msg_en . $this->exts->querySelectorAll($two_factor_message_selector)[$i]->getText() . "\n";
+            }
+            $this->exts->two_factor_notif_msg_en = trim($this->exts->two_factor_notif_msg_en);
+            $this->exts->two_factor_notif_msg_de = $this->exts->two_factor_notif_msg_en;
+            $this->exts->log("Message:\n" . $this->exts->two_factor_notif_msg_en);
+        }
+        if ($this->exts->two_factor_attempts == 2) {
+            $this->exts->two_factor_notif_msg_en = $this->exts->two_factor_notif_msg_en . ' ' . $this->exts->two_factor_notif_msg_retry_en;
+            $this->exts->two_factor_notif_msg_de = $this->exts->two_factor_notif_msg_de . ' ' . $this->exts->two_factor_notif_msg_retry_de;
+        }
+
+        $two_factor_code = trim($this->exts->fetchTwoFactorCode());
+        if (!empty($two_factor_code) && trim($two_factor_code) != '') {
+            $this->exts->log("checkFillTwoFactor: Entering two_factor_code." . $two_factor_code);
+            $this->exts->moveToElementAndType($two_factor_selector, $two_factor_code);
+
+            $this->exts->log("checkFillTwoFactor: Clicking submit button.");
+            sleep(1);
+            $this->exts->capture("2.2-two-factor-filled-" . $this->exts->two_factor_attempts);
+
+            // $this->exts->moveToElementAndClick($two_factor_submit_selector); // auto submit twoFA
+            sleep(15);
+
+            if ($this->exts->querySelector($two_factor_selector) == null) {
+                $this->exts->log("Two factor solved");
+            } else if ($this->exts->two_factor_attempts < 3) {
+                $this->exts->two_factor_attempts++;
+                $this->exts->notification_uid = '';
+                $this->checkFillTwoFactor();
+            } else {
+                $this->exts->log("Two factor can not solved");
+            }
+        } else {
+            $this->exts->log("Not received two factor code");
+        }
+    }
+}
+
 private function checkFillHcaptcha($count = 0)
 {
     $hcaptcha_iframe_selector = 'div#cf-hcaptcha-container iframe[src*="hcaptcha"]';
@@ -102,26 +162,26 @@ private function checkFillHcaptcha($count = 0)
 
         if (!empty($jsonRes) && trim($jsonRes) != '') {
             $captchaScript = "
-                function submitToken(token) {
-                    document.querySelector('[name=\"h-captcha-response\"]').innerText = token;
-                }
-                submitToken(arguments[0]);
-            ";
+            function submitToken(token) {
+                document.querySelector('[name=\"h-captcha-response\"]').innerText = token;
+            }
+            submitToken(arguments[0]);
+        ";
             $params = array($jsonRes);
             $this->exts->executeSafeScript($captchaScript, $params);
             sleep(2);
 
             $captchaScript = '
-                function submitToken1(token) {
-                    form1 = document.querySelector("form#challenge-form div#cf-hcaptcha-container div:not([style*=\"display: none\"]) iframe");
-                    form1.removeAttribute("data-hcaptcha-response");
-                    var att = document.createAttribute("data-hcaptcha-response");
-                    att.value = token;
-                    
-                    form1.setAttributeNode(att);
-                }
-                submitToken1(arguments[0]);
-                ';
+            function submitToken1(token) {
+                form1 = document.querySelector("form#challenge-form div#cf-hcaptcha-container div:not([style*=\"display: none\"]) iframe");
+                form1.removeAttribute("data-hcaptcha-response");
+                var att = document.createAttribute("data-hcaptcha-response");
+                att.value = token;
+                
+                form1.setAttributeNode(att);
+            }
+            submitToken1(arguments[0]);
+            ';
             $params = array($jsonRes);
             $this->exts->executeSafeScript($captchaScript, $params);
 
