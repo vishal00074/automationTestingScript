@@ -1,5 +1,4 @@
-<?php // addded code to triggerLoginFailedConfirmed
-
+<?php // updated  checkFillLogin function 
 /**
  * Chrome Remote via Chrome devtool protocol script, for specific process/portal
  *
@@ -57,7 +56,7 @@ class PortalScriptCDP
         }
     }
 
-    // Server-Portal-ID: 1397 - Last modified: 02.05.2025 13:40:53 UTC - User: 1
+    // Server-Portal-ID: 1397 - Last modified: 22.07.2025 07:43:33 UTC - User: 15
 
     public $baseUrl = 'https://login-ciam.blau.de/signin/XUI/#login/';
     public $loginUrl = 'https://login-ciam.blau.de/signin/XUI/#login/';
@@ -73,17 +72,18 @@ class PortalScriptCDP
 
     public $isNoInvoice = true;
 
+
     private function initPortal($count)
     {
 
         $this->exts->log('Begin initPortal ' . $count);
         $this->exts->openUrl($this->baseUrl);
         $this->exts->execute_javascript('
-        var shadow = document.querySelector("#usercentrics-root");
-        if(shadow){
-            shadow.shadowRoot.querySelector(\'button[data-testid="uc-accept-all-button"]\').click();
-        }
-    ');
+    var shadow = document.querySelector("#usercentrics-root");
+    if(shadow){
+        shadow.shadowRoot.querySelector(\'button[data-testid="uc-accept-all-button"]\').click();
+    }
+');
         sleep(2);
         $this->exts->loadCookiesFromFile();
         sleep(2);
@@ -93,11 +93,11 @@ class PortalScriptCDP
             $this->exts->openUrl($this->loginUrl);
             $this->exts->waitTillPresent('#usercentrics-root', 20);
             $this->exts->execute_javascript('
-            var shadow = document.querySelector("#usercentrics-root");
-            if(shadow){
-                shadow.shadowRoot.querySelector(\'button[data-testid="uc-accept-all-button"]\').click();
-            }
-        ');
+        var shadow = document.querySelector("#usercentrics-root");
+        if(shadow){
+            shadow.shadowRoot.querySelector(\'button[data-testid="uc-accept-all-button"]\').click();
+        }
+    ');
             sleep(2);
             $this->checkFillLogin();
             sleep(15);
@@ -113,11 +113,11 @@ class PortalScriptCDP
                 $this->exts->openUrl($this->loginUrl);
                 sleep(10);
                 $this->exts->execute_javascript('
-                var shadow = document.querySelector("#usercentrics-root");
-                if(shadow){
-                    shadow.shadowRoot.querySelector(\'button[data-testid="uc-accept-all-button"]\').click();
-                }
-            ');
+            var shadow = document.querySelector("#usercentrics-root");
+            if(shadow){
+                shadow.shadowRoot.querySelector(\'button[data-testid="uc-accept-all-button"]\').click();
+            }
+        ');
                 sleep(2);
                 $this->checkFillLogin();
                 sleep(20);
@@ -138,11 +138,11 @@ class PortalScriptCDP
             $this->exts->capture("3-login-success");
 
             $this->exts->execute_javascript('
-            var shadow = document.querySelector("#usercentrics-root");
-            if(shadow){
-                shadow.shadowRoot.querySelector(\'button[data-testid="uc-accept-all-button"]\').click();
-            }
-        ');
+        var shadow = document.querySelector("#usercentrics-root");
+        if(shadow){
+            shadow.shadowRoot.querySelector(\'button[data-testid="uc-accept-all-button"]\').click();
+        }
+    ');
             sleep(2);
 
             // Open invoices url and download invoice
@@ -220,11 +220,11 @@ class PortalScriptCDP
         }
 
         $this->exts->execute_javascript('
-        var shadow = document.querySelector("#usercentrics-root");
-        if(shadow){
-            shadow.shadowRoot.querySelector(\'button[data-testid="uc-accept-all-button"]\').click();
-        }
-    ');
+    var shadow = document.querySelector("#usercentrics-root");
+    if(shadow){
+        shadow.shadowRoot.querySelector(\'button[data-testid="uc-accept-all-button"]\').click();
+    }
+');
 
         if ($this->exts->getElement($this->username_selector) != null) {
             sleep(3);
@@ -263,16 +263,20 @@ class PortalScriptCDP
             $this->exts->type_text_by_xdotool($this->username);
             sleep(2);
             $this->exts->click_by_xdotool('one-input', 130, 127);
+            $this->exts->type_key_by_xdotool('Ctrl+a');
+            $this->exts->type_key_by_xdotool('Delete');
             sleep(1);
             $this->exts->type_text_by_xdotool($this->password);
             $this->exts->capture("3-login-page-filled-shadow-root");
 
             sleep(8);
             // click button submit
-            $this->exts->execute_javascript('
-            var shadow = document.querySelector("one-container.isnotNovumApp one-cluster one-button").shadowRoot;
-            if(shadow) shadow.querySelector("button:not([disabled])").click();
-        ');
+            //         $this->exts->execute_javascript('
+            //     var shadow = document.querySelector("one-container.isnotNovumApp one-cluster one-button").shadowRoot;
+            //     if(shadow) shadow.querySelector("button:not([disabled])").click();
+            // ');
+            $this->exts->click_by_xdotool('one-button[data-type="main-action"]');
+            sleep(5);
             $this->exts->capture("3-login-page-submit-shadow-root");
         } else {
             $this->exts->log(__FUNCTION__ . '::Login page not found');
