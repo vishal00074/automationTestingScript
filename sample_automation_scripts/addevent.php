@@ -1,4 +1,4 @@
-<?php // updated download code.
+<?php // 
 
 /**
  * Chrome Remote via Chrome devtool protocol script, for specific process/portal
@@ -57,7 +57,7 @@ class PortalScriptCDP
         }
     }
 
-    // Server-Portal-ID: 527653 - Last modified: 08.07.2025 08:08:37 UTC - User: 1
+    // Server-Portal-ID: 527653 - Last modified: 21.07.2025 12:59:25 UTC - User: 1
 
     public $baseUrl = 'https://app.addevent.com/signin';
     public $loginUrl = 'https://app.addevent.com/signin';
@@ -205,24 +205,24 @@ class PortalScriptCDP
 
                 // Step 2, check if callback function need executed
                 $gcallbackFunction = $this->exts->execute_javascript('
-                if(document.querySelector("[data-callback]") != null){
-                    document.querySelector("[data-callback]").getAttribute("data-callback");
-                } else {
-                    var result = ""; var found = false;
-                    function recurse (cur, prop, deep) {
-                        if(deep > 5 || found){ return;}console.log(prop);
-                        try {
-                            if(prop.indexOf(".callback") > -1){result = prop; found = true; return;
-                            } else { if(cur == undefined || cur == null || cur instanceof Element || Object(cur) !== cur || Array.isArray(cur)){ return;}deep++;
-                                for (var p in cur) { recurse(cur[p], prop ? prop + "." + p : p, deep);}
-                            }
-                        } catch(ex) { console.log("ERROR in function: " + ex); return; }
-                    }
-
-                    recurse(___grecaptcha_cfg.clients[0], "", 0);
-                    found ? "___grecaptcha_cfg.clients[0]." + result : null;
+            if(document.querySelector("[data-callback]") != null){
+                document.querySelector("[data-callback]").getAttribute("data-callback");
+            } else {
+                var result = ""; var found = false;
+                function recurse (cur, prop, deep) {
+                    if(deep > 5 || found){ return;}console.log(prop);
+                    try {
+                        if(prop.indexOf(".callback") > -1){result = prop; found = true; return;
+                        } else { if(cur == undefined || cur == null || cur instanceof Element || Object(cur) !== cur || Array.isArray(cur)){ return;}deep++;
+                            for (var p in cur) { recurse(cur[p], prop ? prop + "." + p : p, deep);}
+                        }
+                    } catch(ex) { console.log("ERROR in function: " + ex); return; }
                 }
-            ');
+
+                recurse(___grecaptcha_cfg.clients[0], "", 0);
+                found ? "___grecaptcha_cfg.clients[0]." + result : null;
+            }
+        ');
                 $this->exts->log('Callback function: ' . $gcallbackFunction);
                 $this->exts->log('Callback function: ' . $this->exts->recaptcha_answer);
                 if ($gcallbackFunction != null) {
