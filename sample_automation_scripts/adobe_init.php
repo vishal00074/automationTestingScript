@@ -8,7 +8,7 @@ public $password_selector = 'input#PasswordPage-PasswordField';
 public $remember_me_selector = '';
 public $submit_login_selector = 'button[data-id="PasswordPage-ContinueButton"]';
 public $check_login_failed_selector = 'label[data-id="PasswordPage-PasswordField-Error"], label[data-id="EmailPage-EmailField-Error"]';
-public $check_login_success_selector = 'button[data-menu-id="profile"], main [data-e2e="plan-card-payment-invoice-btn"]';
+public $check_login_success_selector = 'a[href="/profile"].account-profile-edit, button[data-menu-id="profile"], main [data-e2e="plan-card-payment-invoice-btn"]';
 public $isNoInvoice = true;
 public $login_with_google = 0;
 
@@ -163,6 +163,7 @@ private function initPortal($count)
         sleep(3);
         $this->exts->log(__FUNCTION__ . '::User logged in');
         $this->exts->capture("3-login-success");
+
 
         if (!empty($this->exts->config_array['allow_login_success_request'])) {
             $this->exts->triggerLoginSuccess();
@@ -338,23 +339,23 @@ private function checkFillRecaptcha()
 
             // Step 2, check if callback function need executed
             $gcallbackFunction = $this->exts->execute_javascript('
-    if(document.querySelector("[data-callback]") != null){
-        document.querySelector("[data-callback]").getAttribute("data-callback");
-    } else {
-        var result = ""; var found = false;
-        function recurse (cur, prop, deep) {
-            if(deep > 5 || found){ return;}console.log(prop);
-            try {
-                if(prop.indexOf(".callback") > -1){result = prop; found = true; return;
-                } else { if(cur == undefined || cur == null || cur instanceof Element || Object(cur) !== cur || Array.isArray(cur)){ return;}deep++;
-                    for (var p in cur) { recurse(cur[p], prop ? prop + "." + p : p, deep);}
-                }
-            } catch(ex) { console.log("ERROR in function: " + ex); return; }
-        }
-
-        recurse(___grecaptcha_cfg.clients[0], "", 0);
-        found ? "___grecaptcha_cfg.clients[0]." + result : null;
+if(document.querySelector("[data-callback]") != null){
+    document.querySelector("[data-callback]").getAttribute("data-callback");
+} else {
+    var result = ""; var found = false;
+    function recurse (cur, prop, deep) {
+        if(deep > 5 || found){ return;}console.log(prop);
+        try {
+            if(prop.indexOf(".callback") > -1){result = prop; found = true; return;
+            } else { if(cur == undefined || cur == null || cur instanceof Element || Object(cur) !== cur || Array.isArray(cur)){ return;}deep++;
+                for (var p in cur) { recurse(cur[p], prop ? prop + "." + p : p, deep);}
+            }
+        } catch(ex) { console.log("ERROR in function: " + ex); return; }
     }
+
+    recurse(___grecaptcha_cfg.clients[0], "", 0);
+    found ? "___grecaptcha_cfg.clients[0]." + result : null;
+}
 ');
             $this->exts->log('Callback function: ' . $gcallbackFunction);
             if ($gcallbackFunction != null) {
@@ -996,23 +997,23 @@ private function googlecheckFillRecaptcha()
 
             // Step 2, check if callback function need executed
             $gcallbackFunction = $this->exts->execute_javascript('
-    if(document.querySelector("[data-callback]") != null){
-        document.querySelector("[data-callback]").getAttribute("data-callback");
-    } else {
-        var result = ""; var found = false;
-        function recurse (cur, prop, deep) {
-            if(deep > 5 || found){ return;}console.log(prop);
-            try {
-                if(prop.indexOf(".callback") > -1){result = prop; found = true; return;
-                } else { if(cur == undefined || cur == null || cur instanceof Element || Object(cur) !== cur || Array.isArray(cur)){ return;}deep++;
-                    for (var p in cur) { recurse(cur[p], prop ? prop + "." + p : p, deep);}
-                }
-            } catch(ex) { console.log("ERROR in function: " + ex); return; }
-        }
-
-        recurse(___grecaptcha_cfg.clients[0], "", 0);
-        found ? "___grecaptcha_cfg.clients[0]." + result : null;
+if(document.querySelector("[data-callback]") != null){
+    document.querySelector("[data-callback]").getAttribute("data-callback");
+} else {
+    var result = ""; var found = false;
+    function recurse (cur, prop, deep) {
+        if(deep > 5 || found){ return;}console.log(prop);
+        try {
+            if(prop.indexOf(".callback") > -1){result = prop; found = true; return;
+            } else { if(cur == undefined || cur == null || cur instanceof Element || Object(cur) !== cur || Array.isArray(cur)){ return;}deep++;
+                for (var p in cur) { recurse(cur[p], prop ? prop + "." + p : p, deep);}
+            }
+        } catch(ex) { console.log("ERROR in function: " + ex); return; }
     }
+
+    recurse(___grecaptcha_cfg.clients[0], "", 0);
+    found ? "___grecaptcha_cfg.clients[0]." + result : null;
+}
 ');
             $this->exts->log('Callback function: ' . $gcallbackFunction);
             if ($gcallbackFunction != null) {
@@ -1212,6 +1213,7 @@ private function checkFillAppleTwoFactor()
     }
 }
 // ==================================END LOGIN WITH APPLE==================================
+
 
 public function switchToFrame($query_string)
 {
