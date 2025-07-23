@@ -1,4 +1,4 @@
-<?php // updated login failed selector and added trigger in firmform
+<?php // replace waitTillPresent to custom js waitFor function updated login failed message
 
 /**
  * Chrome Remote via Chrome devtool protocol script, for specific process/portal
@@ -57,9 +57,8 @@ class PortalScriptCDP
         }
     }
 
-    // Server-Portal-ID: 98912 - Last modified: 16.07.2025 14:24:27 UTC - User: 1
+    // Server-Portal-ID: 98912 - Last modified: 18.07.2025 13:20:54 UTC - User: 1
 
-    /*Define constants used in script*/
     public $baseUrl = 'https://account.mailpoet.com/login';
     public $loginUrl = 'https://account.mailpoet.com/login';
     public $invoicePageUrl = '';
@@ -110,7 +109,10 @@ class PortalScriptCDP
             }
             $this->exts->success();
         } else {
-            if (stripos(strtolower($this->exts->extract($this->check_login_failed_selector)), 'passwor') !== false) {
+            if (
+                stripos(strtolower($this->exts->extract($this->check_login_failed_selector)), 'passwor') !== false ||
+                stripos(strtolower($this->exts->extract($this->check_login_failed_selector)), 'invalid') !== false
+            ) {
                 $this->exts->log("Wrong credential !!!!");
                 $this->exts->loginFailure(1);
             } else {
@@ -123,7 +125,7 @@ class PortalScriptCDP
     private function fillForm($count)
     {
         $this->exts->log("Begin fillForm " . $count);
-        $this->exts->waitTillPresent($this->username_selector, 5);
+        $this->waitFor($this->username_selector, 5);
         try {
             if ($this->exts->querySelector($this->username_selector) != null) {
 
@@ -149,7 +151,10 @@ class PortalScriptCDP
                 $is_captcha = $this->solve_captcha_by_clicking(0);
                 if ($is_captcha) {
                     for ($i = 1; $i < 15; $i++) {
-                        if ($is_captcha == false || stripos(strtolower($this->exts->extract($this->check_login_failed_selector)), 'passwor') !== false) {
+                        if (
+                            $is_captcha == false || stripos(strtolower($this->exts->extract($this->check_login_failed_selector)), 'passwor') !== false ||
+                            stripos(strtolower($this->exts->extract($this->check_login_failed_selector)), 'invalid') !== false
+                        ) {
                             break;
                         }
                         $is_captcha = $this->solve_captcha_by_clicking($i);
@@ -162,7 +167,10 @@ class PortalScriptCDP
                 }
 
 
-                if (stripos(strtolower($this->exts->extract($this->check_login_failed_selector)), 'passwor') !== false) {
+                if (
+                    stripos(strtolower($this->exts->extract($this->check_login_failed_selector)), 'passwor') !== false ||
+                    stripos(strtolower($this->exts->extract($this->check_login_failed_selector)), 'invalid') !== false
+                ) {
                     $this->exts->log("Wrong credential !!!!");
                     $this->exts->loginFailure(1);
                 }
@@ -178,7 +186,7 @@ class PortalScriptCDP
         $two_factor_selector = 'input[id="token"]';
         $two_factor_message_selector = '.login-verification p[class="content"]';
         $two_factor_submit_selector = 'input[id="token-submit"]';
-        $this->exts->waitTillPresent($two_factor_selector, 10);
+        $this->waitFor($two_factor_selector, 10);
         if ($this->exts->querySelector($two_factor_selector) != null && $this->exts->two_factor_attempts < 3) {
             $this->exts->log("Two factor page found.");
             $this->exts->capture("2.1-two-factor");
@@ -224,7 +232,7 @@ class PortalScriptCDP
     {
         $this->exts->log("Checking captcha");
         $captcha_wraper_selector = 'div[style*="visibility: visible;"] iframe[title="recaptcha challenge expires in two minutes"]';
-        $this->exts->waitTillPresent($captcha_wraper_selector, 20);
+        $this->waitFor($captcha_wraper_selector, 10);
         $language_code = '';
         if ($this->exts->exists($captcha_wraper_selector)) {
             $this->exts->capture("mailpoet-captcha");
@@ -307,22 +315,30 @@ class PortalScriptCDP
         return $response;
     }
 
+    public function waitFor($selector, $seconds = 7)
+    {
+        for ($wait = 0; $wait < 2 && $this->exts->executeSafeScript("return !!document.querySelector('" . $selector . "');") != 1; $wait++) {
+            $this->exts->log('Waiting for Selectors.....');
+            sleep($seconds);
+        }
+    }
+
     private function disable_extensions()
     {
         $this->exts->openUrl('chrome://extensions/');
         sleep(2);
         $this->exts->execute_javascript("
-    let manager = document.querySelector('extensions-manager');
-    if (manager && manager.shadowRoot) {
-        let itemList = manager.shadowRoot.querySelector('extensions-item-list');
-        if (itemList && itemList.shadowRoot) {
-            let items = itemList.shadowRoot.querySelectorAll('extensions-item');
-            items.forEach(item => {
-                let toggle = item.shadowRoot.querySelector('#enableToggle[checked]');
-                if (toggle) toggle.click();
-            });
-        }
+let manager = document.querySelector('extensions-manager');
+if (manager && manager.shadowRoot) {
+    let itemList = manager.shadowRoot.querySelector('extensions-item-list');
+    if (itemList && itemList.shadowRoot) {
+        let items = itemList.shadowRoot.querySelectorAll('extensions-item');
+        items.forEach(item => {
+            let toggle = item.shadowRoot.querySelector('#enableToggle[checked]');
+            if (toggle) toggle.click();
+        });
     }
+}
 ");
     }
 
@@ -338,7 +354,7 @@ class PortalScriptCDP
         $this->exts->log("Begin checkLogin ");
         $isLoggedIn = false;
         try {
-            $this->exts->waitTillPresent($this->check_login_success_selector, 20);
+            $this->waitFor($this->check_login_success_selector, 10);
             if ($this->exts->exists($this->check_login_success_selector)) {
 
                 $this->exts->log(">>>>>>>>>>>>>>>Login successful!!!!");
