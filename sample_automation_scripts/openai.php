@@ -1,4 +1,4 @@
-<?php //
+<?php // added code to handle mfa challenge added code to ask twoFA from email after filling google login and if mfa screen appear
 
 /**
  * Chrome Remote via Chrome devtool protocol script, for specific process/portal
@@ -57,14 +57,12 @@ class PortalScriptCDP
         }
     }
 
-
-    // Server-Portal-ID: 771787 - Last modified: 11.06.2025 14:12:54 UTC - User: 1
-
     // Script here
     public $baseUrl = 'https://platform.openai.com/settings/organization/billing/history';
     public $loginUrl = 'https://platform.openai.com/';
     public $username_selector = 'input[name="email"], input#email-input, input#username';
-    public $password_selector = 'input#password, input[name="password"]';
+    public $password_selector = 'input#password, input[name="password"], input[name="current-password"]';
+
 
     public $isNoInvoice = true;
     public $login_with_google = 0;
@@ -95,6 +93,8 @@ class PortalScriptCDP
         if (!$this->isLoggedin()) {
 
             $this->userNotLoggedIn();
+
+
 
             $authError = strtolower($this->exts->extract('h1[class*="heading"] span'));
             $this->exts->log("auth Error:: " . $authError);
@@ -239,6 +239,19 @@ class PortalScriptCDP
             $this->checkFillLogin();
             sleep(6);
         }
+
+        sleep(5);
+        if ($this->exts->querySelector('a[href="/mfa-challenge"]') != null) {
+
+            $this->exts->moveToElementAndClick('a[href="/mfa-challenge"]');
+            sleep(10);
+            $this->exts->moveToElementAndClick('a[href="/mfa-challenge/email-otp"]');
+            sleep(10);
+            $this->exts->two_factor_attempts = 0;
+            $this->exts->capture('mfa-challenge');
+
+            $this->checkFillTwoFactor();
+        }
     }
 
     private function selectLoginType()
@@ -298,7 +311,7 @@ class PortalScriptCDP
     {
         $two_factor_selector = 'input[autocomplete="one-time-code"], input#code,input[id="ootp-pin"]';
         $two_factor_message_selector = 'header p, [class*="loginChallengePage"] > p,h1[id="headingText"]';
-        $two_factor_submit_selector = 'button[value="continue"], button[class*="continueButton"], button[type="submit"][data-action-button-primary="true"], button[type="submit"]';
+        $two_factor_submit_selector = 'button[value="continue"], button[class*="continueButton"], button[type="submit"][data-action-button-primary="true"], button[value="verify"]';
 
         if ($this->exts->querySelector($two_factor_selector) != null && $this->exts->two_factor_attempts < 3) {
             $this->exts->log("Two factor page found.");
