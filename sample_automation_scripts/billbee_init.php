@@ -21,9 +21,7 @@ private function initPortal($count)
     $this->exts->loadCookiesFromFile();
     sleep(1);
     $this->exts->openUrl($this->baseUrl);
-    sleep(3);
-    $this->exts->waitTillAnyPresent([$this->username_selector, $this->check_login_success_selector]);
-    sleep(2);
+    sleep(12);
     $this->exts->capture('1-init-page');
 
     // If user hase not logged in from cookie, clear cookie, open the login url and do login
