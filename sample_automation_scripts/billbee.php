@@ -1,4 +1,4 @@
-<?php // replace waitTillPresent to waitFor added pagination logic
+<?php // remove waitTillPresent any because generating error and increase the sleep time after open base url
 
 /**
  * Chrome Remote via Chrome devtool protocol script, for specific process/portal
@@ -57,9 +57,8 @@ class PortalScriptCDP
         }
     }
 
-    // Server-Portal-ID: 6097 - Last modified: 25.04.2025 13:22:23 UTC - User: 1
+    // Server-Portal-ID: 6097 - Last modified: 21.07.2025 14:05:50 UTC - User: 1
 
-    // Script here
     public $baseUrl = 'https://app.billbee.io/app_v2/';
     public $loginUrl = 'https://app.billbee.io/app_v2/sign-in';
 
@@ -83,9 +82,7 @@ class PortalScriptCDP
         $this->exts->loadCookiesFromFile();
         sleep(1);
         $this->exts->openUrl($this->baseUrl);
-        sleep(3);
-        $this->exts->waitTillAnyPresent([$this->username_selector, $this->check_login_success_selector]);
-        sleep(2);
+        sleep(12);
         $this->exts->capture('1-init-page');
 
         // If user hase not logged in from cookie, clear cookie, open the login url and do login
@@ -265,7 +262,7 @@ class PortalScriptCDP
 
     private function processInvoices()
     {
-        $restrictPages = isset($this->exts->config_array["restrictPages"]) ? (int)@$this->exts->config_array["restrictPages"] : 3;
+        $restrictPages = isset($this->exts->config_array["restrictPages"]) ? (int) @$this->exts->config_array["restrictPages"] : 3;
         sleep(3);
         $this->waitFor('table > tbody > tr[ng-repeat*="invoices"] a[ng-click*="download"]');
         $this->exts->capture("4-invoices-page");
