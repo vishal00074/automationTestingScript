@@ -1,4 +1,4 @@
-<?php //  working fine
+<?php //  
 
 /**
  * Chrome Remote via Chrome devtool protocol script, for specific process/portal
@@ -57,7 +57,7 @@ class PortalScriptCDP
         }
     }
 
-    // Server-Portal-ID: 333 - Last modified: 25.06.2025 14:34:45 UTC - User: 1
+    // Server-Portal-ID: 333 - Last modified: 21.07.2025 13:48:45 UTC - User: 1
 
     public $baseUrl = 'https://www.vistaprint.de/oh';
     public $loginUrl = 'https://www.vistaprint.de/vp/ns/sign_in.aspx?noguest=1&rd=1';
@@ -209,21 +209,21 @@ class PortalScriptCDP
         $this->exts->openUrl('chrome://extensions/?id=cjpalhdlnbpafiamejdnhcphjbkeiagm'); // disable Block origin extension
         sleep(2);
         $this->exts->execute_javascript("
-		if(document.querySelector('extensions-manager') != null) {
-			if(document.querySelector('extensions-manager').shadowRoot.querySelector('extensions-detail-view')  != null){
-				var disable_button = document.querySelector('extensions-manager').shadowRoot.querySelector('extensions-detail-view').shadowRoot.querySelector('#enableToggle[checked]');
-				if(disable_button != null){
-					disable_button.click();
-				}
+	if(document.querySelector('extensions-manager') != null) {
+		if(document.querySelector('extensions-manager').shadowRoot.querySelector('extensions-detail-view')  != null){
+			var disable_button = document.querySelector('extensions-manager').shadowRoot.querySelector('extensions-detail-view').shadowRoot.querySelector('#enableToggle[checked]');
+			if(disable_button != null){
+				disable_button.click();
 			}
 		}
-	");
+	}
+");
         sleep(1);
         $this->exts->openUrl('chrome://extensions/?id=ifibfemgeogfhoebkmokieepdoobkbpo');
         sleep(1);
         $this->exts->execute_javascript("if (document.querySelector('extensions-manager').shadowRoot.querySelector('extensions-detail-view').shadowRoot.querySelector('#enableToggle[checked]') != null) {
-			document.querySelector('extensions-manager').shadowRoot.querySelector('extensions-detail-view').shadowRoot.querySelector('#enableToggle[checked]').click();
-		}");
+		document.querySelector('extensions-manager').shadowRoot.querySelector('extensions-detail-view').shadowRoot.querySelector('#enableToggle[checked]').click();
+	}");
         sleep(2);
     }
 
@@ -699,24 +699,24 @@ class PortalScriptCDP
 
                 // Step 2, check if callback function need executed
                 $gcallbackFunction = $this->exts->execute_javascript('
-				if(document.querySelector("[data-callback]") != null){
-					document.querySelector("[data-callback]").getAttribute("data-callback");
-				} else {
-					var result = ""; var found = false;
-					function recurse (cur, prop, deep) {
-						if(deep > 5 || found){ return;}console.log(prop);
-						try {
-							if(prop.indexOf(".callback") > -1){result = prop; found = true; return;
-							} else { if(cur == undefined || cur == null || cur instanceof Element || Object(cur) !== cur || Array.isArray(cur)){ return;}deep++;
-								for (var p in cur) { recurse(cur[p], prop ? prop + "." + p : p, deep);}
-							}
-						} catch(ex) { console.log("ERROR in function: " + ex); return; }
-					}
-
-					recurse(___grecaptcha_cfg.clients[0], "", 0);
-					found ? "___grecaptcha_cfg.clients[0]." + result : null;
+			if(document.querySelector("[data-callback]") != null){
+				document.querySelector("[data-callback]").getAttribute("data-callback");
+			} else {
+				var result = ""; var found = false;
+				function recurse (cur, prop, deep) {
+					if(deep > 5 || found){ return;}console.log(prop);
+					try {
+						if(prop.indexOf(".callback") > -1){result = prop; found = true; return;
+						} else { if(cur == undefined || cur == null || cur instanceof Element || Object(cur) !== cur || Array.isArray(cur)){ return;}deep++;
+							for (var p in cur) { recurse(cur[p], prop ? prop + "." + p : p, deep);}
+						}
+					} catch(ex) { console.log("ERROR in function: " + ex); return; }
 				}
-			');
+
+				recurse(___grecaptcha_cfg.clients[0], "", 0);
+				found ? "___grecaptcha_cfg.clients[0]." + result : null;
+			}
+		');
                 $this->exts->log('Callback function: ' . $gcallbackFunction);
                 if ($gcallbackFunction != null) {
                     $this->exts->execute_javascript($gcallbackFunction . '("' . $this->exts->recaptcha_answer . '");');

@@ -1,7 +1,8 @@
 public $baseUrl = 'https://platform.openai.com/settings/organization/billing/history';
 public $loginUrl = 'https://platform.openai.com/';
 public $username_selector = 'input[name="email"], input#email-input, input#username';
-public $password_selector = 'input#password, input[name="password"]';
+public $password_selector = 'input#password, input[name="password"], input[name="current-password"]';
+
 
 public $isNoInvoice = true;
 public $login_with_google = 0;
@@ -32,6 +33,8 @@ private function initPortal($count)
     if (!$this->isLoggedin()) {
 
         $this->userNotLoggedIn();
+
+
 
         $authError = strtolower($this->exts->extract('h1[class*="heading"] span'));
         $this->exts->log("auth Error:: " . $authError);
@@ -76,23 +79,12 @@ private function initPortal($count)
     if ($this->isLoggedin()) {
         sleep(5);
         $this->exts->log(__FUNCTION__ . '::User logged in');
-        $popup_ok = $this->exts->getElementByText('[role="dialog"][data-state="open"] button.btn-primary', 'Okay', null, false);
-        if ($popup_ok != null) {
-            $this->exts->click_element($popup_ok);
-            sleep(2);
-        }
-        if ($this->exts->exists('[role="dialog"][data-state="open"] .text-token-text-tertiary button')) {
-            $this->exts->click_element('[role="dialog"][data-state="open"] .text-token-text-tertiary button');
-            sleep(1);
-        }
-        if ($this->exts->exists('[role="dialog"][data-state="open"]')) {
-            $unwanted_dialog = $this->exts->getElement('[role="dialog"][data-state="open"]');
-            $this->exts->execute_javascript('arguments[0].remove();', [$unwanted_dialog]);
-            sleep(1);
-        }
         $this->exts->capture("3-login-success");
 
-        $this->processAfterLogin();
+        if (!empty($this->exts->config_array['allow_login_success_request'])) {
+            $this->exts->triggerLoginSuccess();
+        }
+        $this->exts->success();
     } else {
         $this->exts->log(__FUNCTION__ . '::Use login failed');
         $isTwoFAError = $this->exts->execute_javascript('document.body.innerHTML.includes("The code you entered is incorrect. Please try again.")');
@@ -176,6 +168,19 @@ private function userNotLoggedIn()
         $this->checkFillLogin();
         sleep(6);
     }
+
+    sleep(5);
+    if ($this->exts->querySelector('a[href="/mfa-challenge"]') != null) {
+
+        $this->exts->moveToElementAndClick('a[href="/mfa-challenge"]');
+        sleep(10);
+        $this->exts->moveToElementAndClick('a[href="/mfa-challenge/email-otp"]');
+        sleep(10);
+        $this->exts->two_factor_attempts = 0;
+        $this->exts->capture('mfa-challenge');
+
+        $this->checkFillTwoFactor();
+    }
 }
 
 private function selectLoginType()
@@ -235,7 +240,7 @@ private function checkFillTwoFactor()
 {
     $two_factor_selector = 'input[autocomplete="one-time-code"], input#code,input[id="ootp-pin"]';
     $two_factor_message_selector = 'header p, [class*="loginChallengePage"] > p,h1[id="headingText"]';
-    $two_factor_submit_selector = 'button[value="continue"], button[class*="continueButton"], button[type="submit"][data-action-button-primary="true"], button[type="submit"]';
+    $two_factor_submit_selector = 'button[value="continue"], button[class*="continueButton"], button[type="submit"][data-action-button-primary="true"], button[value="verify"]';
 
     if ($this->exts->querySelector($two_factor_selector) != null && $this->exts->two_factor_attempts < 3) {
         $this->exts->log("Two factor page found.");
@@ -1513,12 +1518,3 @@ private function tryAnotherWay()
     }
 }
 // -------------------- GOOGLE login END
-
-private function processAfterLogin()
-{
-    if (!empty($this->exts->config_array['allow_login_success_request'])) {
-            $this->exts->triggerLoginSuccess();
-    }
-
-    $this->exts->success();
-}

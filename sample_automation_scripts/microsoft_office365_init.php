@@ -8,10 +8,12 @@ public $account_type = 0;
 public $lang = '';
 public $phone_number = '';
 public $recovery_email = '';
+
 /**
 	* Entry Method thats called for a portal
 	* @param Integer $count Number of times portal is retried.
 	*/
+
 private function initPortal($count)
 {
 	$this->exts->log('Begin initPortal ' . $count);
@@ -19,8 +21,9 @@ private function initPortal($count)
 	$this->recovery_email = isset($this->exts->config_array["recovery_email"]) ? $this->exts->config_array["recovery_email"] : '';
 	$this->account_type = isset($this->exts->config_array["ACCOUNT_TYPE"]) ? (int) @$this->exts->config_array["ACCOUNT_TYPE"] : 0;
 	$this->lang = isset($this->exts->config_array["lang"]) ? trim($this->exts->config_array["lang"]) : '';
-	$this->exts->loadCookiesFromFile();
-	$this->exts->log('account_type'. $this->account_type);
+	// $this->exts->loadCookiesFromFile();
+	$this->exts->clearCookies();
+	$this->exts->log('account_type' . $this->account_type);
 	sleep(1);
 	$this->exts->openUrl($this->base_url);
 	sleep(10);
@@ -29,9 +32,11 @@ private function initPortal($count)
 	// If user hase not logged in from cookie, clear cookie, open the login url and do login
 	if (!$this->isLoggedIn()) {
 		$this->exts->log('NOT logged via cookie');
+
 		if ($this->exts->urlContains('BoxError.aspx?aspxerrorpath') || $this->isExists('body > div > #message > p a[href*="status.office"]') || (!$this->isExists($this->username_selector) && !$this->isExists($this->password_selector))) {
 			$this->exts->clearCookies();
 		}
+		$this->clearChrome();
 		sleep(1);
 		$this->exts->openUrl($this->base_url);
 		$this->checkFillLogin();
@@ -51,6 +56,7 @@ private function initPortal($count)
 	$this->doAfterLogin();
 }
 
+
 private function checkFillLogin()
 {
 	$this->exts->log(__FUNCTION__);
@@ -67,34 +73,14 @@ private function checkFillLogin()
 		$this->exts->log("Enter microsoft Username");
 		$this->exts->moveToElementAndType($this->username_selector, $this->username);
 		sleep(1);
-		$this->exts->click_by_xdotool($this->submit_login_selector);
+		$this->exts->moveToElementAndClick($this->submit_login_selector);
 		sleep(10);
 	}
 
 	//Some user need to approve login after entering username on the app
-	if ($this->isExists('div#idDiv_RemoteNGC_PollingDescription')) {
-		$this->exts->two_factor_timeout = 5;
-		$polling_message_selector = '#idDiv_RemoteNGC_PollingDescription, #idRemoteNGC_DisplaySign, .confirmIdentityPageControl #iPollSessionDesc';
-		$this->exts->two_factor_notif_msg_en = trim(join("\n", $this->exts->extract($polling_message_selector)));
-		$this->exts->two_factor_notif_msg_en = $this->exts->two_factor_notif_msg_en . "\n>>>Enter \"OK\" after confirming on device";
-		$this->exts->two_factor_notif_msg_de = $this->exts->two_factor_notif_msg_en . "\n>>>Geben Sie danach hier unten \"OK\" ein.";
+	sleep(5);
+	$this->approvetwofactorcode();
 
-		$two_factor_code = trim($this->exts->fetchTwoFactorCode());
-		if (!empty($two_factor_code) && trim($two_factor_code) != '') {
-			if ($this->isExists($this->remember_me_selector)) {
-				$this->exts->click_by_xdotool($this->remember_me_selector);
-			}
-			$this->exts->capture("2.2-two-factor-filled-" . $this->exts->two_factor_attempts);
-			$this->exts->two_factor_timeout = 15;
-		} else {
-			if ($this->isExists('a#idA_PWD_SwitchToPassword')) {
-				$this->exts->click_by_xdotool('a#idA_PWD_SwitchToPassword');
-				sleep(5);
-			} else {
-				$this->exts->log("Not received two factor code");
-			}
-		}
-	}
 	if ($this->isExists('a[data-bind*="href: svr.urlSwitch"][href*="/logout"]')) {
 		// if site show: Already login with .. account, click logout and login with other account
 		$this->exts->click_by_xdotool('a[data-bind*="href: svr.urlSwitch"][href*="/logout"]');
@@ -128,11 +114,67 @@ private function checkFillLogin()
 		$this->exts->click_by_xdotool($this->remember_me_selector);
 		sleep(2);
 		$this->exts->capture("2-microsoft-password-page-filled");
-		$this->exts->click_by_xdotool($this->submit_login_selector);
+		$this->exts->moveToElementAndClick($this->submit_login_selector);
 		sleep(10);
 		$this->exts->capture("2-microsoft-after-submit-password");
 	} else {
 		$this->exts->log(__FUNCTION__ . '::microsoft Password page not found');
+	}
+}
+
+private function clearChrome()
+{
+	$this->exts->log("Clearing browser history, cookie, cache");
+	$this->exts->openUrl('chrome://settings/clearBrowserData');
+	sleep(10);
+	$this->exts->capture("clear-page");
+	for ($i = 0; $i < 2; $i++) {
+		$this->exts->type_key_by_xdotool('Tab');
+		sleep(1);
+	}
+	$this->exts->type_key_by_xdotool('Tab');
+	sleep(1);
+	$this->exts->type_key_by_xdotool('Return');
+	sleep(1);
+	$this->exts->type_key_by_xdotool('a');
+	sleep(1);
+	$this->exts->type_key_by_xdotool('Return');
+	sleep(3);
+	$this->exts->capture("clear-page");
+	for ($i = 0; $i < 5; $i++) {
+		$this->exts->type_key_by_xdotool('Tab');
+		sleep(1);
+	}
+	$this->exts->type_key_by_xdotool('Return');
+	sleep(15);
+	$this->exts->capture("after-clear");
+}
+
+private function approvetwofactorcode()
+{
+	//Some user need to approve login after entering username on the app
+	if ($this->isExists('#idDiv_SAASTO_Title , div#idDiv_RemoteNGC_PollingDescription')) {
+		$this->exts->two_factor_timeout = 5;
+		$polling_message_selector = '#idDiv_SAASTO_Description , #idDiv_RemoteNGC_PollingDescription, #idRemoteNGC_DisplaySign, .confirmIdentityPageControl #iPollSessionDesc';
+		$this->exts->two_factor_notif_msg_en = trim(join("\n", $this->exts->extract($polling_message_selector)));
+		$this->exts->two_factor_notif_msg_en = $this->exts->two_factor_notif_msg_en . "\n>>>Enter \"OK\" after confirming on device";
+		$this->exts->two_factor_notif_msg_de = $this->exts->two_factor_notif_msg_en . "\n>>>Geben Sie danach hier unten \"OK\" ein.";
+
+		$two_factor_code = trim($this->exts->fetchTwoFactorCode());
+		if (!empty($two_factor_code) && trim($two_factor_code) != '') {
+			if ($this->isExists($this->remember_me_selector)) {
+				$this->exts->click_by_xdotool($this->remember_me_selector);
+			}
+			$this->exts->capture("2.2-two-factor-filled-" . $this->exts->two_factor_attempts);
+			$this->exts->two_factor_timeout = 15;
+		} else {
+			if ($this->isExists('a#idA_PWD_SwitchToPassword')) {
+				$this->exts->click_by_xdotool('a#idA_PWD_SwitchToPassword');
+				sleep(5);
+			} else {
+				$this->exts->log("Not received two factor code");
+			}
+		}
 	}
 }
 private function checkExternalFillLogin()
@@ -273,11 +315,16 @@ private function checkConfirmButton()
 		$this->exts->click_by_xdotool("input#idSubmit_ProofUp_Redirect");
 		sleep(10);
 	}
-	if ($this->exts->urlContains('mysignins.microsoft.com/register') && $this->isExists('#id__11')) {
-		// Great job! Your security information has been successfully set up. Click "Done" to continue login.
-		$this->exts->click_by_xdotool(' #id__11');
+	// if ($this->exts->urlContains('mysignins.microsoft.com/register') && $this->isExists('#id__11')) {
+	//     // Great job! Your security information has been successfully set up. Click "Done" to continue login.
+	//     $this->exts->click_by_xdotool(' #id__11');
+	//     sleep(10);
+	// }
+	if ($this->exts->urlContains('mysignins.microsoft.com/register')) {
+		$this->exts->account_not_ready();
 		sleep(10);
 	}
+
 	if ($this->exts->getElement('div input#iNext') != null) {
 		$this->exts->click_by_xdotool('div input#iNext');
 		sleep(10);
@@ -337,7 +384,9 @@ private function checkTwoFactorMethod()
 		sleep(3);
 	} else if ($this->isExists('#idDiv_SAOTCS_Proofs [role="listitem"]')) {
 		// Updated 11-2020
-		if ($this->isExists('#idDiv_SAOTCS_Proofs [role="listitem"] [data-value="OneWaySMS"]')) { // phone SMS
+		if ($this->isExists('#idDiv_SAOTCS_Proofs [role="listitem"] [data-value="PhoneAppOTP"]')) { // phone SMS
+			$this->exts->click_by_xdotool('#idDiv_SAOTCS_Proofs [role="listitem"] [data-value="PhoneAppOTP"]');
+		} else if ($this->isExists('#idDiv_SAOTCS_Proofs [role="listitem"] [data-value="OneWaySMS"]')) { // phone SMS
 			$this->exts->click_by_xdotool('#idDiv_SAOTCS_Proofs [role="listitem"] [data-value="OneWaySMS"]');
 		} else if ($this->isExists('#idDiv_SAOTCS_Proofs [role="listitem"] [data-value^="3:"]')) { // phone SMS
 			$this->exts->click_by_xdotool('#idDiv_SAOTCS_Proofs [role="listitem"] [data-value^="3:"]');
@@ -437,6 +486,10 @@ private function checkTwoFactorMethod()
 		$this->exts->two_factor_attempts = 0;
 		$this->fillTwoFactor($input_selector, $message_selector, $remember_selector, $submit_selector);
 	}
+	// STEP 4: input code
+	if ($this->isExists('#idDiv_SAASTO_Title , div#idDiv_RemoteNGC_PollingDescription')) {
+		$this->approvetwofactorcode();
+	}
 }
 private function fillTwoFactor($input_selector, $message_selector, $remember_selector, $submit_selector)
 {
@@ -450,11 +503,11 @@ private function fillTwoFactor($input_selector, $message_selector, $remember_sel
 		$this->exts->two_factor_notif_msg_de = $this->exts->two_factor_notif_msg_en;
 	}
 	$this->exts->log("Message:\n" . $this->exts->two_factor_notif_msg_en);
-	$this->notification_uid = "";
+	$this->exts->notification_uid = "";
 
 	$two_factor_code = trim($this->exts->fetchTwoFactorCode());
 	if (empty($two_factor_code) || trim($two_factor_code) == '') {
-		$this->notification_uid = "";
+		$this->exts->notification_uid = "";
 		$two_factor_code = trim($this->exts->fetchTwoFactorCode());
 	}
 	if (!empty($two_factor_code) && trim($two_factor_code) != '') {
@@ -477,6 +530,7 @@ private function fillTwoFactor($input_selector, $message_selector, $remember_sel
 				$this->exts->log("Two factor solved");
 			} else if ($this->exts->two_factor_attempts < 3) {
 				$this->exts->two_factor_attempts++;
+				$this->exts->notification_uid = "";
 				$this->fillTwoFactor($input_selector, $message_selector, $remember_selector, $submit_selector);
 			} else {
 				$this->exts->log("Two factor can not solved");
@@ -490,9 +544,9 @@ private function fillTwoFactor($input_selector, $message_selector, $remember_sel
 }
 private function isLoggedIn()
 {
-	sleep(5);
+	sleep(50);
 	$isLoggedIn = false;
-	if ($this->exts->querySelector('button#O365_MainLink_Me #O365_MainLink_MePhoto, div.msame_Drop_signOut a, a[href*="/logout"]:not(#footerSignout)') != null) {
+	if ($this->exts->querySelector('button#O365_MainLink_Me #O365_MainLink_MePhoto, div.msame_Drop_signOut a, a[href*="/logout"]:not(#footerSignout), button#Admin') != null) {
 		$isLoggedIn = true;
 	} else if ($this->exts->querySelector('ul[role="menubar"] li button[data-value="billing"]') != null) {
 		$isLoggedIn = true;
@@ -503,11 +557,15 @@ private function isLoggedIn()
 	} else if ($this->exts->querySelector('a[href="#/homepage"]') != null) {
 		$isLoggedIn = true;
 	}
-
-
-
-
-
+	// if ($this->isExists('button#Admin')) {
+	//     $this->exts->click_element('button#Admin');
+	//     sleep(5);
+	//     $tabs = $this->exts->get_all_tabs();
+	//     if (count($tabs) > 1) {
+	//         $this->exts->switchToNewestActiveTab();
+	//         sleep(3);
+	//     }
+	// }
 	return $isLoggedIn;
 }
 
@@ -544,21 +602,72 @@ function select_invoice_filter_month($select_date)
 
 private function doAfterLogin()
 {
-	sleep(15);
+	$this->exts->log(__FUNCTION__);
+	if ($this->isExists('button#Admin')) {
+		$this->exts->click_element('button#Admin');
+		sleep(5);
+		$tabs = $this->exts->get_all_tabs();
+		if (count($tabs) > 1) {
+			$this->exts->switchToNewestActiveTab();
+			sleep(3);
+		}
+	}
+
+	sleep(10);
+	$titleText = strtolower($this->exts->extract('#idDiv_SAOTCAS_Title'));
+	if (stripos($titleText, strtolower('Approve sign in request')) !== false) {
+		$this->exts->click_element('#signInAnotherWay');
+		sleep(7);
+	}
+
+	if ($this->exts->querySelector('a[id="signInAnotherWay"]') != null) {
+		$this->exts->execute_javascript('document.querySelector("a#signInAnotherWay")?.click();');
+		sleep(7);
+	}
+
+	sleep(5);
+	if ($this->isExists('div[role="listitem"]:nth-child(2) .table-cell.text-left.content > div')) {
+		$this->exts->click_element('div[role="listitem"]:nth-child(2) .table-cell.text-left.content > div');
+	} else {
+		sleep(5);
+		if ($this->isExists('div[role="listitem"]:nth-child(3) .table-cell.text-left.content > div')) {
+			$this->exts->click_element('div[role="listitem"]:nth-child(3) .table-cell.text-left.content > div');
+		}
+	}
+	sleep(10);
+	if ($this->isExists('input[name="otc"], input[name="iOttText"]')) {
+		$input_selector = 'input[name="otc"], input[name="iOttText"]';
+		$message_selector = 'div#idDiv_SAOTCC_Description, .OTTLabel, #idDiv_SAOTCC_Description';
+		$remember_selector = 'label#idLbl_SAOTCC_TD_Cb';
+		$submit_selector = 'input#idSubmit_SAOTCC_Continue, input#iVerifyCodeAction';
+		$this->exts->two_factor_attempts = 0;
+		$this->fillTwoFactor($input_selector, $message_selector, $remember_selector, $submit_selector);
+	}
+
+	sleep(30);
 	$this->exts->log(__FUNCTION__);
 	// then check user logged in or not
 	if ($this->isLoggedIn()) {
 		sleep(3);
 		$this->exts->log(__FUNCTION__ . '::User logged in');
 		$this->exts->capture("3-login-success");
-		
+
 		if (!empty($this->exts->config_array['allow_login_success_request'])) {
             $this->exts->triggerLoginSuccess();
         }
-
+		
 		$this->exts->success();
 	} else {
 		$this->exts->log(__FUNCTION__ . '::Use login failed ' . $this->exts->getUrl());
+
+
+		$extractedMessage = $this->exts->extract('div[id="heading"].row.text-title');
+
+		$this->exts->log(__FUNCTION__ . '::Error text: ' . $extractedMessage);
+		if (stripos($extractedMessage, strtolower("account secure")) !== false) {
+			$this->exts->account_not_ready();
+		}
+
 		if ($this->exts->getElementByText('div#passwordError', ['has been locked'], null, false)) {
 			$this->exts->account_not_ready();
 		}
@@ -576,6 +685,7 @@ private function doAfterLogin()
 		}
 	}
 }
+
 
 
 public function switchToFrame($query_string)
