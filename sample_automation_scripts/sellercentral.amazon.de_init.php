@@ -167,11 +167,33 @@ private function initPortal($count)
         sleep(3);
         $this->exts->log(__FUNCTION__ . '::User logged in');
         $this->exts->capture("3-login-success");
+        if ($this->isExists('button.full-page-account-switcher-account-details')) {
+            // This portal is for Germany so select UK first, else select default
+            $target_selection = $this->exts->getElementByText('button.full-page-account-switcher-account-details', ['Germany', 'Deutschland', 'Allemagne'], null, true);
+            if ($target_selection == null) {
+                //Sometime we need to expand to see the list
+                $this->exts->moveToElementAndClick('button.full-page-account-switcher-account-details');
+                sleep(10);
+                $target_selection = $this->exts->getElementByText('button.full-page-account-switcher-account-details', ['Germany', 'Deutschland', 'Allemagne'], null, true);
+            }
 
+            if ($target_selection == null && count($this->exts->getElements('button.full-page-account-switcher-account-details')) > 1) { // If do not found, get default picker
+                $target_selection = $this->exts->getElements('button.full-page-account-switcher-account-details')[1];
+            }
+            if ($target_selection != null) {
+                $this->exts->click_element($target_selection);
+            }
+            sleep(1);
+            if ($this->isExists('button.kat-button--primary:not([disabled])')) {
+                $this->exts->moveToElementAndClick('button.kat-button--primary:not([disabled])');
+                sleep(10);
+            } else {
+                $this->exts->account_not_ready();
+            }
+        }
         if (!empty($this->exts->config_array['allow_login_success_request'])) {
             $this->exts->triggerLoginSuccess();
         }
-
         $this->exts->success();
     } else {
         $this->exts->log(__FUNCTION__ . '::Use login failed ' . $this->exts->getUrl());
