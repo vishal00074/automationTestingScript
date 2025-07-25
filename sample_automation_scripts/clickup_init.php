@@ -1,15 +1,12 @@
 public $baseUrl = 'https://app.clickup.com';
 public $loginUrl = 'https://app.clickup.com/login';
 public $invoicePageUrl = '';
-
 public $username_selector = 'form input#email-input, input#login-email-input';
 public $password_selector = 'form input#password-input, input#login-password-input';
 public $remember_me_selector = '';
 public $submit_login_btn = 'form button#login-submit, button.login-page-new__main-form-button[type="submit"]';
-
 public $check_login_failed_selector = '.show form#login-form .cu-form__error.show';
 public $check_login_success_selector = 'div.cu-avatar-container, a#signout, .account-picker a, .user-main-settings-menu__avatar';
-
 public $isNoInvoice = true;
 
 private function initPortal($count)
@@ -42,7 +39,7 @@ private function initPortal($count)
         if (!empty($this->exts->config_array['allow_login_success_request'])) {
             $this->exts->triggerLoginSuccess();
         }
-
+        
         $this->exts->success();
     } else {
         $this->exts->log(__FUNCTION__ . '::Use login failed');
@@ -101,31 +98,6 @@ public function waitFor($selector, $seconds = 10)
     }
 }
 
-
-/**
-    * Method to Check where user is logged in or not
-    * return boolean true/false
-    */
-public  function checkLogin()
-{
-    $this->exts->log("Begin checkLogin ");
-    $isLoggedIn = false;
-    try {
-        for ($wait = 0; $wait < 2 && $this->exts->executeSafeScript("return !!document.querySelector('" . $this->check_login_success_selector . "');") != 1; $wait++) {
-            $this->exts->log('Waiting for login.....');
-            sleep(10);
-        }
-        if ($this->isExists($this->check_login_success_selector)) {
-            $this->exts->log(">>>>>>>>>>>>>>>Login successful!!!!");
-            $isLoggedIn = true;
-        }
-    } catch (Exception $exception) {
-
-        $this->exts->log("Exception checking loggedin " . $exception);
-    }
-    return $isLoggedIn;
-}
-
 private function checkFillLogin()
 {
     if ($this->exts->getElement($this->username_selector) != null) {
@@ -173,10 +145,10 @@ private function checkFillLogin()
             $this->exts->moveToElementAndType($this->password_selector, $this->password);
             sleep(1);
             $this->exts->capture("2-login-page-filled");
-            $this->exts->click_if_existed($this->submit_login_btn);
+            $this->exts->moveToElementAndClick($this->submit_login_btn);
             sleep(5);
             $this->checkFillRecaptcha();
-            $this->exts->click_if_existed($this->submit_login_btn);
+            $this->exts->moveToElementAndClick($this->submit_login_btn);
             if (strpos(strtolower($this->exts->extract('[data-test="toast__new-item"]')), 'no account was found') !== false) {
                 $this->exts->loginFailure(1);
             }
@@ -230,6 +202,7 @@ private function checkFillTwoFactor()
             if ($this->exts->getElement($two_factor_selector) == null) {
                 $this->exts->log("Two factor solved");
             } else if ($this->exts->two_factor_attempts < 3) {
+                $this->exts->notification_uid = '';
                 $this->exts->two_factor_attempts++;
                 $this->checkFillTwoFactor();
             } else {
@@ -267,25 +240,25 @@ private function checkFillRecaptcha()
 
             // Step 2, check if callback function need executed
             $gcallbackFunction = $this->exts->executeSafeScript('
-                if(document.querySelector("[data-callback]") != null){
-                    return document.querySelector("[data-callback]").getAttribute("data-callback");
-                }
+        if(document.querySelector("[data-callback]") != null){
+            return document.querySelector("[data-callback]").getAttribute("data-callback");
+        }
 
-                var result = ""; var found = false;
-                function recurse (cur, prop, deep) {
-                    if(deep > 5 || found){ return;}console.log(prop);
-                    try {
-                        if(cur == undefined || cur == null || cur instanceof Element || Object(cur) !== cur || Array.isArray(cur)){ return;}
-                        if(prop.indexOf(".callback") > -1){result = prop; found = true; return;
-                        } else { deep++;
-                            for (var p in cur) { recurse(cur[p], prop ? prop + "." + p : p, deep);}
-                        }
-                    } catch(ex) { console.log("ERROR in function: " + ex); return; }
+        var result = ""; var found = false;
+        function recurse (cur, prop, deep) {
+            if(deep > 5 || found){ return;}console.log(prop);
+            try {
+                if(cur == undefined || cur == null || cur instanceof Element || Object(cur) !== cur || Array.isArray(cur)){ return;}
+                if(prop.indexOf(".callback") > -1){result = prop; found = true; return;
+                } else { deep++;
+                    for (var p in cur) { recurse(cur[p], prop ? prop + "." + p : p, deep);}
                 }
+            } catch(ex) { console.log("ERROR in function: " + ex); return; }
+        }
 
-                recurse(___grecaptcha_cfg.clients[0], "", 0);
-                return found ? "___grecaptcha_cfg.clients[0]." + result : null;
-            ');
+        recurse(___grecaptcha_cfg.clients[0], "", 0);
+        return found ? "___grecaptcha_cfg.clients[0]." + result : null;
+    ');
             $this->exts->log('Callback function: ' . $gcallbackFunction);
             if ($gcallbackFunction != null) {
                 $this->exts->executeSafeScript($gcallbackFunction . '("' . $this->exts->recaptcha_answer . '");');
@@ -302,8 +275,12 @@ public $google_username_selector = 'input[name="identifier"]:not([aria-hidden="t
 public $google_submit_username_selector = '#identifierNext, input#submit, input#next';
 public $google_password_selector = 'input[name="password"], input[name="Passwd"]';
 public $google_submit_password_selector = '#passwordNext, #gaia_loginform input#signIn, #passwordNext button, input#submit';
+public $security_phone_number = '';
+public $recovery_email = '';
 private function loginGoogleIfRequired()
 {
+    $this->security_phone_number = isset($this->exts->config_array["security_phone_number"]) ? $this->exts->config_array["security_phone_number"] : '';
+    $this->recovery_email = isset($this->exts->config_array["recovery_email"]) ? $this->exts->config_array["recovery_email"] : '';
     if ($this->exts->urlContains('google.')) {
         if ($this->exts->urlContains('/webreauth')) {
             $this->exts->moveToElementAndClick('#identifierNext');
@@ -748,24 +725,24 @@ private function googlecheckFillRecaptcha()
 
             // Step 2, check if callback function need executed
             $gcallbackFunction = $this->exts->execute_javascript('
-                if(document.querySelector("[data-callback]") != null){
-                    document.querySelector("[data-callback]").getAttribute("data-callback");
-                } else {
-                    var result = ""; var found = false;
-                    function recurse (cur, prop, deep) {
-                        if(deep > 5 || found){ return;}console.log(prop);
-                        try {
-                            if(prop.indexOf(".callback") > -1){result = prop; found = true; return;
-                            } else { if(cur == undefined || cur == null || cur instanceof Element || Object(cur) !== cur || Array.isArray(cur)){ return;}deep++;
-                                for (var p in cur) { recurse(cur[p], prop ? prop + "." + p : p, deep);}
-                            }
-                        } catch(ex) { console.log("ERROR in function: " + ex); return; }
+        if(document.querySelector("[data-callback]") != null){
+            document.querySelector("[data-callback]").getAttribute("data-callback");
+        } else {
+            var result = ""; var found = false;
+            function recurse (cur, prop, deep) {
+                if(deep > 5 || found){ return;}console.log(prop);
+                try {
+                    if(prop.indexOf(".callback") > -1){result = prop; found = true; return;
+                    } else { if(cur == undefined || cur == null || cur instanceof Element || Object(cur) !== cur || Array.isArray(cur)){ return;}deep++;
+                        for (var p in cur) { recurse(cur[p], prop ? prop + "." + p : p, deep);}
                     }
+                } catch(ex) { console.log("ERROR in function: " + ex); return; }
+            }
 
-                    recurse(___grecaptcha_cfg.clients[0], "", 0);
-                    found ? "___grecaptcha_cfg.clients[0]." + result : null;
-                }
-            ');
+            recurse(___grecaptcha_cfg.clients[0], "", 0);
+            found ? "___grecaptcha_cfg.clients[0]." + result : null;
+        }
+    ');
             $this->exts->log('Callback function: ' . $gcallbackFunction);
             if ($gcallbackFunction != null) {
                 $this->exts->execute_javascript($gcallbackFunction . '("' . $this->exts->recaptcha_answer . '");');
@@ -1073,11 +1050,11 @@ private function fillMicrosoftTwoFactor($input_selector, $message_selector, $rem
         $this->exts->two_factor_notif_msg_de = $this->exts->two_factor_notif_msg_en;
     }
     $this->exts->log("Message:\n" . $this->exts->two_factor_notif_msg_en);
-    $this->notification_uid = "";
+    $this->exts->notification_uid = "";
 
     $two_factor_code = trim($this->exts->fetchTwoFactorCode());
     if (empty($two_factor_code) || trim($two_factor_code) == '') {
-        $this->notification_uid = "";
+        $this->exts->notification_uid = "";
         $two_factor_code = trim($this->exts->fetchTwoFactorCode());
     }
     if (!empty($two_factor_code) && trim($two_factor_code) != '') {
@@ -1112,3 +1089,27 @@ private function fillMicrosoftTwoFactor($input_selector, $message_selector, $rem
     }
 }
 // End MICROSOFT login
+
+/**
+    * Method to Check where user is logged in or not
+    * return boolean true/false
+    */
+public  function checkLogin()
+{
+    $this->exts->log("Begin checkLogin ");
+    $isLoggedIn = false;
+    try {
+        for ($wait = 0; $wait < 2 && $this->exts->executeSafeScript("return !!document.querySelector('" . $this->check_login_success_selector . "');") != 1; $wait++) {
+            $this->exts->log('Waiting for login.....');
+            sleep(10);
+        }
+        if ($this->isExists($this->check_login_success_selector)) {
+            $this->exts->log(">>>>>>>>>>>>>>>Login successful!!!!");
+            $isLoggedIn = true;
+        }
+    } catch (Exception $exception) {
+
+        $this->exts->log("Exception checking loggedin " . $exception);
+    }
+    return $isLoggedIn;
+}

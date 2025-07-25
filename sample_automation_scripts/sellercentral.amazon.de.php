@@ -1,4 +1,4 @@
-<?php // replace exists to isExists function and updated region select selector
+<?php // 
 
 /**
  * Chrome Remote via Chrome devtool protocol script, for specific process/portal
@@ -57,7 +57,7 @@ class PortalScriptCDP
         }
     }
 
-    // Server-Portal-ID: 916 - Last modified: 14.07.2025 14:28:56 UTC - User: 1
+    // Server-Portal-ID: 916 - Last modified: 23.07.2025 06:47:20 UTC - User: 1
 
     public $baseUrl = 'https://sellercentral.amazon.de/home';
     public $username_selector = 'form[name="signIn"] input[name="email"]:not([type="hidden"])';
@@ -644,8 +644,8 @@ class PortalScriptCDP
                 sleep(15);
                 //$this->exts->changeSelectbox('select#sc-mkt-picker-switcher-select', $marketplace_option);
                 $this->exts->execute_javascript('
-            $("select#sc-mkt-picker-switcher-select").val("' . $marketplace_option . '");
-            $("select#sc-mkt-picker-switcher-select").change();');
+        $("select#sc-mkt-picker-switcher-select").val("' . $marketplace_option . '");
+        $("select#sc-mkt-picker-switcher-select").change();');
                 sleep(15);
 
                 if ($this->exts->getElement($this->password_selector) == null) {
@@ -1115,20 +1115,20 @@ document.querySelectorAll(\'.currentpagination + a\')[0].click();
                             if ($this->isExists('#sc-content-container .transaction-details-body-section .event-details-body')) {
                                 // Clear some alert, popup..etc
                                 $this->exts->executeSafeScript('
-                if(document.querySelector("kat-alert") != null){
-                document.querySelector("kat-alert").shadowRoot.querySelector("[part=alert-dismiss-button]").click();
-                }
-            ');
+            if(document.querySelector("kat-alert") != null){
+            document.querySelector("kat-alert").shadowRoot.querySelector("[part=alert-dismiss-button]").click();
+            }
+        ');
                                 $this->exts->moveToElementAndClick('.katHmdCancelBtn');
                                 // END clearing alert..
 
                                 // Capture page if detail displayed
                                 $this->exts->executeSafeScript('
-                var divs = document.querySelectorAll("body > div > *:not(#sc-content-container)");
-                for( var i = 0; i < divs.length; i++){
-                    divs[i].style.display = "none";
-                }
-            ');
+            var divs = document.querySelectorAll("body > div > *:not(#sc-content-container)");
+            for( var i = 0; i < divs.length; i++){
+                divs[i].style.display = "none";
+            }
+        ');
 
                                 $downloaded_file = $this->exts->download_current($invoiceFileName, 0);
                                 if (trim($downloaded_file) != '' && file_exists($downloaded_file)) {
@@ -1151,13 +1151,13 @@ document.querySelectorAll(\'.currentpagination + a\')[0].click();
                 // Process next page
                 // This page using shadow element, We must process via JS
                 $is_next = $this->exts->executeSafeScript('
-                try {
-                document.querySelector("kat-pagination").shadowRoot.querySelector("[part=pagination-nav-right]:not(.end)").click();
-                return true;
-                } catch(ex){
-                return false;
-                }
-            ');
+            try {
+            document.querySelector("kat-pagination").shadowRoot.querySelector("[part=pagination-nav-right]:not(.end)").click();
+            return true;
+            } catch(ex){
+            return false;
+            }
+        ');
                 if ($is_next && $this->exts->config_array["restrictPages"] == '0') {
                     sleep(7);
                 } else {
@@ -1230,8 +1230,8 @@ document.querySelectorAll(\'.currentpagination + a\')[0].click();
         if ($this->isExists('select[name="reportType"]') && $pageCount == 1) {
             //$this->exts->changeSelectbox('select[name="reportType"]', "VAT Invoices");
             $this->exts->execute_javascript('
-            $("select[name=\'reportType\']").val("VAT Invoices");
-            $("select[name=\'reportType\']").change();');
+        $("select[name=\'reportType\']").val("VAT Invoices");
+        $("select[name=\'reportType\']").change();');
             sleep(10);
             if ($this->isExists('li#vtr-start-date2 input#vtr-start-date-calendar2')) {
                 $currentStart_date = $this->exts->getElement('li#vtr-start-date2 input#vtr-start-date-calendar2')->getAttribute('aria-label');
@@ -1460,14 +1460,14 @@ document.querySelectorAll(\'.currentpagination + a\')[0].click();
 
                 if (count($this->exts->getElements('#printableSections')) > 0) {
                     $this->exts->executeSafeScript('
-                var printableView = document.getElementById("printableSections");
-                var allLinks = document.getElementsByTagName("link");
-                var allStyles = document.getElementsByTagName("style");
-                var printableHTML = Array.from(allLinks).map(link => link.outerHTML).join("")
-                                    + Array.from(allStyles).map(link => link.outerHTML).join("")
-                                    + printableView.outerHTML;
-                document.body.innerHTML = printableHTML;
-            ');
+            var printableView = document.getElementById("printableSections");
+            var allLinks = document.getElementsByTagName("link");
+            var allStyles = document.getElementsByTagName("style");
+            var printableHTML = Array.from(allLinks).map(link => link.outerHTML).join("")
+                                + Array.from(allStyles).map(link => link.outerHTML).join("")
+                                + printableView.outerHTML;
+            document.body.innerHTML = printableHTML;
+        ');
 
                     $downloaded_file = $this->exts->download_current($invoiceFileName, 3);
                     if (trim($downloaded_file) != '' && file_exists($downloaded_file)) {
@@ -1478,10 +1478,10 @@ document.querySelectorAll(\'.currentpagination + a\')[0].click();
                     }
                 } else if (count($this->exts->getElements('#sc-navbar-container')) > 0) {
                     $this->exts->executeSafeScript('
-                document.querySelectorAll("#sc-navbar-container")[0].remove();
-                document.querySelectorAll("article.dashboard-header")[0].remove();
-                document.querySelectorAll(".sc-footer")[0].remove();
-            ');
+            document.querySelectorAll("#sc-navbar-container")[0].remove();
+            document.querySelectorAll("article.dashboard-header")[0].remove();
+            document.querySelectorAll(".sc-footer")[0].remove();
+        ');
 
                     $downloaded_file = $this->exts->download_current($invoiceFileName, 3);
                     if (trim($downloaded_file) != '' && file_exists($downloaded_file)) {
@@ -1531,23 +1531,23 @@ document.querySelectorAll(\'.currentpagination + a\')[0].click();
 
             // It using shadow root, so collect invoice detail by JS
             $invoices = $this->exts->executeSafeScript('
-            var data = [];
-            var trs = document.querySelectorAll("kat-data-table tbody tr .dashboard-link kat-link[href*=groupId]");
+        var data = [];
+        var trs = document.querySelectorAll("kat-data-table tbody tr .dashboard-link kat-link[href*=groupId]");
 
-            // Skip first row because it is current period, do not get it
-            for (var i = 1; i < trs.length; i ++) {
-            var link = trs[i].shadowRoot.querySelector("a");
-            var url = link.href;
+        // Skip first row because it is current period, do not get it
+        for (var i = 1; i < trs.length; i ++) {
+        var link = trs[i].shadowRoot.querySelector("a");
+        var url = link.href;
 
-            data.push({
-            invoiceName: url.split("groupId=").pop().split("&")[0],
-            invoiceDate: "",
-            invoiceAmount: "",
-            invoiceUrl: url
-            });
-            }
-            return data;
-            ');
+        data.push({
+        invoiceName: url.split("groupId=").pop().split("&")[0],
+        invoiceDate: "",
+        invoiceAmount: "",
+        invoiceUrl: url
+        });
+        }
+        return data;
+        ');
             // Download all invoices
             $this->exts->log('Statements found: ' . count($invoices));
             foreach ($invoices as $invoice) {
@@ -1575,10 +1575,10 @@ document.querySelectorAll(\'.currentpagination + a\')[0].click();
                     if ($this->isExists('.dashboard-content #print-this-page-link')) {
                         // Clear some alert, popup..etc
                         $this->exts->executeSafeScript('
-                if(document.querySelector("kat-alert") != null){
-                document.querySelector("kat-alert").shadowRoot.querySelector("[part=alert-dismiss-button]").click();
-                }
-            ');
+            if(document.querySelector("kat-alert") != null){
+            document.querySelector("kat-alert").shadowRoot.querySelector("[part=alert-dismiss-button]").click();
+            }
+        ');
                         $this->exts->moveToElementAndClick('.katHmdCancelBtn');
                         // END clearing alert..
 

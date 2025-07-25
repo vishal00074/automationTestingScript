@@ -1,5 +1,4 @@
-<?php
-
+<?php // replace click_if_existed to moveToElementAndClick added limit to download only 50 invoices if restricted page != 0
 /**
  * Chrome Remote via Chrome devtool protocol script, for specific process/portal
  *
@@ -57,21 +56,19 @@ class PortalScriptCDP
         }
     }
 
-    // Server-Portal-ID: 80141 - Last modified: 01.04.2025 13:53:08 UTC - User: 1
+    // Server-Portal-ID: 80141 - Last modified: 23.07.2025 05:56:54 UTC - User: 1
 
-    // Script here
+    // Start Script
+
     public $baseUrl = 'https://app.clickup.com';
     public $loginUrl = 'https://app.clickup.com/login';
     public $invoicePageUrl = '';
-
     public $username_selector = 'form input#email-input, input#login-email-input';
     public $password_selector = 'form input#password-input, input#login-password-input';
     public $remember_me_selector = '';
     public $submit_login_btn = 'form button#login-submit, button.login-page-new__main-form-button[type="submit"]';
-
     public $check_login_failed_selector = '.show form#login-form .cu-form__error.show';
     public $check_login_success_selector = 'div.cu-avatar-container, a#signout, .account-picker a, .user-main-settings-menu__avatar';
-
     public $isNoInvoice = true;
 
     private function initPortal($count)
@@ -174,31 +171,6 @@ class PortalScriptCDP
         }
     }
 
-
-    /**
-     * Method to Check where user is logged in or not
-     * return boolean true/false
-     */
-    public  function checkLogin()
-    {
-        $this->exts->log("Begin checkLogin ");
-        $isLoggedIn = false;
-        try {
-            for ($wait = 0; $wait < 2 && $this->exts->executeSafeScript("return !!document.querySelector('" . $this->check_login_success_selector . "');") != 1; $wait++) {
-                $this->exts->log('Waiting for login.....');
-                sleep(10);
-            }
-            if ($this->isExists($this->check_login_success_selector)) {
-                $this->exts->log(">>>>>>>>>>>>>>>Login successful!!!!");
-                $isLoggedIn = true;
-            }
-        } catch (Exception $exception) {
-
-            $this->exts->log("Exception checking loggedin " . $exception);
-        }
-        return $isLoggedIn;
-    }
-
     private function checkFillLogin()
     {
         if ($this->exts->getElement($this->username_selector) != null) {
@@ -246,10 +218,10 @@ class PortalScriptCDP
                 $this->exts->moveToElementAndType($this->password_selector, $this->password);
                 sleep(1);
                 $this->exts->capture("2-login-page-filled");
-                $this->exts->click_if_existed($this->submit_login_btn);
+                $this->exts->moveToElementAndClick($this->submit_login_btn);
                 sleep(5);
                 $this->checkFillRecaptcha();
-                $this->exts->click_if_existed($this->submit_login_btn);
+                $this->exts->moveToElementAndClick($this->submit_login_btn);
                 if (strpos(strtolower($this->exts->extract('[data-test="toast__new-item"]')), 'no account was found') !== false) {
                     $this->exts->loginFailure(1);
                 }
@@ -303,6 +275,7 @@ class PortalScriptCDP
                 if ($this->exts->getElement($two_factor_selector) == null) {
                     $this->exts->log("Two factor solved");
                 } else if ($this->exts->two_factor_attempts < 3) {
+                    $this->exts->notification_uid = '';
                     $this->exts->two_factor_attempts++;
                     $this->checkFillTwoFactor();
                 } else {
@@ -340,25 +313,25 @@ class PortalScriptCDP
 
                 // Step 2, check if callback function need executed
                 $gcallbackFunction = $this->exts->executeSafeScript('
-					if(document.querySelector("[data-callback]") != null){
-						return document.querySelector("[data-callback]").getAttribute("data-callback");
-					}
+			if(document.querySelector("[data-callback]") != null){
+				return document.querySelector("[data-callback]").getAttribute("data-callback");
+			}
 
-					var result = ""; var found = false;
-					function recurse (cur, prop, deep) {
-					    if(deep > 5 || found){ return;}console.log(prop);
-					    try {
-					        if(cur == undefined || cur == null || cur instanceof Element || Object(cur) !== cur || Array.isArray(cur)){ return;}
-					        if(prop.indexOf(".callback") > -1){result = prop; found = true; return;
-					        } else { deep++;
-					            for (var p in cur) { recurse(cur[p], prop ? prop + "." + p : p, deep);}
-					        }
-					    } catch(ex) { console.log("ERROR in function: " + ex); return; }
-					}
+			var result = ""; var found = false;
+			function recurse (cur, prop, deep) {
+			    if(deep > 5 || found){ return;}console.log(prop);
+			    try {
+			        if(cur == undefined || cur == null || cur instanceof Element || Object(cur) !== cur || Array.isArray(cur)){ return;}
+			        if(prop.indexOf(".callback") > -1){result = prop; found = true; return;
+			        } else { deep++;
+			            for (var p in cur) { recurse(cur[p], prop ? prop + "." + p : p, deep);}
+			        }
+			    } catch(ex) { console.log("ERROR in function: " + ex); return; }
+			}
 
-					recurse(___grecaptcha_cfg.clients[0], "", 0);
-					return found ? "___grecaptcha_cfg.clients[0]." + result : null;
-				');
+			recurse(___grecaptcha_cfg.clients[0], "", 0);
+			return found ? "___grecaptcha_cfg.clients[0]." + result : null;
+		');
                 $this->exts->log('Callback function: ' . $gcallbackFunction);
                 if ($gcallbackFunction != null) {
                     $this->exts->executeSafeScript($gcallbackFunction . '("' . $this->exts->recaptcha_answer . '");');
@@ -375,8 +348,12 @@ class PortalScriptCDP
     public $google_submit_username_selector = '#identifierNext, input#submit, input#next';
     public $google_password_selector = 'input[name="password"], input[name="Passwd"]';
     public $google_submit_password_selector = '#passwordNext, #gaia_loginform input#signIn, #passwordNext button, input#submit';
+    public $security_phone_number = '';
+    public $recovery_email = '';
     private function loginGoogleIfRequired()
     {
+        $this->security_phone_number = isset($this->exts->config_array["security_phone_number"]) ? $this->exts->config_array["security_phone_number"] : '';
+        $this->recovery_email = isset($this->exts->config_array["recovery_email"]) ? $this->exts->config_array["recovery_email"] : '';
         if ($this->exts->urlContains('google.')) {
             if ($this->exts->urlContains('/webreauth')) {
                 $this->exts->moveToElementAndClick('#identifierNext');
@@ -821,24 +798,24 @@ class PortalScriptCDP
 
                 // Step 2, check if callback function need executed
                 $gcallbackFunction = $this->exts->execute_javascript('
-					if(document.querySelector("[data-callback]") != null){
-						document.querySelector("[data-callback]").getAttribute("data-callback");
-					} else {
-						var result = ""; var found = false;
-						function recurse (cur, prop, deep) {
-						    if(deep > 5 || found){ return;}console.log(prop);
-						    try {
-						        if(prop.indexOf(".callback") > -1){result = prop; found = true; return;
-						        } else { if(cur == undefined || cur == null || cur instanceof Element || Object(cur) !== cur || Array.isArray(cur)){ return;}deep++;
-						            for (var p in cur) { recurse(cur[p], prop ? prop + "." + p : p, deep);}
-						        }
-						    } catch(ex) { console.log("ERROR in function: " + ex); return; }
-						}
+			if(document.querySelector("[data-callback]") != null){
+				document.querySelector("[data-callback]").getAttribute("data-callback");
+			} else {
+				var result = ""; var found = false;
+				function recurse (cur, prop, deep) {
+				    if(deep > 5 || found){ return;}console.log(prop);
+				    try {
+				        if(prop.indexOf(".callback") > -1){result = prop; found = true; return;
+				        } else { if(cur == undefined || cur == null || cur instanceof Element || Object(cur) !== cur || Array.isArray(cur)){ return;}deep++;
+				            for (var p in cur) { recurse(cur[p], prop ? prop + "." + p : p, deep);}
+				        }
+				    } catch(ex) { console.log("ERROR in function: " + ex); return; }
+				}
 
-						recurse(___grecaptcha_cfg.clients[0], "", 0);
-						found ? "___grecaptcha_cfg.clients[0]." + result : null;
-					}
-				');
+				recurse(___grecaptcha_cfg.clients[0], "", 0);
+				found ? "___grecaptcha_cfg.clients[0]." + result : null;
+			}
+		');
                 $this->exts->log('Callback function: ' . $gcallbackFunction);
                 if ($gcallbackFunction != null) {
                     $this->exts->execute_javascript($gcallbackFunction . '("' . $this->exts->recaptcha_answer . '");');
@@ -1146,11 +1123,11 @@ class PortalScriptCDP
             $this->exts->two_factor_notif_msg_de = $this->exts->two_factor_notif_msg_en;
         }
         $this->exts->log("Message:\n" . $this->exts->two_factor_notif_msg_en);
-        $this->notification_uid = "";
+        $this->exts->notification_uid = "";
 
         $two_factor_code = trim($this->exts->fetchTwoFactorCode());
         if (empty($two_factor_code) || trim($two_factor_code) == '') {
-            $this->notification_uid = "";
+            $this->exts->notification_uid = "";
             $two_factor_code = trim($this->exts->fetchTwoFactorCode());
         }
         if (!empty($two_factor_code) && trim($two_factor_code) != '') {
@@ -1186,6 +1163,31 @@ class PortalScriptCDP
     }
     // End MICROSOFT login
 
+    /**
+     * Method to Check where user is logged in or not
+     * return boolean true/false
+     */
+    public  function checkLogin()
+    {
+        $this->exts->log("Begin checkLogin ");
+        $isLoggedIn = false;
+        try {
+            for ($wait = 0; $wait < 2 && $this->exts->executeSafeScript("return !!document.querySelector('" . $this->check_login_success_selector . "');") != 1; $wait++) {
+                $this->exts->log('Waiting for login.....');
+                sleep(10);
+            }
+            if ($this->isExists($this->check_login_success_selector)) {
+                $this->exts->log(">>>>>>>>>>>>>>>Login successful!!!!");
+                $isLoggedIn = true;
+            }
+        } catch (Exception $exception) {
+
+            $this->exts->log("Exception checking loggedin " . $exception);
+        }
+        return $isLoggedIn;
+    }
+
+    public $totalInvoices = 0;
     private function processInvoices($teamId)
     {
         sleep(10);
@@ -1197,6 +1199,7 @@ class PortalScriptCDP
         }
 
         $this->exts->capture('4-invoices-page');
+        $restrictPages = isset($this->exts->config_array["restrictPages"]) ? (int)@$this->exts->config_array["restrictPages"] : 3;
 
         $invoice_tab_button = $this->exts->getElementByText('button.tab-item.ng-star-inserted', 'invoice', null, false);
         if ($invoice_tab_button != null) {
@@ -1211,24 +1214,28 @@ class PortalScriptCDP
         }
         if ($this->exts->getElement('div.billing-plan__invoices-item') != null) {
             $this->exts->execute_javascript('
-				closeButtons= document.querySelectorAll(".cu-modal__close");
-				for(var i = 0; i< closeButtons.length; i ++){
-					closeButtons[i].click();
-				}
-			');
+                closeButtons= document.querySelectorAll(".cu-modal__close");
+                for(var i = 0; i< closeButtons.length; i ++){
+                    closeButtons[i].click();
+                }
+            ');
 
             $this->exts->log('Invoices found');
             $this->exts->capture("4-page-opened");
             $invoices = [];
             $paths = explode('/', $this->exts->getUrl());
             $currentDomainUrl = $paths[0] . '//' . $paths[2];
-            $restrictPages = isset($this->exts->config_array["restrictPages"]) ? (int)@$this->exts->config_array["restrictPages"] : 3;
             $maxBackDate = date('Y-m-d', strtotime('-1 years'));
             if ($restrictPages == 3) {
                 $maxBackDate = date('Y-m-d', strtotime('-6 months'));
             }
             $rows = $this->exts->getElements('div.billing-plan__invoices-item');
             foreach ($rows as $index => $row) {
+
+                if ($restrictPages != 0 && $this->totalInvoices >= 50) {
+                    return;
+                }
+
                 $tags = $this->exts->getElements('div', $row);
                 if (count($tags) >= 3) {
 
@@ -1304,6 +1311,7 @@ class PortalScriptCDP
                 $downloaded_file = $this->exts->direct_download($invoice['invoiceUrl'], 'pdf', $invoiceFileName);
                 if (trim($downloaded_file) != '' && file_exists($downloaded_file)) {
                     $this->exts->new_invoice($invoice['invoiceName'], $invoice['invoiceDate'], $invoice['invoiceAmount'], $invoiceFileName);
+                    $this->totalInvoices++;
                 } else {
                     $this->exts->log(__FUNCTION__ . '::No download ' . $invoiceFileName);
                 }
@@ -1311,6 +1319,11 @@ class PortalScriptCDP
         } else if ($this->isExists('cu-billing-invoices-table table tbody tr a.cu-billing-invoices-download-button')) {
             $rows = count($this->exts->getElements('cu-billing-invoices-table table tbody tr'));
             for ($i = 0; $i < $rows; $i++) {
+
+                if ($restrictPages != 0 && $this->totalInvoices >= 50) {
+                    return;
+                }
+
                 //$row = $this->exts->getElements('#recieptList table > tbody > tr')[$i];
                 $row = $this->exts->getElements('cu-billing-invoices-table table tbody tr')[$i];
                 $tags = $this->exts->getElements('td', $row);
@@ -1318,7 +1331,7 @@ class PortalScriptCDP
                     $this->isNoInvoice = false;
                     $download_button = $this->exts->getElement('cu-billing-invoices-download-button', $tags[3]);
                     $invoiceName = trim($tags[1]->getAttribute('innerText'));
-                    $invoiceFileName = !empty($invoiceName) ?  $invoiceName . '.pdf': '';
+                    $invoiceFileName = !empty($invoiceName) ?  $invoiceName . '.pdf' : '';
                     $invoiceDate = trim($tags[0]->getAttribute('innerText'));
                     $invoiceAmount = trim(preg_replace('/[^\d\.\,]/', '', $tags[2]->getAttribute('innerText'))) . ' USD';
 
@@ -1337,6 +1350,7 @@ class PortalScriptCDP
 
                         if (trim($downloaded_file) != '' && file_exists($downloaded_file)) {
                             $this->exts->new_invoice($invoiceName, $parsed_date, $invoiceAmount, $invoiceFileName);
+                            $this->totalInvoices++;
                         } else {
                             $this->exts->log(__FUNCTION__ . '::No download ' . $invoiceFileName);
                             $this->exts->capture('4-failed-download');
