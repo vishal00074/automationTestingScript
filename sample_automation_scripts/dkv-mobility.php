@@ -62,7 +62,6 @@ class PortalScriptCDP
     public $baseUrl = 'https://www.dkv-mobility.com/en/';
     public $loginUrl = 'https://my.dkv-mobility.com/dkv-portal-webapp';
     public $invoicePageUrl = 'https://my.dkv-mobility.com/customer/invoices/overview';
-
     public $username_selector = 'input#username';
     public $password_selector = 'input#password';
     public $remember_me_selector = '';
