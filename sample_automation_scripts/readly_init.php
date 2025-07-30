@@ -80,7 +80,9 @@ private function initPortal($count)
             $this->exts->log(">>>>>>>>>>>>>>>Login successful!!!!");
             $this->exts->capture("LoginSuccess");
 
-            c
+            if (!empty($this->exts->config_array['allow_login_success_request'])) {
+                $this->exts->triggerLoginSuccess();
+            }
 
             $this->exts->success();
         } else {
