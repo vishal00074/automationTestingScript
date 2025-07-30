@@ -70,7 +70,7 @@ class PortalScriptCDP
     public $remember_me_selector = '';
     public $submit_login_selector = 'form input[name="commit"]';
 
-    public $check_login_failed_selector = 'div.alert-display-top-center p';
+    public $check_login_failed_selector = 'div[class*="panelWidth"] h1';
     public $check_login_success_selector = 'a[href*="explore"]';
 
     public $isNoInvoice = true;
