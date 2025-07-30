@@ -1155,6 +1155,7 @@ class PortalScriptCDP
             } else {
                 $this->exts->openUrl($invoice['invoiceUrl']);
                 sleep(5);
+                // not good approach 
                 $download_tax_invoice_button = $this->exts->getElement('//button//*[contains(text(), "herunterladen") or contains(text(), "ownload")]', null, 'xpath');
                 if ($download_tax_invoice_button == null) {
                     sleep(15);
