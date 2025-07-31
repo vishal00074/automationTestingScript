@@ -8,7 +8,7 @@ public $remember_me_selector = 'form#hoodForm label input[data-parsley-multiple*
 public $submit_login_selector = 'form#hoodForm button[type="submit"]';
 
 public $check_login_failed_selector = 'div[class*="iError iErrorActive"] ul[class*="iListMessage"] li';
-public $check_login_success_selector = 'div[onclick*="logout"] ';
+public $check_login_success_selector = 'div.iHeaderSubMenu  div[onclick*="logout"]';
 
 public $isNoInvoice = true;
 /**
@@ -25,17 +25,17 @@ private function initPortal($count)
     $this->exts->loadCookiesFromFile();
     sleep(1);
     $this->exts->openUrl($this->baseUrl);
-    sleep(5);
+    sleep(2);
     $this->waitFor($this->check_login_success_selector);
     $this->exts->capture('1-init-page');
 
     $this->exts->execute_javascript('
-            var shadow = document.querySelector("#usercentrics-cmp-ui");
-            if(shadow){
-                shadow.shadowRoot.querySelector(\'button[id="accept"]\').click();
-            }
-        ');
-
+        var shadow = document.querySelector("#usercentrics-cmp-ui");
+        if(shadow){
+            shadow.shadowRoot.querySelector(\'button[id="accept"]\').click();
+        }
+    ');
+    sleep(5);
     // If user hase not logged in from cookie, clear cookie, open the login url and do login
     if ($this->exts->getElement($this->check_login_success_selector) == null) {
         $this->exts->log('NOT logged via cookie');
@@ -54,8 +54,6 @@ private function initPortal($count)
     // }
     if ($this->exts->getElement($this->check_login_success_selector) != null) {
         sleep(3);
-        $this->exts->log(__FUNCTION__ . '::User logged in');
-        $this->exts->capture("3-login-success");
 
         $this->exts->execute_javascript('
             var shadow = document.querySelector("#usercentrics-cmp-ui");
@@ -63,6 +61,10 @@ private function initPortal($count)
                 shadow.shadowRoot.querySelector(\'button[id="accept"]\').click();
             }
         ');
+        sleep(5);
+
+        $this->exts->log(__FUNCTION__ . '::User logged in');
+        $this->exts->capture("3-login-success");
 
         if (!empty($this->exts->config_array['allow_login_success_request'])) {
             $this->exts->triggerLoginSuccess();
