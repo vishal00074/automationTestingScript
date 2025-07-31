@@ -1,4 +1,4 @@
-<?php // handle empty invoice name case and replace waitTillPresentAny and waitTillPresent to waitFor added to accept cookies
+<?php // updated login success selector and added code to click on cookies button and added restriction to download only 50 invoice if restricpage != 0
 
 /**
  * Chrome Remote via Chrome devtool protocol script, for specific process/portal
@@ -57,8 +57,6 @@ class PortalScriptCDP
         }
     }
 
-    // Server-Portal-ID: 20627 - Last modified: 25.02.2025 12:51:20 UTC - User: 1
-
     public $baseUrl = 'https://www.hood.de/mein-hood.htm?sec=1';
     public $loginUrl = 'https://www.hood.de/mein-hood.htm?sec=1';
     public $invoicePageUrl = 'https://www.hood.de/mein-hood.htm?sec=1';
@@ -69,7 +67,7 @@ class PortalScriptCDP
     public $submit_login_selector = 'form#hoodForm button[type="submit"]';
 
     public $check_login_failed_selector = 'div[class*="iError iErrorActive"] ul[class*="iListMessage"] li';
-    public $check_login_success_selector = 'div[onclick*="logout"] ';
+    public $check_login_success_selector = 'div.iHeaderSubMenu  div[onclick*="logout"]';
 
     public $isNoInvoice = true;
     /**
@@ -86,17 +84,17 @@ class PortalScriptCDP
         $this->exts->loadCookiesFromFile();
         sleep(1);
         $this->exts->openUrl($this->baseUrl);
-        sleep(5);
+        sleep(2);
         $this->waitFor($this->check_login_success_selector);
         $this->exts->capture('1-init-page');
 
         $this->exts->execute_javascript('
-                var shadow = document.querySelector("#usercentrics-cmp-ui");
-                if(shadow){
-                    shadow.shadowRoot.querySelector(\'button[id="accept"]\').click();
-                }
-            ');
-
+            var shadow = document.querySelector("#usercentrics-cmp-ui");
+            if(shadow){
+                shadow.shadowRoot.querySelector(\'button[id="accept"]\').click();
+            }
+        ');
+        sleep(5);
         // If user hase not logged in from cookie, clear cookie, open the login url and do login
         if ($this->exts->getElement($this->check_login_success_selector) == null) {
             $this->exts->log('NOT logged via cookie');
@@ -115,8 +113,6 @@ class PortalScriptCDP
         // }
         if ($this->exts->getElement($this->check_login_success_selector) != null) {
             sleep(3);
-            $this->exts->log(__FUNCTION__ . '::User logged in');
-            $this->exts->capture("3-login-success");
 
             $this->exts->execute_javascript('
                 var shadow = document.querySelector("#usercentrics-cmp-ui");
@@ -124,9 +120,22 @@ class PortalScriptCDP
                     shadow.shadowRoot.querySelector(\'button[id="accept"]\').click();
                 }
             ');
+            sleep(5);
+
+            $this->exts->log(__FUNCTION__ . '::User logged in');
+            $this->exts->capture("3-login-success");
 
             // Open invoices url and download invoice
             $this->exts->openUrl($this->invoicePageUrl);
+            sleep(10);
+
+            $this->exts->execute_javascript('
+                var shadow = document.querySelector("#usercentrics-cmp-ui");
+                if(shadow){
+                    shadow.shadowRoot.querySelector(\'button[id="accept"]\').click();
+                }
+            ');
+            sleep(5);
             $this->processInvoices();
 
             // Final, check no invoice
@@ -180,9 +189,12 @@ class PortalScriptCDP
         }
     }
 
+    public $totalInvoices = 0;
+
     private function processInvoices()
     {
         sleep(15);
+        $restrictPages = isset($this->exts->config_array["restrictPages"]) ? (int) @$this->exts->config_array["restrictPages"] : 3;
 
         $this->exts->capture("4-invoices-page");
         $this->exts->moveToElementAndClick('div.iMySettingsHeader');
@@ -225,6 +237,11 @@ class PortalScriptCDP
         // Download all invoices
         $this->exts->log('Invoices found: ' . count($invoices));
         foreach ($invoices as $invoice) {
+
+            if ($restrictPages != 0 && $this->totalInvoices >= 50) {
+                return;
+            }
+
             $this->exts->log('--------------------------');
             $this->exts->log('invoiceName: ' . $invoice['invoiceName']);
             $this->exts->log('invoiceDate: ' . $invoice['invoiceDate']);
@@ -252,6 +269,7 @@ class PortalScriptCDP
                 if (trim($downloaded_file) != "" && file_exists($downloaded_file)) {
                     $this->exts->log("create file");
                     $this->exts->new_invoice($invoice['invoiceName'], $invoice['invoiceDate'], $invoice['invoiceAmount'], $downloaded_file);
+                    $this->totalInvoices++;
                 }
             }
         }
