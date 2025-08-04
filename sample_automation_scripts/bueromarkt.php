@@ -1,4 +1,4 @@
-<?php // handle empty invoice name case updated download code
+<?php //  added dateRange logic 
 
 /**
  * Chrome Remote via Chrome devtool protocol script, for specific process/portal
@@ -57,7 +57,7 @@ class PortalScriptCDP
         }
     }
 
-    // Server-Portal-ID: 53506 - Last modified: 05.02.2025 08:43:44 UTC - User: 1
+    // Server-Portal-ID: 53506 - Last modified: 17.07.2025 14:41:47 UTC - User: 1
 
     public $baseUrl = 'https://www.bueromarkt-ag.de/';
     public $loginUrl = 'https://www.bueromarkt-ag.de/anmeldung/anmelden_auswahl.php?reg=1';
@@ -110,12 +110,12 @@ class PortalScriptCDP
             }
             // accept cookies button
             $this->exts->execute_javascript('
-			var shadow = document.querySelector("#usercentrics-root").shadowRoot;
-			var button = shadow.querySelector(\'button[data-testid="uc-accept-all-button"]\')
-			if(button){
-				button.click();
-			}
-		');
+		var shadow = document.querySelector("#usercentrics-root").shadowRoot;
+		var button = shadow.querySelector(\'button[data-testid="uc-accept-all-button"]\')
+		if(button){
+			button.click();
+		}
+	');
 
             $this->waitForLoginPage();
             sleep(20);
@@ -194,25 +194,25 @@ class PortalScriptCDP
 
                 // Step 2, check if callback function need executed
                 $gcallbackFunction = $this->exts->execute_javascript('
-				if(document.querySelector("[data-callback]") != null){
-					return document.querySelector("[data-callback]").getAttribute("data-callback");
-				}
+			if(document.querySelector("[data-callback]") != null){
+				return document.querySelector("[data-callback]").getAttribute("data-callback");
+			}
 
-				var result = ""; var found = false;
-				function recurse (cur, prop, deep) {
-					if(deep > 5 || found){ return;}console.log(prop);
-					try {
-						if(cur == undefined || cur == null || cur instanceof Element || Object(cur) !== cur || Array.isArray(cur)){ return;}
-						if(prop.indexOf(".callback") > -1){result = prop; found = true; return;
-						} else { deep++;
-							for (var p in cur) { recurse(cur[p], prop ? prop + "." + p : p, deep);}
-						}
-					} catch(ex) { console.log("ERROR in function: " + ex); return; }
-				}
+			var result = ""; var found = false;
+			function recurse (cur, prop, deep) {
+				if(deep > 5 || found){ return;}console.log(prop);
+				try {
+					if(cur == undefined || cur == null || cur instanceof Element || Object(cur) !== cur || Array.isArray(cur)){ return;}
+					if(prop.indexOf(".callback") > -1){result = prop; found = true; return;
+					} else { deep++;
+						for (var p in cur) { recurse(cur[p], prop ? prop + "." + p : p, deep);}
+					}
+				} catch(ex) { console.log("ERROR in function: " + ex); return; }
+			}
 
-				recurse(___grecaptcha_cfg.clients[0], "", 0);
-				return found ? "___grecaptcha_cfg.clients[0]." + result : null;
-			');
+			recurse(___grecaptcha_cfg.clients[0], "", 0);
+			return found ? "___grecaptcha_cfg.clients[0]." + result : null;
+		');
                 $this->exts->log('Callback function: ' . $gcallbackFunction);
                 if ($gcallbackFunction != null) {
                     $this->exts->execute_javascript($gcallbackFunction . '("' . $this->exts->recaptcha_answer . '");');
@@ -283,9 +283,27 @@ class PortalScriptCDP
         }
     }
 
-    public $totalInvoices = 0;
+    public function dateRange($count)
+    {
 
-    private function processInvoices()
+        $selectDate = new DateTime();
+
+
+        if ($this->restrictPages == 0) {
+            $yearSelector = '-' . $count . ' years';
+            $selectDate->modify($yearSelector);
+            $formattedDate = strtoupper($selectDate->format('Y'));
+            $this->exts->log('date-range-3-years');
+            $this->exts->openUrl('https://www.bueromarkt-ag.de/mein-konto/bestellungen?filter=allOrders&year=' . $formattedDate);
+            return true;
+        } else {
+            // current year invoices already download 
+            return false;
+        }
+    }
+
+    public $totalInvoices = 0;
+    private function processInvoices($count = 0)
     {
         sleep(25);
         $this->exts->capture("4-invoices-page");
@@ -337,6 +355,11 @@ class PortalScriptCDP
                     }
                 }
             }
+        }
+        $count++;
+        $status = $this->dateRange($count);
+        if ($count < 3 && $status == true) {
+            $this->processInvoices($count);
         }
     }
 }
