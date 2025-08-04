@@ -1,4 +1,4 @@
-<?php //  updated login code remove waitTillPresent 
+<?php // working fine
 
 /**
  * Chrome Remote via Chrome devtool protocol script, for specific process/portal
@@ -57,9 +57,7 @@ class PortalScriptCDP
         }
     }
 
-    // Server-Portal-ID: 10796 - Last modified: 25.04.2025 13:30:49 UTC - User: 1
-
-    /*start script*/
+    // Server-Portal-ID: 10796 - Last modified: 21.07.2025 15:02:11 UTC - User: 1
 
     public $baseUrl = 'https://kundencenter.jtl-software.de/rechnungen';
     public $loginUrl = 'https://kundencenter.jtl-software.de/rechnungen';
