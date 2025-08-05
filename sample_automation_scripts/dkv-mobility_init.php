@@ -1,77 +1,32 @@
-public $baseUrl = 'https://www.dkv-mobility.com/en/';
+public $baseUrl = 'https://my.dkv-mobility.com/dkv-portal-webapp';
 public $loginUrl = 'https://my.dkv-mobility.com/dkv-portal-webapp';
-public $invoicePageUrl = 'https://my.dkv-mobility.com/customer/invoices/overview';
+public $invoicePageUrl = '';
+
 public $username_selector = 'input#username';
 public $password_selector = 'input#password';
 public $remember_me_selector = '';
-public $submit_login_selector = 'input[name="login"]';
+public $submit_login_selector = 'input#kc-login, button#kc-login';
 
-public $check_login_success_selector = '//div[contains(@class, "wireframe-icon") and contains(text(), "logout")]';
+public $check_login_failed_selector = 'div.dkv-input-error';
+public $check_login_success_selector = 'div[data-test="cf-logout-icon"]';
+
 public $isNoInvoice = true;
 
-/**
-    * Entry Method thats called for a portal
-    * @param Integer $count Number of times portal is retried.
-    */
 private function initPortal($count)
 {
+
     $this->exts->log('Begin initPortal ' . $count);
-    // Load cookies
     $this->exts->loadCookiesFromFile();
-    sleep(1);
-    $this->exts->openUrl($this->baseUrl);
-    sleep(10);
-    $this->waitFor($this->check_login_success_selector);
-    
-    if ($this->exts->exists('button#onetrust-accept-btn-handler')) {
-        $this->exts->moveToElementAndClick('button#onetrust-accept-btn-handler');
-        sleep(5);
-    }
-    $this->exts->capture('1-init-page');
-
-    // If user hase not logged in from cookie, clear cookie, open the login url and do login
-    if ($this->exts->getElement($this->check_login_success_selector) == null) {
+    $this->exts->openUrl($this->loginUrl);
+    if (!$this->checkLogin()) {
         $this->exts->log('NOT logged via cookie');
-        $this->exts->openUrl($this->loginUrl);
+        $this->fillForm(0);
         sleep(3);
-        $this->waitFor($this->username_selector);
-        $button_cookie = $this->exts->execute_javascript('document.querySelector("#usercentrics-root").shadowRoot.querySelector(\'button[data-testid="uc-accept-all-button"]\')');
-        if ($button_cookie != null) {
-            $this->exts->execute_javascript("arguments[0].click()", [$button_cookie]);
-            sleep(5);
-        }
-        $this->checkFillLogin();
-        $this->waitFor($this->check_login_success_selector, 5);
-        if ($this->exts->getElement('a#loginContinueLink') != null) {
-            $this->exts->moveToElementAndClick('a#loginContinueLink');
-            sleep(5);
-        }
-        $this->waitFor($this->check_login_success_selector, 5);
-        if ($this->exts->exists('button#onetrust-accept-btn-handler')) {
-            $this->exts->moveToElementAndClick('button#onetrust-accept-btn-handler');
-            sleep(5);
-        }
-        //click terms
-        if ($this->exts->exists('input#kc-accept') && $this->exts->getElement($this->check_login_success_selector) == null) {
-            $this->exts->moveToElementAndClick('input#kc-accept');
-            sleep(3);
-                $this->waitFor($this->check_login_success_selector, 5);
-            if ($this->exts->exists('input#kc-accept') && $this->exts->getElement($this->check_login_success_selector) == null) {
-                $this->exts->moveToElementAndClick('input#kc-accept');
-                sleep(3);
-                    $this->waitFor($this->check_login_success_selector, 5);
-            }
-        }
-        if ($this->exts->getElements('button#onetrust-accept-btn-handler') != null) {
-            $this->exts->moveToElementAndClick('button#onetrust-accept-btn-handler');
-            sleep(2);
-        }
     }
 
-    // then check user logged in or not
-    if ($this->exts->getElement($this->check_login_success_selector) != null) {
-        $this->exts->log(__FUNCTION__ . '::User logged in');
-        $this->exts->capture("3-login-success");
+    if ($this->checkLogin()) {
+        $this->exts->log(">>>>>>>>>>>>>>>Login successful!!!!");
+        $this->exts->capture("LoginSuccess");
 
         if (!empty($this->exts->config_array['allow_login_success_request'])) {
             $this->exts->triggerLoginSuccess();
@@ -79,55 +34,60 @@ private function initPortal($count)
 
         $this->exts->success();
     } else {
-        $this->exts->log(__FUNCTION__ . '::Use login failed');
-        if (strpos(strtolower($this->exts->extract('.kc-feedback-text')), 'account is disabled') !== false) {
-            $this->exts->account_not_ready();
-        }
-        if ($this->exts->exists('input[name="password-new"]')) {
-            $this->exts->account_not_ready();
-        }
-        if (!filter_var($this->username, FILTER_VALIDATE_EMAIL)) {
-            $this->exts->log("Username is not a valid email address");
-            $this->exts->loginFailure(1);
-        }
-        if ($this->exts->getElementByText('#dkv-login-container .alert-error, div#password-error', ['invalid username or password', 'tiger benutzername oder passwort', "Nom d'utilisateur ou mot de passe invalide.", 'utilisateur ou mot de passe invalide', 'Benutzername oder Passwort'], null, false) != null) {
+        if (stripos(strtolower($this->exts->extract($this->check_login_failed_selector)), 'passwor') !== false) {
+            $this->exts->log("Wrong credential !!!!");
             $this->exts->loginFailure(1);
         } else {
             $this->exts->loginFailure();
         }
     }
 }
-
-public function waitFor($selector, $seconds = 7)
+function fillForm($count)
 {
-    for ($wait = 0; $wait < 2 && $this->exts->executeSafeScript("return !!document.querySelector('" . $selector . "');") != 1; $wait++) {
-        $this->exts->log('Waiting for Selectors.....');
-        sleep($seconds);
+    $this->exts->log("Begin fillForm " . $count);
+    $this->exts->waitTillPresent($this->username_selector, 5);
+    try {
+        if ($this->exts->querySelector($this->username_selector) != null) {
+
+            $this->exts->capture("1-pre-login");
+            $this->exts->log("Enter Username");
+            $this->exts->moveToElementAndType($this->username_selector, $this->username);
+
+            $this->exts->log("Enter Password");
+            $this->exts->moveToElementAndType($this->password_selector, $this->password);
+            sleep(1);
+
+            if ($this->exts->exists($this->remember_me_selector)) {
+                $this->exts->click_by_xdotool($this->remember_me_selector);
+                sleep(1);
+            }
+            $this->exts->capture("1-login-page-filled");
+            sleep(5);
+            if ($this->exts->exists($this->submit_login_selector)) {
+                $this->exts->click_by_xdotool($this->submit_login_selector);
+            }
+        }
+    } catch (\Exception $exception) {
+
+        $this->exts->log("Exception filling loginform " . $exception->getMessage());
     }
 }
-
-private function checkFillLogin()
+function checkLogin()
 {
-    if ($this->exts->getElement($this->password_selector) != null) {
-        $this->exts->capture("2-login-page");
+    $this->exts->log("Begin checkLogin ");
+    $isLoggedIn = false;
+    try {
+        $this->exts->waitTillPresent($this->check_login_success_selector, 20);
+        if ($this->exts->exists($this->check_login_success_selector)) {
 
-        $this->exts->log("Enter Username");
-        $this->exts->moveToElementAndType($this->username_selector, $this->username);
-        sleep(1);
+            $this->exts->log(">>>>>>>>>>>>>>>Login successful!!!!");
 
-        $this->exts->log("Enter Password");
-        $this->exts->moveToElementAndType($this->password_selector, $this->password);
-        sleep(1);
+            $isLoggedIn = true;
+        }
+    } catch (Exception $exception) {
 
-        if ($this->remember_me_selector != '')
-            $this->exts->moveToElementAndClick($this->remember_me_selector);
-        sleep(2);
-
-        $this->exts->capture("2-login-page-filled");
-        $this->exts->moveToElementAndClick($this->submit_login_selector);
-        sleep(3);
-    } else {
-        $this->exts->log(__FUNCTION__ . '::Login page not found');
-        $this->exts->capture("2-login-page-not-found");
+        $this->exts->log("Exception checking loggedin " . $exception);
     }
+
+    return $isLoggedIn;
 }

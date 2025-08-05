@@ -1,4 +1,4 @@
-<?php // replace waitTillPresent and waitTillPresentAny to waitFor and handle empty invoice name case
+<?php // handle empty invoice name updated submit button selector added restrict invoices logic updated checkLogin function
 
 /**
  * Chrome Remote via Chrome devtool protocol script, for specific process/portal
@@ -57,292 +57,177 @@ class PortalScriptCDP
         }
     }
 
-    // Server-Portal-ID: 1664932 - Last modified: 22.07.2025 20:55:39 UTC - User: 1
+    // Server-Portal-ID: 11668 - Last modified: 27.01.2025 14:24:13 UTC - User: 1
 
-    public $baseUrl = 'https://www.dkv-mobility.com/en/';
+    // Script here
+    public $baseUrl = 'https://my.dkv-mobility.com/dkv-portal-webapp';
     public $loginUrl = 'https://my.dkv-mobility.com/dkv-portal-webapp';
-    public $invoicePageUrl = 'https://my.dkv-mobility.com/customer/invoices/overview';
+    public $invoicePageUrl = '';
+
     public $username_selector = 'input#username';
     public $password_selector = 'input#password';
     public $remember_me_selector = '';
-    public $submit_login_selector = 'input[name="login"]';
+    public $submit_login_selector = 'input#kc-login, button#kc-login';
 
-    public $check_login_success_selector = '//div[contains(@class, "wireframe-icon") and contains(text(), "logout")]';
+    public $check_login_failed_selector = 'div.dkv-input-error';
+    public $check_login_success_selector = 'div[data-test="cf-logout-icon"]';
+
     public $isNoInvoice = true;
 
-    /**
-     * Entry Method thats called for a portal
-     * @param Integer $count Number of times portal is retried.
-     */
     private function initPortal($count)
     {
+
         $this->exts->log('Begin initPortal ' . $count);
-        // Load cookies
         $this->exts->loadCookiesFromFile();
-        sleep(1);
-        $this->exts->openUrl($this->baseUrl);
-        sleep(10);
-        $this->waitFor($this->check_login_success_selector);
-      
-        if ($this->exts->exists('button#onetrust-accept-btn-handler')) {
-            $this->exts->moveToElementAndClick('button#onetrust-accept-btn-handler');
-            sleep(5);
-        }
-        $this->exts->capture('1-init-page');
-
-        // If user hase not logged in from cookie, clear cookie, open the login url and do login
-        if ($this->exts->getElement($this->check_login_success_selector) == null) {
+        $this->exts->openUrl($this->loginUrl);
+        if (!$this->checkLogin()) {
             $this->exts->log('NOT logged via cookie');
-            $this->exts->openUrl($this->loginUrl);
+            $this->fillForm(0);
             sleep(3);
-            $this->waitFor($this->username_selector);
-            $button_cookie = $this->exts->execute_javascript('document.querySelector("#usercentrics-root").shadowRoot.querySelector(\'button[data-testid="uc-accept-all-button"]\')');
-            if ($button_cookie != null) {
-                $this->exts->execute_javascript("arguments[0].click()", [$button_cookie]);
-                sleep(5);
-            }
-            $this->checkFillLogin();
-            $this->waitFor($this->check_login_success_selector, 5);
-            if ($this->exts->getElement('a#loginContinueLink') != null) {
-                $this->exts->moveToElementAndClick('a#loginContinueLink');
-                sleep(5);
-            }
-           $this->waitFor($this->check_login_success_selector, 5);
-            if ($this->exts->exists('button#onetrust-accept-btn-handler')) {
-                $this->exts->moveToElementAndClick('button#onetrust-accept-btn-handler');
-                sleep(5);
-            }
-            //click terms
-            if ($this->exts->exists('input#kc-accept') && $this->exts->getElement($this->check_login_success_selector) == null) {
-                $this->exts->moveToElementAndClick('input#kc-accept');
-                sleep(3);
-                 $this->waitFor($this->check_login_success_selector, 5);
-                if ($this->exts->exists('input#kc-accept') && $this->exts->getElement($this->check_login_success_selector) == null) {
-                    $this->exts->moveToElementAndClick('input#kc-accept');
-                    sleep(3);
-                     $this->waitFor($this->check_login_success_selector, 5);
-                }
-            }
-            if ($this->exts->getElements('button#onetrust-accept-btn-handler') != null) {
-                $this->exts->moveToElementAndClick('button#onetrust-accept-btn-handler');
-                sleep(2);
-            }
         }
 
-        // then check user logged in or not
-        if ($this->exts->getElement($this->check_login_success_selector) != null) {
-            $this->exts->log(__FUNCTION__ . '::User logged in');
-            $this->exts->capture("3-login-success");
-
-            // Open invoices url and download invoice
-            $this->exts->openUrl($this->invoicePageUrl);
-            sleep(3);
-            $this->waitFor('span[data-test="cf-customer-search-toggle"],[id*="customerSelectForm:custNoSelection"] button.ui-autocomplete-dropdown');
+        if ($this->checkLogin()) {
+            $this->exts->log(">>>>>>>>>>>>>>>Login successful!!!!");
+            $this->exts->capture("LoginSuccess");
+            $this->exts->success();
             sleep(2);
-            if ($this->exts->exists('div#usercentrics-root')) {
-                $this->exts->execute_javascript("document.querySelector('div#usercentrics-root').shadowRoot.querySelector('button[data-testid=\"uc-accept-all-button\"]').click()");
-                sleep(3);
-            }
-            $this->exts->moveToElementAndClick('span[data-test="cf-customer-search-toggle"],[id*="customerSelectForm:custNoSelection"] button.ui-autocomplete-dropdown');
-            sleep(1);
 
-            $accounts = $this->exts->getElements('span[data-test="cf-customer-search-customer-number"],[id*="customerSelectForm:custNoSelection_panel"] ul li');
-            $this->exts->log('Total Accounts - ' . count($accounts));
-
-            if (count($accounts) > 1) {
-                $account_array = [];
-
-                for ($i = 0; $i < count($accounts); $i++) {
-                    $element = 'dkv-customer-record:nth-child(' . ($i + 1) . ') span[data-test="cf-customer-search-customer-number"]';
-                    $accountNumber = $this->exts->getElement($element)->getAttribute('innerText');
-                    $account_array[] = $accountNumber;
+            $this->exts->waitTillPresent('#usercentrics-root', 5);
+            $this->exts->execute_javascript('
+                var shadow = document.querySelector("#usercentrics-root");
+                if(shadow){
+                    shadow.shadowRoot.querySelector(\'button[data-testid="uc-accept-all-button"]\').click();
                 }
+            ');
+            $this->exts->waitTillPresent('div[data-test*="INVOICES"]', 10);
+            $this->exts->click_by_xdotool('div[data-test*="INVOICES"]');
 
-                print_r($account_array);
-
-                foreach ($account_array  as $account) {
-
-                    $this->exts->log('Accounts - ' . $account);
-
-                    $accountsToSelect = array_filter(explode(',', $this->exts->config_array['account_number']));
-
-                    if (empty($accountsToSelect) || in_array($account, $accountsToSelect)) {
-                        $btnClick = $this->exts->getElement('//dkv-customer-record//span[@data-test="cf-customer-search-customer-number" and text()="' . $account . '"]', '', 'xpath');
-                        try {
-                            $btnClick->click();
-                        } catch (\Exception $ex) {
-                            $this->exts->execute_javascript('arguments[0].click()', [$btnClick]);
-                        }
-                        sleep(15);
-                        if ($this->exts->getElements('button#onetrust-accept-btn-handler') != null) {
-                            $this->exts->moveToElementAndClick('button#onetrust-accept-btn-handler');
-                            sleep(2);
-                        }
-
-                        if (!$this->exts->exists('lib-invoice-overview-table-pc mat-row[style*="visible"] > mat-cell > mat-table > mat-row:not([style*="none"])')) {
-
-                            $this->exts->moveToElementAndClick('span[data-test="cf-customer-search-toggle"],[id*="customerSelectForm:custNoSelection"] button.ui-autocomplete-dropdown');
-                            sleep(5);
-                        }
-
-                        $this->processInvoices();
-
-                        $this->exts->moveToElementAndClick('span[data-test="cf-customer-search-toggle"],[id*="customerSelectForm:custNoSelection"] button.ui-autocomplete-dropdown');
-                        sleep(5);
-                    }
-                }
-            } else {
-                if ($this->exts->getElements('button#onetrust-accept-btn-handler') != null) {
-                    $this->exts->moveToElementAndClick('button#onetrust-accept-btn-handler');
-                    sleep(2);
-                }
-                $this->processInvoices();
-            }
+            $this->exts->waitTillPresent('a[href*="https://my.dkv-mobility.com/customer/invoices"]', 10);
+            $this->exts->click_by_xdotool('a[href*="https://my.dkv-mobility.com/customer/invoices"]');
+            $this->processInvoices();
             // Final, check no invoice
             if ($this->isNoInvoice) {
                 $this->exts->no_invoice();
             }
             $this->exts->success();
         } else {
-            $this->exts->log(__FUNCTION__ . '::Use login failed');
-            if (strpos(strtolower($this->exts->extract('.kc-feedback-text')), 'account is disabled') !== false) {
-                $this->exts->account_not_ready();
-            }
-            if ($this->exts->exists('input[name="password-new"]')) {
-                $this->exts->account_not_ready();
-            }
-            if (!filter_var($this->username, FILTER_VALIDATE_EMAIL)) {
-                $this->exts->log("Username is not a valid email address");
-                $this->exts->loginFailure(1);
-            }
-            if ($this->exts->getElementByText('#dkv-login-container .alert-error, div#password-error', ['invalid username or password', 'tiger benutzername oder passwort', "Nom d'utilisateur ou mot de passe invalide.", 'utilisateur ou mot de passe invalide', 'Benutzername oder Passwort'], null, false) != null) {
+            if (stripos(strtolower($this->exts->extract($this->check_login_failed_selector)), 'passwor') !== false) {
+                $this->exts->log("Wrong credential !!!!");
                 $this->exts->loginFailure(1);
             } else {
                 $this->exts->loginFailure();
             }
         }
     }
-
-    public function waitFor($selector, $seconds = 7)
+    function fillForm($count)
     {
-        for ($wait = 0; $wait < 2 && $this->exts->executeSafeScript("return !!document.querySelector('" . $selector . "');") != 1; $wait++) {
-            $this->exts->log('Waiting for Selectors.....');
-            sleep($seconds);
-        }
-    }
+        $this->exts->log("Begin fillForm " . $count);
+        $this->exts->waitTillPresent($this->username_selector, 5);
+        try {
+            if ($this->exts->querySelector($this->username_selector) != null) {
 
-    private function checkFillLogin()
-    {
-        if ($this->exts->getElement($this->password_selector) != null) {
-            $this->exts->capture("2-login-page");
+                $this->exts->capture("1-pre-login");
+                $this->exts->log("Enter Username");
+                $this->exts->moveToElementAndType($this->username_selector, $this->username);
 
-            $this->exts->log("Enter Username");
-            $this->exts->moveToElementAndType($this->username_selector, $this->username);
-            sleep(1);
+                $this->exts->log("Enter Password");
+                $this->exts->moveToElementAndType($this->password_selector, $this->password);
+                sleep(1);
 
-            $this->exts->log("Enter Password");
-            $this->exts->moveToElementAndType($this->password_selector, $this->password);
-            sleep(1);
-
-            if ($this->remember_me_selector != '')
-                $this->exts->moveToElementAndClick($this->remember_me_selector);
-            sleep(2);
-
-            $this->exts->capture("2-login-page-filled");
-            $this->exts->moveToElementAndClick($this->submit_login_selector);
-            sleep(3);
-        } else {
-            $this->exts->log(__FUNCTION__ . '::Login page not found');
-            $this->exts->capture("2-login-page-not-found");
-        }
-    }
-
-    private function processInvoices($paging_count = 1)
-    {
-        $this->waitFor('lib-invoice-overview-table-pc mat-row[style*="visible"] > mat-cell > mat-table > mat-row:not([style*="none"]),table mat-row[style*="visible"] > mat-cell > mat-table > mat-row:not([style*="none"] span.download-link');
-        sleep(1);
-        if ($this->exts->exists('div#usercentrics-root')) {
-            $this->exts->execute_javascript("document.querySelector('div#usercentrics-root').shadowRoot.querySelector('button[data-testid=\"uc-accept-all-button\"]').click()");
-            sleep(3);
-        }
-        $this->exts->capture("4-invoices-page");
-        $invoices = [];
-        $rows = count($this->exts->getElements('lib-invoice-overview-table-pc mat-row[style*="visible"] > mat-cell > mat-table > mat-row:not([style*="none"]),table mat-row[style*="visible"] > mat-cell > mat-table > mat-row:not([style*="none"]'));
-        for ($i = 0; $i < $rows; $i++) {
-            $row = $this->exts->getElements('lib-invoice-overview-table-pc mat-row[style*="visible"] > mat-cell > mat-table > mat-row:not([style*="none"]),table mat-row[style*="visible"] > mat-cell > mat-table > mat-row:not([style*="none"]')[$i];
-            $tags = $this->exts->getElements('mat-cell', $row);
-            if (count($tags) >= 7 && $this->exts->getElement('span.download-link', $tags[4]) != null) {
-                $this->isNoInvoice = false;
-                if ($this->exts->getElement('span.download-link.clickable', $tags[5]) != null) {
-                    $download_button = $this->exts->getElement('span.download-link.clickable', $tags[5]);
-                } else {
-                    $download_button = $this->exts->getElement('span.download-link', $tags[4]);
+                if ($this->exts->exists($this->remember_me_selector)) {
+                    $this->exts->click_by_xdotool($this->remember_me_selector);
+                    sleep(1);
                 }
-                $invoiceName = str_replace('/', '', trim($tags[1]->getAttribute('innerText')));
-
-                $invoiceDate = trim($tags[0]->getAttribute('innerText'));
-                $invoiceAmount = trim(preg_replace('/[^\d\.\,]/', '', $tags[7]->getAttribute('innerText'))) . ' USD';
-                $invoiceAccountNum = trim($tags[2]->getAttribute('innerText'));
-
-                $invoiceName = $invoiceName . '-' . $invoiceAccountNum . '.pdf';
-
-                $invoiceFileName = !empty($invoiceName) ? $invoiceName . '.pdf' : '';
-
-                $this->exts->log('--------------------------');
-                $this->exts->log('invoiceName: ' . $invoiceName);
-                $this->exts->log('invoiceDate: ' . $invoiceDate);
-                $this->exts->log('invoiceAmount: ' . $invoiceAmount);
-                $this->exts->log('invoiceAccountNum: ' . $invoiceAccountNum);
-                $this->exts->log('invoiceFileName: ' . $invoiceFileName);
-                $parsed_date = $this->exts->parse_date($invoiceDate, 'j/n/y', 'Y-m-d');
-                if ($parsed_date == '') {
-                    $parsed_date = $this->exts->parse_date($invoiceDate, 'd.m.Y', 'Y-m-d');
-                }
-                $this->exts->log('Date parsed: ' . $parsed_date);
-
-                // Download invoice if it not exisited
-                if ($this->exts->invoice_exists($invoiceName)) {
-                    $this->exts->log('Invoice existed ' . $invoiceFileName);
-                } else {
-                    try {
-                        $this->exts->log('Click download button');
-                        $download_button->click();
-                    } catch (\Exception $exception) {
-                        $this->exts->log('Click download button by javascript');
-                        $this->exts->execute_javascript("arguments[0].click()", [$download_button]);
-                    }
-                    sleep(3);
-                    $this->exts->wait_and_check_download('pdf');
-                    $downloaded_file = $this->exts->find_saved_file('pdf', $invoiceFileName);
-                    if (trim($downloaded_file) == '' && !file_exists($downloaded_file)) {
-                        try {
-                            $this->exts->log('Click download button');
-                            $download_button->click();
-                        } catch (\Exception $exception) {
-                            $this->exts->log('Click download button by javascript');
-                            $this->exts->execute_javascript("arguments[0].click()", [$download_button]);
-                        }
-                        sleep(5);
-                    }
-                    if (trim($downloaded_file) != '' && file_exists($downloaded_file)) {
-                        $this->exts->new_invoice($invoiceName, $parsed_date, $invoiceAmount, $downloaded_file);
-                    } else {
-                        $this->exts->log(__FUNCTION__ . '::No download ' . $invoiceFileName);
-                    }
+                $this->exts->capture("1-login-page-filled");
+                sleep(5);
+                if ($this->exts->exists($this->submit_login_selector)) {
+                    $this->exts->click_by_xdotool($this->submit_login_selector);
                 }
             }
+        } catch (\Exception $exception) {
+
+            $this->exts->log("Exception filling loginform " . $exception->getMessage());
         }
-        // next page
+    }
+    function checkLogin()
+    {
+        $this->exts->log("Begin checkLogin ");
+        $isLoggedIn = false;
+        try {
+            $this->exts->waitTillPresent($this->check_login_success_selector, 20);
+            if ($this->exts->exists($this->check_login_success_selector)) {
+
+                $this->exts->log(">>>>>>>>>>>>>>>Login successful!!!!");
+
+                $isLoggedIn = true;
+            }
+        } catch (Exception $exception) {
+
+            $this->exts->log("Exception checking loggedin " . $exception);
+        }
+
+        return $isLoggedIn;
+    }
+    private function processInvoices($paging_count = 1)
+    {
+        $this->exts->waitTillPresent('mat-row.collapsedLeftBorder', 30);
+        $this->exts->capture("4-invoices-page");
+        $invoices = [];
+
         $restrictPages = isset($this->exts->config_array["restrictPages"]) ? (int)@$this->exts->config_array["restrictPages"] : 3;
-        if (
-            $restrictPages == 0 &&
-            $paging_count < 50 &&
-            $this->exts->getElement('span.ui-paginator-next:not(.ui-state-disabled)') != null
-        ) {
-            $paging_count++;
-            $this->exts->moveToElementAndClick('span.ui-paginator-next:not(.ui-state-disabled)');
-            sleep(5);
-            $this->processInvoices($paging_count);
+
+        sleep(10);
+        $rows = $this->exts->querySelectorAll('mat-row.collapsedLeftBorder');
+        foreach ($rows as $row) {
+            if ($this->exts->querySelector('mat-cell.cdk-column-fileIdCopy span.download-link', $row) != null) {
+                $invoiceUrl = '';
+                $invoiceName = trim(str_replace('/', '_', $this->exts->extract('mat-cell.cdk-column-number', $row)));
+                $invoiceAmount =  $this->exts->extract('mat-cell.cdk-column-amount b', $row);
+                $invoiceDate =  $this->exts->extract('mat-cell.cdk-column-date', $row);
+
+                $downloadBtn = $this->exts->querySelector('mat-cell.cdk-column-fileIdCopy span.download-link', $row);
+
+                array_push($invoices, array(
+                    'invoiceName' => $invoiceName,
+                    'invoiceDate' => $invoiceDate,
+                    'invoiceAmount' => $invoiceAmount,
+                    'invoiceUrl' => $invoiceUrl,
+                    'downloadBtn' => $downloadBtn
+                ));
+                $this->isNoInvoice = false;
+            }
+        }
+
+        // Download all invoices
+        $this->exts->log('Invoices found: ' . count($invoices));
+        foreach ($invoices as $invoice) {
+
+            if ($this->totalInvoices >= 50 && $restrictPages != 0) {
+                return;
+            }
+
+            $this->exts->log('--------------------------');
+            $this->exts->log('invoiceName: ' . $invoice['invoiceName']);
+            $this->exts->log('invoiceDate: ' . $invoice['invoiceDate']);
+            $this->exts->log('invoiceAmount: ' . $invoice['invoiceAmount']);
+            $this->exts->log('invoiceUrl: ' . $invoice['invoiceUrl']);
+
+            $invoiceFileName = !empty($invoice['invoiceName']) ? $invoice['invoiceName'] . '.pdf' : '';
+            $invoice['invoiceDate'] = $this->exts->parse_date($invoice['invoiceDate'], 'd.m.y', 'Y-m-d');
+            $this->exts->log('Date parsed: ' . $invoice['invoiceDate']);
+
+            // $downloaded_file = $this->exts->direct_download($invoice['invoiceUrl'], 'pdf', $invoiceFileName);
+            $this->exts->execute_javascript("arguments[0].click();", [$invoice['downloadBtn']]);
+            $this->exts->wait_and_check_download('pdf');
+            $downloaded_file = $this->exts->find_saved_file('pdf', $invoiceFileName);
+
+            if (trim($downloaded_file) != '' && file_exists($downloaded_file)) {
+                $this->exts->new_invoice($invoice['invoiceName'], $invoice['invoiceDate'], $invoice['invoiceAmount'], $invoiceFileName);
+                sleep(1);
+                $this->totalInvoices++;
+            } else {
+                $this->exts->log(__FUNCTION__ . '::No download ' . $invoiceFileName);
+            }
         }
     }
 }
