@@ -1,4 +1,4 @@
-<?php // handle empty invoice name case replace waitForSelector to waitFor function getting js error in waitforselector while executings
+<?php // working fines
 
 /**
  * Chrome Remote via Chrome devtool protocol script, for specific process/portal
@@ -57,7 +57,7 @@ class PortalScriptCDP
         }
     }
 
-    // Server-Portal-ID: 37598 - Last modified: 19.06.2025 15:08:32 UTC - User: 1
+    // Server-Portal-ID: 37598 - Last modified: 24.07.2025 13:27:09 UTC - User: 1
 
     public $baseUrl = 'https://adsl.free.fr/liste-factures.pl';
     public $loginUrl = 'https://subscribe.free.fr/login/';
