@@ -1,4 +1,4 @@
-<?php //   updated loginfailedConfirmed Message
+<?php // i have updated the code and added no-invoices function inportal function 
 
 /**
  * Chrome Remote via Chrome devtool protocol script, for specific process/portal
@@ -57,7 +57,8 @@ class PortalScriptCDP
         }
     }
 
-    // Server-Portal-ID: 19835 - Last modified: 15.07.2025 14:42:33 UTC - User: 1
+
+    // Server-Portal-ID: 19835 - Last modified: 25.07.2025 14:13:36 UTC - User: 1
 
     public $baseUrl = "https://portal.rundfunkbeitrag.de";
     public $loginUrl = "https://portal.rundfunkbeitrag.de/portal/";
@@ -66,6 +67,7 @@ class PortalScriptCDP
     public $password_selector = "input[name=\"login:ctpasswort:passwort\"]";
     public $submit_button_selector = "button[type=\"button\"]";
     public $login_tryout = 0;
+    public $isNoInvoice = true;
 
     /**
      * Entry Method thats called for a portal
@@ -110,7 +112,9 @@ class PortalScriptCDP
 
                 sleep(5);
                 $this->processInvoices();
-
+                if ($this->isNoInvoice) {
+                    $this->exts->no_invoice();
+                }
                 $this->exts->success();
             } else {
                 $this->exts->capture("LoginFailed");
@@ -125,7 +129,9 @@ class PortalScriptCDP
             sleep(2);
 
             $this->processSalesInvoice();
-
+            if ($this->isNoInvoice) {
+                $this->exts->no_invoice();
+            }
             $this->exts->success();
         }
     }
