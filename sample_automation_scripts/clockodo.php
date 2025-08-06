@@ -1,4 +1,4 @@
-<?php // 
+<?php // I have updated restrictPage logic
 
 /**
  * Chrome Remote via Chrome devtool protocol script, for specific process/portal
@@ -56,7 +56,7 @@ class PortalScriptCDP
             echo 'Script execution failed.. ' . "\n";
         }
     }
-    // Server-Portal-ID: 3833 - Last modified: 08.07.2025 14:28:56 UTC - User: 1
+    // Server-Portal-ID: 3833 - Last modified: 29.07.2025 09:29:04 UTC - User: 1
 
     public $baseUrl = 'https://my.clockodo.com/de';
     public $loginUrl = 'https://my.clockodo.com/de';
@@ -184,7 +184,9 @@ class PortalScriptCDP
         // Download all invoices
         $this->exts->log('Invoices found: ' . count($invoices));
         foreach ($invoices as $invoice) {
-            if ($this->restrictPages != 0 && $total_invoices >= 100) break;
+            if ($this->restrictPages != 0 && $total_invoices >= 50) {
+                return;
+            }
             $this->exts->log('--------------------------');
             $this->exts->log('invoiceName: ' . $invoice['invoiceName']);
             $this->exts->log('invoiceDate: ' . $invoice['invoiceDate']);
