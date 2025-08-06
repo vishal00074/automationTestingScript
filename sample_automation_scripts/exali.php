@@ -1,5 +1,5 @@
-<?php  // handle empty invoice name case and remove empty space from invoice name added restriction to download only 50 invoices in case restrict page is != 0
-// replace click function to click_and_download and download 
+<?php // i have added the restrictPages condition in invoices function
+
 /**
  * Chrome Remote via Chrome devtool protocol script, for specific process/portal
  *
@@ -162,8 +162,11 @@ class PortalScriptCDP
         }
     }
 
+    public $totalInvoices = 0;
     private function processInvoices()
     {
+        $restrictPages = isset($this->exts->config_array["restrictPages"]) ? (int) @$this->exts->config_array["restrictPages"] : 3;
+        $this->exts->log("restrictPages:: " . $restrictPages);
         sleep(5);
         $this->exts->moveToElementAndClick('div.schritt_2ME');
         sleep(5);
@@ -202,13 +205,16 @@ class PortalScriptCDP
         // Download all invoices
         $this->exts->log('Invoices found: ' . count($invoices));
         foreach ($invoices as $invoice) {
+            if ($restrictPages != 0 && $this->totalInvoices >= 50) {
+                return;
+            }
             $this->exts->log('--------------------------');
             $this->exts->log('invoiceName: ' . $invoice['invoiceName']);
             $this->exts->log('invoiceDate: ' . $invoice['invoiceDate']);
             $this->exts->log('invoiceAmount: ' . $invoice['invoiceAmount']);
             $this->exts->log('invoiceUrl: ' . $invoice['invoiceUrl']);
 
-            $invoiceFileName = !empty($invoice['invoiceName']) ? $invoice['invoiceName'] . '.pdf' : '';
+            $invoiceFileName = $invoice['invoiceName'] . '.pdf';
             $invoice['invoiceDate'] = $this->exts->parse_date($invoice['invoiceDate'], 'd.m.Y', 'Y-m-d');
             $this->exts->log('Date parsed: ' . $invoice['invoiceDate']);
 
@@ -216,16 +222,18 @@ class PortalScriptCDP
             $downloaded_file = $this->exts->direct_download($invoice['invoiceUrl'], 'pdf', $invoiceFileName);
             if (trim($downloaded_file) != '' && file_exists($downloaded_file)) {
                 $this->exts->new_invoice($invoice['invoiceName'], $invoice['invoiceDate'], $invoice['invoiceAmount'], $invoiceFileName);
+                $this->totalInvoices++;
             } else {
                 $this->exts->log(__FUNCTION__ . '::No download ' . $invoiceFileName);
             }
         }
     }
-    public $totalInvoices = 0;
     // page has changed 11.04.2023
     private function processInvoicesnew()
     {
         $restrictPages = isset($this->exts->config_array["restrictPages"]) ? (int) @$this->exts->config_array["restrictPages"] : 3;
+        $this->exts->log("restrictPages:: " . $restrictPages);
+
         sleep(3);
         $this->exts->waitTillPresent('div.row--dense [class*="col"] button');
 
@@ -233,11 +241,9 @@ class PortalScriptCDP
         $invoices = [];
         $rows = count($this->exts->getElements('div.row--dense'));
         for ($i = 0; $i < $rows; $i++) {
-
             if ($restrictPages != 0 && $this->totalInvoices >= 50) {
                 return;
             }
-
             $row = $this->exts->getElements('div.row--dense')[$i];
             $tags = $this->exts->getElements('[class*="col"]', $row);
             if (
@@ -246,16 +252,14 @@ class PortalScriptCDP
             ) {
                 $this->isNoInvoice = false;
                 $download_button = $this->exts->getElement('button', $tags[1]);
-                $invoiceName = $this->exts->extract('div[class="col-md-auto col-10"]', $row);
+                $invoiceName = str_replace('/', '-', trim($tags[0]->getAttribute('innerText')));
                 $invoiceName = str_replace('.pdf', '', trim($invoiceName));
-                // Remove empty space
-                $invoiceName =  str_replace(' ', '', $invoiceName);
-                $invoiceFileName = '';
+                $invoiceFileName = $invoiceName . '.pdf';
                 $invoiceDate = '';
                 $invoiceAmount = '';
 
                 $this->exts->log('--------------------------');
-                
+                $this->exts->log('invoiceName: ' . $invoiceName);
                 $this->exts->log('invoiceDate: ' . $invoiceDate);
                 $this->exts->log('invoiceAmount: ' . $invoiceAmount);
 
@@ -263,14 +267,17 @@ class PortalScriptCDP
                 if ($this->exts->invoice_exists($invoiceName)) {
                     $this->exts->log('Invoice existed ' . $invoiceFileName);
                 } else {
+                    try {
+                        $this->exts->log('Click download button');
+                        $download_button->click();
+                    } catch (\Exception $exception) {
+                        $this->exts->log('Click download button by javascript');
+                        $this->exts->executeSafeScript("arguments[0].click()", [$download_button]);
+                    }
+                    $this->exts->wait_and_check_download('pdf');
+                    $downloaded_file = $this->exts->find_saved_file('pdf', $invoiceFileName);
 
-                    $downloaded_file = $this->exts->click_and_download($download_button, 'pdf', $invoiceFileName);
-                    sleep(2);
                     if (trim($downloaded_file) != '' && file_exists($downloaded_file)) {
-                        $invoiceName = basename($downloaded_file, '.pdf');
-
-                        $this->exts->log('invoiceName: ' . $invoiceName);
-                        
                         $this->exts->new_invoice($invoiceName, $invoiceDate, $invoiceAmount, $invoiceFileName);
                         $this->totalInvoices++;
                     } else {
