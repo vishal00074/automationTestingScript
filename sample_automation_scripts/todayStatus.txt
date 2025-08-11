@@ -1,0 +1,23 @@
+-----------------------------------------------------------------------------------------------------------------------------
+date = 7-8-25
+
+fondsfinanz
+i have added waittillpresent to waitFor function and increase the sleep time after login submited 
+
+
+artlist.io
+i have increase sleep timeout after loginurl opening
+
+
+lichtblick
+update waittillpresent to waitFor and added the not empty condition on invoiceName .pdf
+
+
+ timebutler
+i have added the not empty condition on invioceName and otimize the code 
+
+
+
+riverside
+ update waittillpresent to waitFor and increase sleep time before loginurl opening and after login  add condition for dialog box if exists and then moveToElementAndClick 
+----------------------------------------------------------------------------------------------------------------------------

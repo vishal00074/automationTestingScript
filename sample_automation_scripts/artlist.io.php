@@ -1,5 +1,4 @@
-<?php // added check_solve_cloudflare_page updated processInvoice code 
-
+<?php // i have increase sleep timeout after loginurl opening
 /**
  * Chrome Remote via Chrome devtool protocol script, for specific process/portal
  *
@@ -57,7 +56,7 @@ class PortalScriptCDP
         }
     }
 
-    // Server-Portal-ID: 21941 - Last modified: 10.06.2025 09:12:38 UTC - User: 1
+    // Server-Portal-ID: 21941 - Last modified: 23.07.2025 06:51:46 UTC - User: 1
 
     public $baseUrl = 'https://artlist.io/account';
     public $loginUrl = 'https://artlist.io/page/signin';
@@ -77,7 +76,7 @@ class PortalScriptCDP
         $this->exts->capture("Home-page-without-cookie");
         sleep(1);
         $this->exts->openUrl($this->loginUrl);
-        sleep(15);
+        sleep(30);
         $this->check_solve_cloudflare_page();
         if ($this->checkLoggedIn()) {
             // If user has logged in via cookies, call waitForLogin
@@ -174,8 +173,6 @@ class PortalScriptCDP
                 sleep(13);
                 $this->processInvoices();
             }
-
-
 
 
             if ($this->totalFiles == 0) {

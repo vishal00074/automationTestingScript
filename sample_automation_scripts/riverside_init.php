@@ -1,246 +1,76 @@
-public $baseUrl = 'https://de.todoist.com';
-public $loginUrl = 'https://todoist.com/users/showlogin?lang=de';
-public $invoicePageUrl = 'https://de.todoist.com/Users/viewPrefs?page=payments';
-public $businessInvoicePageUrl = 'https://de.todoist.com/business/accountAndBilling';
-
-public $username_selector = 'input#email, form input[type="email"]';
-public $password_selector = 'input#password, form input[type="password"]';
+public $baseUrl = 'https://riverside.fm/login';
+public $loginUrl = 'https://riverside.fm/login';
+public $invoicePageUrl = 'https://riverside.fm/dashboard/account/subscription';
+public $username_selector = 'input[name="email"]';
+public $password_selector = 'input[name="password"]';
 public $remember_me_selector = '';
-public $submit_login_selector = 'button.ist_button, form button[type="submit"]';
-
-public $check_login_failed_selector = 'div.error_msg';
-public $check_login_success_selector = '#top_bar_inner, button.settings_btn, nav button[aria-haspopup="menu"]';
-
+public $submit_login_selector = 'form button[type="submit"]';
+public $check_login_failed_selector = 'div[data-cy="form-error"]';
+public $check_login_success_selector = 'div[data-automation-class="appbar usermenu-container"], div[data-testid="sidebar-menu-list"]';
 public $login_with_google = 0;
 public $isNoInvoice = true;
+public $restrictPages = 3;
 
-
-/**
-    * Entry Method thats called for a portal
-    * @param Integer $count Number of times portal is retried.
-    */
 private function initPortal($count)
 {
+    $this->restrictPages = isset($this->exts->config_array["restrictPages"]) ? (int) @$this->exts->config_array["restrictPages"] : 3;
     $this->exts->log('Begin initPortal ' . $count);
-
-    $this->login_with_google = isset($this->exts->config_array["login_with_google"]) ? (int)@$this->exts->config_array["login_with_google"] : 0;
-
-    $this->exts->openUrl($this->baseUrl);
-    sleep(1);
-
-    // Load cookies
+    $this->login_with_google = isset($this->exts->config_array["login_with_google"]) ? (int) @$this->exts->config_array["login_with_google"] : (isset($this->exts->config_array["LOGIN_WITH_GOOGLE"]) ? (int) @$this->exts->config_array["LOGIN_WITH_GOOGLE"] : 0);
     $this->exts->loadCookiesFromFile();
-    sleep(1);
+    sleep(5);
     $this->exts->openUrl($this->baseUrl);
-    sleep(10);
-    $this->exts->capture('1-init-page');
 
-    // If user hase not logged in from cookie, clear cookie, open the login url and do login
-    if ($this->exts->getElement($this->check_login_success_selector) == null) {
+    sleep(10);
+
+    for ($wait = 0; $wait < 30 && $this->exts->execute_javascript("!!document.querySelector('" . $this->username_selector . "');") != 1 && $this->exts->execute_javascript("!!document.querySelector('" . $this->username_selector . "');") != 1; $wait++) {
+        $this->exts->log('Waiting for login.....');
+        sleep(3);
+    }
+
+    if (!$this->checkLogin()) {
         $this->exts->log('NOT logged via cookie');
-        $this->exts->clearCookies();
-        $this->exts->openUrl($this->loginUrl);
-        sleep(15);
-        //redirected you too many times.
-        for ($i = 0; $i < 2; $i++) {
-            if ($this->exts->exists('#reload-button')) {
-                $this->exts->moveToElementAndClick('#reload-button');
-                sleep(10);
-            } else {
-                break;
-            }
-        }
 
         if ($this->login_with_google == 1) {
-
-
-            $this->exts->markCurrentTabByName('rootTab');
-            $this->exts->moveToElementAndClick('.login_signup_form a.ist_button_google');
-            sleep(5);
-            $google_login_tab = $this->exts->findTabMatchedUrl(['accounts.google.com']);
-            if ($google_login_tab != null) {
-                $this->exts->switchToTab($google_login_tab);
-            }
+            $this->exts->moveToElementAndClick('a[data-testid="continue-with-google"]');
+            sleep(10);
             $this->loginGoogleIfRequired();
-            $this->exts->capture("Page-after-login-google");
-            // go back to root tab
-            $this->exts->switchToTab($this->exts->getMarkedTab('rootTab'));
         } else {
-            $this->checkFillLogin();
+            $this->fillForm(0);
+            sleep(10);
         }
-        sleep(20);
-        $this->checkFillTwoFactor();
     }
 
-    if ($this->exts->getElement('a.timezone_link_block, div[data-dialog] button:nth-child(2)') != null) {
-        $this->exts->moveToElementAndClick('a.timezone_link_block:nth-child(4), div[data-dialog] button:nth-child(2)');
-        sleep(3);
+    sleep(2);
+    // Skip onboarding questins shown even is user is not new
+    if ($this->exts->exists('button[data-testid="onboarding-question-section-skip-button"]')) {
+        $this->exts->click_element('button[data-testid="onboarding-question-section-skip-button"]');
+        sleep(10);
     }
-    if ($this->exts->exists('div#loading') && $this->exts->getElement($this->check_login_success_selector) == null) {
-        $this->exts->log('wait load page');
-        sleep(15);
-        if ($this->exts->exists('div#loading') && $this->exts->getElement($this->check_login_success_selector) == null) {
-            $this->exts->capture("wait-load-page");
-            $this->exts->refresh();
-            sleep(15);
-            if ($this->exts->exists('div#loading') && $this->exts->getElement($this->check_login_success_selector) == null) {
-                // $this->clearChrome();
-                $this->exts->openUrl($this->loginUrl);
-                sleep(15);
-                $this->checkFillLogin();
-                sleep(20);
-                $this->checkFillTwoFactor();
-            }
-        }
+    if ($this->exts->exists('button[data-testid="onboarding-question-section-skip-button"]')) {
+        $this->exts->click_element('button[data-testid="onboarding-question-section-skip-button"]');
+        sleep(10);
     }
-    sleep(10);
-    if ($this->exts->exists('div[data-dialog] button:nth-child(2)')) {
-        $this->exts->moveToElementAndClick('div[data-dialog] button:nth-child(2)');
-        sleep(2);
-    }
-    if ($this->exts->getElement($this->check_login_success_selector) != null) {
-        sleep(3);
-        $this->exts->log(__FUNCTION__ . '::User logged in');
-        $this->exts->capture("3-login-success");
+
+
+    if ($this->checkLogin()) {
+        $this->exts->log(">>>>>>>>>>>>>>>Login successful!!!!");
+        $this->exts->capture("LoginSuccess");
 
         if (!empty($this->exts->config_array['allow_login_success_request'])) {
             $this->exts->triggerLoginSuccess();
         }
-        
+
         $this->exts->success();
     } else {
-        $this->exts->log(__FUNCTION__ . '::Use login failed');
-        if ($this->getElementByText('form div', ['password', 'Passwort', 'mot de passe erron'], null, false)) {
+        if (stripos(strtolower($this->exts->extract($this->check_login_failed_selector)), 'incorrect') !== false) {
+            $this->exts->log("Wrong credential !!!!");
             $this->exts->loginFailure(1);
-        }
-        $this->exts->loginFailure();
-    }
-}
-
-private function getElementByText($selector, $multi_language_texts, $parent_element = null, $is_absolutely_matched = true)
-{
-    $this->exts->log(__FUNCTION__);
-    if (is_array($multi_language_texts)) {
-        $multi_language_texts = join('|', $multi_language_texts);
-    }
-    // Seaching matched element
-    $object_elements = $this->exts->getElements($selector, $parent_element);
-    foreach ($object_elements as $object_element) {
-        $element_text = trim($object_element->getAttribute('textContent'));
-        // First, search via text
-        // If is_absolutely_matched = true, seach element matched EXACTLY input text, else search element contain the text
-        if ($is_absolutely_matched) {
-            $multi_language_texts = explode('|', $multi_language_texts);
-            foreach ($multi_language_texts as $searching_text) {
-                if (strtoupper($element_text) == strtoupper($searching_text)) {
-                    $this->exts->log('Matched element found');
-                    return $object_element;
-                }
-            }
-            $multi_language_texts = join('|', $multi_language_texts);
         } else {
-            if (preg_match('/' . $multi_language_texts . '/i', $element_text) === 1) {
-                $this->exts->log('Matched element found');
-                return $object_element;
-            }
-        }
-
-        // Second, is search by text not found element, support searching by regular expression
-        if (@preg_match($multi_language_texts, '') !== FALSE) {
-            if (preg_match($multi_language_texts, $element_text) === 1) {
-                $this->exts->log('Matched element found');
-                return $object_element;
-            }
-        }
-    }
-    return null;
-}
-
-private function checkFillLogin()
-{
-    if ($this->exts->getElement($this->password_selector) != null) {
-        sleep(3);
-        $this->exts->capture("2-login-page");
-
-        $this->exts->log("Enter Username");
-        $this->exts->moveToElementAndType($this->username_selector, $this->username);
-        sleep(1);
-
-        $this->exts->log("Enter Password");
-        $this->exts->moveToElementAndType($this->password_selector, $this->password);
-        sleep(1);
-
-        if ($this->remember_me_selector != '')
-            $this->exts->moveToElementAndClick($this->remember_me_selector);
-        sleep(2);
-
-        $this->exts->capture("2-login-page-filled");
-        $this->exts->moveToElementAndClick($this->submit_login_selector);
-    } else {
-        $this->exts->log(__FUNCTION__ . '::Login page not found');
-        $this->exts->capture("2-login-page-not-found");
-    }
-}
-
-private function checkFillTwoFactor()
-{
-    $two_factor_selector = 'input[autocomplete="one-time-code"]';
-    $two_factor_message_selector = '//*[text()="Two-factor authentication"]/../following-sibling::div[1]';
-    $two_factor_submit_selector = '';
-
-    if ($this->exts->getElement($two_factor_selector) != null && $this->exts->two_factor_attempts < 3) {
-        $this->exts->log("Two factor page found.");
-        $this->exts->capture("2.1-two-factor");
-
-        if ($this->exts->getElement($two_factor_message_selector) != null) {
-            $this->exts->two_factor_notif_msg_en = "";
-            for ($i = 0; $i < count($this->exts->getElements($two_factor_message_selector)); $i++) {
-                $this->exts->two_factor_notif_msg_en = $this->exts->two_factor_notif_msg_en . $this->exts->getElements($two_factor_message_selector, null, 'xpath')[$i]->getAttribute('innerText') . "\n";
-            }
-            $this->exts->two_factor_notif_msg_en = trim($this->exts->two_factor_notif_msg_en);
-            $this->exts->two_factor_notif_msg_de = $this->exts->two_factor_notif_msg_en;
-            $this->exts->log("Message:\n" . $this->exts->two_factor_notif_msg_en);
-        }
-        if ($this->exts->two_factor_attempts == 2) {
-            $this->exts->two_factor_notif_msg_en = $this->exts->two_factor_notif_msg_en . ' ' . $this->exts->two_factor_notif_msg_retry_en;
-            $this->exts->two_factor_notif_msg_de = $this->exts->two_factor_notif_msg_de . ' ' . $this->exts->two_factor_notif_msg_retry_de;
-        }
-
-        $two_factor_code = trim($this->exts->fetchTwoFactorCode());
-        if (!empty($two_factor_code) && trim($two_factor_code) != '') {
-            $this->exts->log("checkFillTwoFactor: Entering two_factor_code." . $two_factor_code);
-            $this->exts->moveToElementAndType($two_factor_selector, $two_factor_code);
-
-            $this->exts->log("checkFillTwoFactor: Clicking submit button.");
-            sleep(3);
-            $this->exts->capture("2.2-two-factor-filled-" . $this->exts->two_factor_attempts);
-
-            $this->exts->moveToElementAndClick($two_factor_submit_selector);
-            sleep(15);
-
-            if ($this->exts->getElement($two_factor_selector) == null) {
-                $this->exts->log("Two factor solved");
-            } else if ($this->exts->two_factor_attempts < 3) {
-                $this->exts->notification_uid = '';
-                $this->exts->two_factor_attempts++;
-                $this->checkFillTwoFactor();
-            } else {
-                $this->exts->log("Two factor can not solved");
-            }
-        } else {
-            $this->exts->log("Not received two factor code");
+            $this->exts->loginFailure();
         }
     }
 }
 
-private function clearChrome()
-{
-    $this->exts->log("Clearing browser history, cookie, cache");
-    $this->exts->openUrl('chrome://settings/clearBrowserData');
-    sleep(3);
-    $this->exts->type_key_by_xdotool('Return');
-    sleep(15);
-}
 public function waitFor($selector, $seconds = 7)
 {
     for ($wait = 0; $wait < 2 && $this->exts->executeSafeScript("return !!document.querySelector('" . $selector . "');") != 1; $wait++) {
@@ -248,6 +78,48 @@ public function waitFor($selector, $seconds = 7)
         sleep($seconds);
     }
 }
+
+private function fillForm($count)
+{
+    $this->exts->log("Begin fillForm " . $count);
+    if ($this->exts->querySelector($this->username_selector) != null) {
+        $this->exts->capture("1-pre-login");
+        $this->exts->log("Enter Username");
+        $this->exts->moveToElementAndType($this->username_selector, $this->username);
+        sleep(5);
+        $this->exts->log("Enter Password");
+        if ($this->exts->exists($this->password_selector)) {
+            $this->exts->moveToElementAndType($this->password_selector, $this->password);
+            sleep(1);
+        }
+        $this->exts->moveToElementAndClick($this->submit_login_selector);
+        sleep(2); // Portal itself has one second delay after showing toast
+    }
+}
+
+private function checkLogin()
+{
+    $this->exts->log("Begin checkLogin ");
+    $isLoggedIn = false;
+    sleep(10);
+    if ($this->exts->urlContains('dashboard/productions')) {
+        $this->exts->log(">>>>>>>>>>>>>>>Login successful!!!!");
+        $isLoggedIn = true;
+    } else {
+        for ($wait = 0; $wait < 30 && $this->exts->execute_javascript("!!document.querySelector('" . $this->check_login_success_selector . "');") != 1; $wait++) {
+            $this->exts->log('Waiting for login.....');
+            sleep(3);
+        }
+
+        if ($this->exts->exists($this->check_login_success_selector)) {
+            $this->exts->log(">>>>>>>>>>>>>>>Login successful!!!!");
+            $isLoggedIn = true;
+        }
+    }
+
+    return $isLoggedIn;
+}
+
 // -------------------- GOOGLE login
 public $google_username_selector = 'input[name="identifier"]:not([aria-hidden="true"])';
 public $google_submit_username_selector = '#identifierNext, input#submit, input#next';
@@ -327,7 +199,6 @@ private function loginGoogleIfRequired()
         $this->exts->capture("3-no-google-required");
     }
 }
-
 private function googleCheckFillLogin()
 {
     if ($this->exts->exists('form ul li [role="link"][data-identifier]')) {
@@ -414,7 +285,6 @@ private function googleCheckFillLogin()
         $this->exts->capture("2-google-password-page-not-found");
     }
 }
-
 private function googleCheckTwoFactorMethod()
 {
     // Currently we met many two factor methods
@@ -616,7 +486,6 @@ private function googleCheckTwoFactorMethod()
         $this->googleFillTwoFactor($input_selector, $message_selector, $submit_selector);
     }
 }
-
 private function googleFillTwoFactor($input_selector, $message_selector, $submit_selector, $submit_by_enter = false)
 {
     $this->exts->log(__FUNCTION__);
@@ -676,7 +545,6 @@ private function googleFillTwoFactor($input_selector, $message_selector, $submit
         $this->exts->two_factor_attempts = 3;
     }
 }
-
 private function googlecheckFillRecaptcha()
 {
     $this->exts->log(__FUNCTION__);
@@ -694,7 +562,7 @@ private function googlecheckFillRecaptcha()
         if ($isCaptchaSolved) {
             // Step 1 fill answer to textarea
             $this->exts->log(__FUNCTION__ . "::filling reCaptcha response..");
-            $recaptcha_textareas =  $this->exts->getElements($recaptcha_textarea_selector);
+            $recaptcha_textareas = $this->exts->getElements($recaptcha_textarea_selector);
             for ($i = 0; $i < count($recaptcha_textareas); $i++) {
                 $this->exts->execute_javascript("arguments[0].innerHTML = '" . $this->exts->recaptcha_answer . "';", [$recaptcha_textareas[$i]]);
             }
@@ -703,24 +571,24 @@ private function googlecheckFillRecaptcha()
 
             // Step 2, check if callback function need executed
             $gcallbackFunction = $this->exts->execute_javascript('
-            if(document.querySelector("[data-callback]") != null){
-                document.querySelector("[data-callback]").getAttribute("data-callback");
-            } else {
-                var result = ""; var found = false;
-                function recurse (cur, prop, deep) {
-                    if(deep > 5 || found){ return;}console.log(prop);
-                    try {
-                        if(prop.indexOf(".callback") > -1){result = prop; found = true; return;
-                        } else { if(cur == undefined || cur == null || cur instanceof Element || Object(cur) !== cur || Array.isArray(cur)){ return;}deep++;
-                            for (var p in cur) { recurse(cur[p], prop ? prop + "." + p : p, deep);}
-                        }
-                    } catch(ex) { console.log("ERROR in function: " + ex); return; }
-                }
-
-                recurse(___grecaptcha_cfg.clients[0], "", 0);
-                found ? "___grecaptcha_cfg.clients[0]." + result : null;
+        if(document.querySelector("[data-callback]") != null){
+            document.querySelector("[data-callback]").getAttribute("data-callback");
+        } else {
+            var result = ""; var found = false;
+            function recurse (cur, prop, deep) {
+                if(deep > 5 || found){ return;}console.log(prop);
+                try {
+                    if(prop.indexOf(".callback") > -1){result = prop; found = true; return;
+                    } else { if(cur == undefined || cur == null || cur instanceof Element || Object(cur) !== cur || Array.isArray(cur)){ return;}deep++;
+                        for (var p in cur) { recurse(cur[p], prop ? prop + "." + p : p, deep);}
+                    }
+                } catch(ex) { console.log("ERROR in function: " + ex); return; }
             }
-        ');
+
+            recurse(___grecaptcha_cfg.clients[0], "", 0);
+            found ? "___grecaptcha_cfg.clients[0]." + result : null;
+        }
+    ');
             $this->exts->log('Callback function: ' . $gcallbackFunction);
             if ($gcallbackFunction != null) {
                 $this->exts->execute_javascript($gcallbackFunction . '("' . $this->exts->recaptcha_answer . '");');
