@@ -1,5 +1,5 @@
-<?php // hanlde empty invoice name case in downloadInvoiceAW function added success function in init portal and added capture in login with cookies
-// replace waitTillPresent to waitFor
+<?php // working fine
+
 /**
  * Chrome Remote via Chrome devtool protocol script, for specific process/portal
  *
@@ -57,7 +57,7 @@ class PortalScriptCDP
         }
     }
 
-    // Server-Portal-ID: 14249 - Last modified: 23.07.2025 14:24:30 UTC - User: 1
+    // Server-Portal-ID: 14249 - Last modified: 29.07.2025 08:31:25 UTC - User: 1
 
     public $baseUrl = "https://selfserve.fleetcor.de/";
     public $loginUrl = "https://selfserve.fleetcor.de/gfnsmewww/pages/public/login.aspx";
@@ -283,10 +283,10 @@ class PortalScriptCDP
                 try {
                     $this->exts->execute_javascript(
                         'var select = document.querySelector("' . $select_box . '"); 
-				if (select) {
-					select.value = "' . $option_value . '";
-					select.dispatchEvent(new Event("change", { bubbles: true }));
-				}'
+			if (select) {
+				select.value = "' . $option_value . '";
+				select.dispatchEvent(new Event("change", { bubbles: true }));
+			}'
                     );
                 } catch (\Exception $e) {
                     $this->exts->log('JavaScript selection failed, error: ' . $e->getMessage());
