@@ -49,9 +49,7 @@ private function initPortal($count)
         $this->exts->log(__FUNCTION__ . '::User logged in');
         $this->exts->capture("3-login-success");
 
-        if (!empty($this->exts->config_array['allow_login_success_request'])) {
-            $this->exts->triggerLoginSuccess();
-        }
+        c
 
         $this->exts->success();
     } else {
