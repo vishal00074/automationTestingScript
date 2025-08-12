@@ -1,5 +1,4 @@
 public $baseUrl = 'https://www.gorgias.com/';
-
 public $username_selector = 'input#email';
 public $password_selector = 'input#password';
 public $submit_login_selector = 'form[action="/login"] button.btn-success, button.btn-primary';
@@ -103,7 +102,7 @@ private function initPortal($count)
 private function checkFillLogin()
 {
     sleep(30);
-    $this->exts->waitTillPresent($this->password_selector, 20);
+    $this->waitFor($this->password_selector, 10);
     if ($this->exts->querySelector($this->password_selector) != null) {
         sleep(3);
         $this->exts->capture("2-login-page");
@@ -132,67 +131,11 @@ private function checkFillLogin()
     }
 }
 
-private function checkFillRecaptcha($count = 1)
+public function waitFor($selector, $seconds = 7)
 {
-    $this->exts->log(__FUNCTION__);
-    $this->exts->switchToFrame('iframe#captcha-internal');
-    $recaptcha_iframe_selector = 'iframe[src*="/recaptcha/api2/anchor?"]';
-    $recaptcha_textarea_selector = 'textarea[name="g-recaptcha-response"]';
-    if ($this->exts->exists($recaptcha_iframe_selector)) {
-        $iframeUrl = $this->exts->extract($recaptcha_iframe_selector, null, 'src');
-        $data_siteKey = explode('&', end(explode("&k=", $iframeUrl)))[0];
-        $this->exts->log("iframe url  - " . $iframeUrl);
-        $this->exts->log("SiteKey - " . $data_siteKey);
-
-        $isCaptchaSolved = $this->exts->processRecaptcha($this->exts->getUrl(), $data_siteKey, false);
-        $this->exts->log("isCaptchaSolved - " . $isCaptchaSolved);
-
-        if ($isCaptchaSolved) {
-            // Step 1 fill answer to textarea
-            $this->exts->log(__FUNCTION__ . "::filling reCaptcha response..");
-            $recaptcha_textareas =  $this->exts->getElements($recaptcha_textarea_selector);
-            for ($i = 0; $i < count($recaptcha_textareas); $i++) {
-                $this->exts->executeSafeScript("arguments[0].innerHTML = '" . $this->exts->recaptcha_answer . "';", [$recaptcha_textareas[$i]]);
-            }
-            sleep(2);
-            $this->exts->capture('recaptcha-filled');
-
-            // Step 2, check if callback function need executed
-            $gcallbackFunction = $this->exts->executeSafeScript('
-            if(document.querySelector("[data-callback]") != null){
-                return document.querySelector("[data-callback]").getAttribute("data-callback");
-            }
-
-            var result = ""; var found = false;
-            function recurse (cur, prop, deep) {
-                if(deep > 5 || found){ return;}console.log(prop);
-                try {
-                    if(prop.indexOf(".callback") > -1){result = prop; found = true; return;
-                    } else { if(cur == undefined || cur == null || cur instanceof Element || Object(cur) !== cur || Array.isArray(cur)){ return;}deep++;
-                        for (var p in cur) { recurse(cur[p], prop ? prop + "." + p : p, deep);}
-                    }
-                } catch(ex) { console.log("ERROR in function: " + ex); return; }
-            }
-
-            recurse(___grecaptcha_cfg.clients[0], "", 0);
-            return found ? "___grecaptcha_cfg.clients[0]." + result : null;
-        ');
-            $this->exts->log('Callback function: ' . $gcallbackFunction);
-            if ($gcallbackFunction != null) {
-                $this->exts->executeSafeScript($gcallbackFunction . '("' . $this->exts->recaptcha_answer . '");');
-                sleep(10);
-            }
-        } else {
-            // Only call this if recaptcha service expired.
-            if ($count < 5) {
-                $count++;
-                $this->checkFillRecaptcha($count);
-            }
-        }
-        return true;
-    } else {
-        $this->exts->log(__FUNCTION__ . '::Not found reCaptcha');
-        return false;
+    for ($wait = 0; $wait < 2 && $this->exts->executeSafeScript("return !!document.querySelector('" . $selector . "');") != 1; $wait++) {
+        $this->exts->log('Waiting for Selectors.....');
+        sleep($seconds);
     }
 }
 
@@ -571,21 +514,21 @@ private function check_solve_rejected_browser()
 private function overwrite_user_agent($user_agent_string = 'DN')
 {
     $userAgentScript = "
-    (function() {
-        if ('userAgentData' in navigator) {
-            navigator.userAgentData.getHighEntropyValues({}).then(() => {
-                Object.defineProperty(navigator, 'userAgent', { 
-                    value: '{$user_agent_string}', 
-                    configurable: true 
-                });
-            });
-        } else {
+(function() {
+    if ('userAgentData' in navigator) {
+        navigator.userAgentData.getHighEntropyValues({}).then(() => {
             Object.defineProperty(navigator, 'userAgent', { 
                 value: '{$user_agent_string}', 
                 configurable: true 
             });
-        }
-    })();
+        });
+    } else {
+        Object.defineProperty(navigator, 'userAgent', { 
+            value: '{$user_agent_string}', 
+            configurable: true 
+        });
+    }
+})();
 ";
     $this->exts->execute_javascript($userAgentScript);
 }
