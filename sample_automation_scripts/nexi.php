@@ -1,5 +1,4 @@
-<?php // handle empty invoiceName case otpimize the script code by increase sleep time in filterInvoices function
-
+<?php // working fine
 /**
  * Chrome Remote via Chrome devtool protocol script, for specific process/portal
  *
@@ -57,7 +56,8 @@ class PortalScriptCDP
         }
     }
 
-    // Server-Portal-ID: 2161800 - Last modified: 03.08.2025 00:42:37 UTC - User: 1
+
+    // Server-Portal-ID: 2161800 - Last modified: 11.08.2025 20:11:52 UTC - User: 1
 
     public $baseUrl = 'https://login.nexi.de/';
     public $loginUrl = 'https://login.nexi.de/';
@@ -312,7 +312,7 @@ class PortalScriptCDP
             $this->exts->log('invoiceAmount: ' . $invoice['invoiceAmount']);
             $this->exts->log('invoiceUrl: ' . $invoice['invoiceUrl']);
 
-            $invoiceFileName = !empty($invoice['invoiceName']) ? $invoice['invoiceName'] . '.pdf': '';
+            $invoiceFileName = !empty($invoice['invoiceName']) ? $invoice['invoiceName'] . '.pdf' : '';
             $invoice['invoiceDate'] = $this->exts->parse_date($invoice['invoiceDate'], 'd. F Y', 'Y-m-d');
             $this->exts->log('Date parsed: ' . $invoice['invoiceDate']);
 

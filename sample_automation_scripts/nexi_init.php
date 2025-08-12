@@ -30,12 +30,11 @@ private function initPortal($count)
     if ($this->checkLogin()) {
         $this->exts->log(">>>>>>>>>>>>>>>Login successful!!!!");
         $this->exts->capture("LoginSuccess");
-        // $this->exts->success();
 
         if (!empty($this->exts->config_array['allow_login_success_request'])) {
             $this->exts->triggerLoginSuccess();
         }
-        
+
         $this->exts->success();
     } else {
         if (stripos(strtolower($this->exts->extract($this->check_login_failed_selector)), 'passwor') !== false) {
