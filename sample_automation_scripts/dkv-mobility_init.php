@@ -45,7 +45,7 @@ private function initPortal($count)
 function fillForm($count)
 {
     $this->exts->log("Begin fillForm " . $count);
-    $this->exts->waitTillPresent($this->username_selector, 5);
+    $this->waitFor($this->username_selector, 4);
     try {
         if ($this->exts->querySelector($this->username_selector) != null) {
 
@@ -72,12 +72,21 @@ function fillForm($count)
         $this->exts->log("Exception filling loginform " . $exception->getMessage());
     }
 }
+
+public function waitFor($selector, $seconds = 7)
+{
+    for ($wait = 0; $wait < 2 && $this->exts->executeSafeScript("return !!document.querySelector('" . $selector . "');") != 1; $wait++) {
+        $this->exts->log('Waiting for Selectors.....');
+        sleep($seconds);
+    }
+}
+
 function checkLogin()
 {
     $this->exts->log("Begin checkLogin ");
     $isLoggedIn = false;
     try {
-        $this->exts->waitTillPresent($this->check_login_success_selector, 20);
+        $this->waitFor($this->check_login_success_selector, 10);
         if ($this->exts->exists($this->check_login_success_selector)) {
 
             $this->exts->log(">>>>>>>>>>>>>>>Login successful!!!!");

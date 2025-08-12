@@ -1,4 +1,4 @@
-<?php // handle empty invoice name updated submit button selector added restrict invoices logic updated checkLogin function
+<?php // replace waitTillPresent to waitFor
 
 /**
  * Chrome Remote via Chrome devtool protocol script, for specific process/portal
@@ -57,9 +57,9 @@ class PortalScriptCDP
         }
     }
 
-    // Server-Portal-ID: 11668 - Last modified: 27.01.2025 14:24:13 UTC - User: 1
 
-    // Script here
+    // Server-Portal-ID: 11668 - Last modified: 05.08.2025 13:56:30 UTC - User: 1
+
     public $baseUrl = 'https://my.dkv-mobility.com/dkv-portal-webapp';
     public $loginUrl = 'https://my.dkv-mobility.com/dkv-portal-webapp';
     public $invoicePageUrl = '';
@@ -92,17 +92,17 @@ class PortalScriptCDP
             $this->exts->success();
             sleep(2);
 
-            $this->exts->waitTillPresent('#usercentrics-root', 5);
+            $this->waitFor('#usercentrics-root', 3);
             $this->exts->execute_javascript('
-                var shadow = document.querySelector("#usercentrics-root");
-                if(shadow){
-                    shadow.shadowRoot.querySelector(\'button[data-testid="uc-accept-all-button"]\').click();
-                }
-            ');
-            $this->exts->waitTillPresent('div[data-test*="INVOICES"]', 10);
+            var shadow = document.querySelector("#usercentrics-root");
+            if(shadow){
+                shadow.shadowRoot.querySelector(\'button[data-testid="uc-accept-all-button"]\').click();
+            }
+        ');
+            $this->waitFor('div[data-test*="INVOICES"]', 5);
             $this->exts->click_by_xdotool('div[data-test*="INVOICES"]');
 
-            $this->exts->waitTillPresent('a[href*="https://my.dkv-mobility.com/customer/invoices"]', 10);
+            $this->waitFor('a[href*="https://my.dkv-mobility.com/customer/invoices"]', 5);
             $this->exts->click_by_xdotool('a[href*="https://my.dkv-mobility.com/customer/invoices"]');
             $this->processInvoices();
             // Final, check no invoice
@@ -122,7 +122,7 @@ class PortalScriptCDP
     function fillForm($count)
     {
         $this->exts->log("Begin fillForm " . $count);
-        $this->exts->waitTillPresent($this->username_selector, 5);
+        $this->waitFor($this->username_selector, 4);
         try {
             if ($this->exts->querySelector($this->username_selector) != null) {
 
@@ -149,12 +149,21 @@ class PortalScriptCDP
             $this->exts->log("Exception filling loginform " . $exception->getMessage());
         }
     }
+
+    public function waitFor($selector, $seconds = 7)
+    {
+        for ($wait = 0; $wait < 2 && $this->exts->executeSafeScript("return !!document.querySelector('" . $selector . "');") != 1; $wait++) {
+            $this->exts->log('Waiting for Selectors.....');
+            sleep($seconds);
+        }
+    }
+
     function checkLogin()
     {
         $this->exts->log("Begin checkLogin ");
         $isLoggedIn = false;
         try {
-            $this->exts->waitTillPresent($this->check_login_success_selector, 20);
+            $this->waitFor($this->check_login_success_selector, 10);
             if ($this->exts->exists($this->check_login_success_selector)) {
 
                 $this->exts->log(">>>>>>>>>>>>>>>Login successful!!!!");
@@ -170,7 +179,7 @@ class PortalScriptCDP
     }
     private function processInvoices($paging_count = 1)
     {
-        $this->exts->waitTillPresent('mat-row.collapsedLeftBorder', 30);
+        $this->waitFor('mat-row.collapsedLeftBorder', 15);
         $this->exts->capture("4-invoices-page");
         $invoices = [];
 
