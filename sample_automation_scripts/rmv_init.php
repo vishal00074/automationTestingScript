@@ -29,19 +29,19 @@ private function initPortal($count)
         $this->exts->log('NOT logged via cookie');
         $this->exts->clearCookies();
         $this->exts->openUrl($this->loginUrl);
-        $this->exts->waitTillPresent('div.my-rmv-login a[href*="login"]', 10);
-        $this->exts->click_by_xdotool('div.my-rmv-login a[href*="login"]');
+        $this->waitFor('div.my-rmv-login a[href*="login"]', 5);
+        $this->exts->moveToElementAndClick('div.my-rmv-login a[href*="login"]');
         $this->fillForm(0);
     }
 
     if ($this->checkLogin()) {
         $this->exts->log(">>>>>>>>>>>>>>>Login successful!!!!");
         $this->exts->capture("LoginSuccess");
-        
+
         if (!empty($this->exts->config_array['allow_login_success_request'])) {
             $this->exts->triggerLoginSuccess();
         }
-
+        
         $this->exts->success();
     } else {
         if (stripos(strtolower($this->exts->extract($this->check_login_failed_selector)), 'passwor') !== false) {
@@ -57,7 +57,7 @@ private function initPortal($count)
 function fillForm($count)
 {
     $this->exts->log("Begin fillForm " . $count);
-    $this->exts->waitTillPresent($this->username_selector, 10);
+    $this->waitFor($this->username_selector, 5);
     try {
         if ($this->exts->querySelector($this->username_selector) != null) {
 
@@ -85,6 +85,14 @@ function fillForm($count)
     }
 }
 
+public function waitFor($selector, $seconds = 7)
+{
+    for ($wait = 0; $wait < 2 && $this->exts->executeSafeScript("return !!document.querySelector('" . $selector . "');") != 1; $wait++) {
+        $this->exts->log('Waiting for Selectors.....');
+        sleep($seconds);
+    }
+}
+
 
 /**
 
@@ -98,7 +106,7 @@ function checkLogin()
     $this->exts->log("Begin checkLogin ");
     $isLoggedIn = false;
     try {
-        $this->exts->waitTillPresent($this->check_login_success_selector, 20);
+        $this->waitFor($this->check_login_success_selector, 10);
         if ($this->exts->exists($this->check_login_success_selector)) {
 
             $this->exts->log(">>>>>>>>>>>>>>>Login successful!!!!");
