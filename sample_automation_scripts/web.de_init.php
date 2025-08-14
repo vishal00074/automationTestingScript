@@ -20,34 +20,34 @@ private function initPortal($count)
     $this->exts->loadCookiesFromFile();
     sleep(1);
     $this->exts->openUrl($this->baseUrl);
-    sleep(3);
-    $this->exts->waitTillAnyPresent([$this->username_selector, $this->check_login_success_selector]);
+    sleep(7);
+    $this->waitFor($this->check_login_success_selector, 5);
     $this->exts->capture('1-init-page');
 
     // If user hase not logged in from cookie, clear cookie, open the login url and do login
     if ($this->exts->getElement($this->check_login_success_selector) == null) {
         $this->exts->log('NOT logged via cookie');
-        if ($this->exts->exists('#thirdPartyFrame_permission_dialog')) {
+        if ($this->isExists('#thirdPartyFrame_permission_dialog')) {
             $this->switchToFrame("#thirdPartyFrame_permission_dialog");
             sleep(1);
-            if ($this->exts->exists("#permission-iframe")) {
+            if ($this->isExists("#permission-iframe")) {
                 $this->switchToFrame("#permission-iframe");
                 sleep(1);
             }
-            if ($this->exts->exists('button#save-all-pur')) {
+            if ($this->isExists('button#save-all-pur')) {
                 $this->exts->moveToElementAndClick('button#save-all-pur');
                 sleep(5);
             }
             $this->exts->switchToDefault();
         }
-        if ($this->exts->exists('iframe.permission-core-iframe')) {
+        if ($this->isExists('iframe.permission-core-iframe')) {
             $this->switchToFrame('iframe.permission-core-iframe');
             sleep(1);
-            if ($this->exts->exists('iframe[sandbox*="allow-popups"]')) {
+            if ($this->isExists('iframe[sandbox*="allow-popups"]')) {
                 $this->switchToFrame('iframe[sandbox*="allow-popups"]');
                 sleep(1);
             }
-            if ($this->exts->exists('button#save-all-conditionally')) {
+            if ($this->isExists('button#save-all-conditionally')) {
                 $this->exts->moveToElementAndClick('button#save-all-conditionally');
                 sleep(5);
             }
@@ -56,38 +56,38 @@ private function initPortal($count)
 
         $this->checkFillLogin();
 
-        $this->exts->waitTillPresent($this->check_login_success_selector, 20);
+        $this->waitFor($this->check_login_success_selector, 10);
         //redirected you too many times.
-        for ($i = 0; $i < 2 && $this->exts->exists('button#reload-button'); $i++) {
+        for ($i = 0; $i < 2 && $this->isExists('button#reload-button'); $i++) {
             $this->exts->moveToElementAndClick('button#reload-button');
             sleep(10);
         }
-        if ($this->exts->exists('button#reload-button')) {
+        if ($this->isExists('button#reload-button')) {
             $this->clearChrome();
             $this->exts->openUrl($this->loginUrl);
             sleep(3);
-            $this->exts->waitTillPresent($this->username_selector, 20);
-            if ($this->exts->exists('#thirdPartyFrame_permission_dialog')) {
+            $this->waitFor($this->username_selector, 10);
+            if ($this->isExists('#thirdPartyFrame_permission_dialog')) {
                 $this->switchToFrame("#thirdPartyFrame_permission_dialog");
                 sleep(1);
-                if ($this->exts->exists("#permission-iframe")) {
+                if ($this->isExists("#permission-iframe")) {
                     $this->switchToFrame("#permission-iframe");
                     sleep(1);
                 }
-                if ($this->exts->exists('button#save-all-pur')) {
+                if ($this->isExists('button#save-all-pur')) {
                     $this->exts->moveToElementAndClick('button#save-all-pur');
                     sleep(5);
                 }
                 $this->exts->switchToDefault();
             }
-            if ($this->exts->exists('iframe.permission-core-iframe')) {
+            if ($this->isExists('iframe.permission-core-iframe')) {
                 $this->switchToFrame('iframe.permission-core-iframe');
                 sleep(1);
-                if ($this->exts->exists('iframe[sandbox*="allow-popups"]')) {
+                if ($this->isExists('iframe[sandbox*="allow-popups"]')) {
                     $this->switchToFrame('iframe[sandbox*="allow-popups"]');
                     sleep(1);
                 }
-                if ($this->exts->exists('button#save-all-conditionally')) {
+                if ($this->isExists('button#save-all-conditionally')) {
                     $this->exts->moveToElementAndClick('button#save-all-conditionally');
                     sleep(5);
                 }
@@ -95,20 +95,20 @@ private function initPortal($count)
             }
             $this->checkFillLogin();
 
-            $this->exts->waitTillPresent($this->check_login_success_selector, 10);
+            $this->waitFor($this->check_login_success_selector, 5);
         }
 
-        if ($this->exts->exists('a[data-open-dialog-id="confirmPasswordDialog"]')) {
+        if ($this->isExists('a[data-open-dialog-id="confirmPasswordDialog"]')) {
             $this->exts->moveToElementAndClick('a[data-open-dialog-id="confirmPasswordDialog"]');
             sleep(5);
         }
 
-        if ($this->exts->exists('a[id*="skip-logout"]')) {
+        if ($this->isExists('a[id*="skip-logout"]')) {
             $this->exts->moveToElementAndClick('a[id*="skip-logout"]');
             sleep(5);
         }
 
-        if ($this->exts->exists('div.twoFa-code-input__input input.separated-input__field')) {
+        if ($this->isExists('div.twoFa-code-input__input input.separated-input__field')) {
             $two_fa_selector = '.twoFa-code-input__input input.separated-input__field';
             $trusted_btn_selector = 'button.pos-button';
             $this->processTwoFactorAuth($two_fa_selector, $trusted_btn_selector);
@@ -116,24 +116,24 @@ private function initPortal($count)
         $this->checkFillTwoFactor();
     }
 
-    if ($this->exts->exists('input[name*=usernameInput]') && $this->exts->exists("input[name*=passwordInput]")) {
+    if ($this->isExists('input[name*=usernameInput]') && $this->isExists("input[name*=passwordInput]")) {
         $this->reCheckFillLogin();
-        $this->exts->waitTillPresent($this->check_login_success_selector, 10);
+        $this->waitFor($this->check_login_success_selector, 5);
     }
 
 
-    if ($this->exts->exists('div.instruction__container')) {
+    if ($this->isExists('div.instruction__container')) {
         $this->checkFill2FA();
-        $this->exts->waitTillPresent($this->check_login_success_selector, 10);
+        $this->waitFor($this->check_login_success_selector, 5);
     }
 
-    if ($this->exts->exists('div[class*="instruction__alternative-link"] a')) {
+    if ($this->isExists('div[class*="instruction__alternative-link"] a')) {
         $this->exts->moveToElementAndClick('div[class*="instruction__alternative-link"] a');
         sleep(3);
-        if ($this->exts->exists('a[href*="PhoneAlternativesContainer"]')) {
+        if ($this->isExists('a[href*="PhoneAlternativesContainer"]')) {
             $this->exts->moveToElementAndClick('a[href*="PhoneAlternativesContainer"]');
             sleep(5);
-            if ($this->exts->exists('form[id="mtanStartPageForm"] button') || $this->exts->exists('button[name="sendSmsCode"]')) {
+            if ($this->isExists('form[id="mtanStartPageForm"] button') || $this->isExists('button[name="sendSmsCode"]')) {
                 $this->exts->moveToElementAndClick('form[id="mtanStartPageForm"] button, button[name="sendSmsCode"]');
                 sleep(3);
                 $this->checkFillTwoFactor();
@@ -149,6 +149,7 @@ private function initPortal($count)
         if (!empty($this->exts->config_array['allow_login_success_request'])) {
             $this->exts->triggerLoginSuccess();
         }
+        
         $this->exts->success();
     } else {
         $this->exts->log(__FUNCTION__ . '::Use login failed');
@@ -156,9 +157,9 @@ private function initPortal($count)
         $this->exts->log(__FUNCTION__ . '::Error text: ' . $error_text);
         if (stripos($error_text, strtolower('Ihre Anmeldung war nicht erfolgreich!')) !== false) {
             $this->exts->loginFailure(1);
-        } else if ($this->exts->exists('button[data-testid="confirm"]') && stripos($this->exts->extract('body h1'), 'Ist Ihre E-Mail-Kontaktadresse noch aktuell') !== false) {
+        } else if ($this->isExists('button[data-testid="confirm"]') && stripos($this->exts->extract('body h1'), 'Ist Ihre E-Mail-Kontaktadresse noch aktuell') !== false) {
             $this->exts->account_not_ready();
-        } elseif ($this->exts->urlContains('/interception') && $this->exts->exists('h2#hintInterceptions')) {
+        } elseif ($this->exts->urlContains('/interception') && $this->isExists('h2#hintInterceptions')) {
             $this->exts->account_not_ready();
         } else {
             $this->exts->loginFailure();
@@ -179,8 +180,32 @@ private function clearChrome()
     $this->exts->capture("after-clear");
 }
 
+private function isExists($selector = '')
+{
+    $safeSelector = addslashes($selector);
+    $this->exts->log('Element:: ' . $safeSelector);
+    $isElement = $this->exts->execute_javascript('!!document.querySelector("' . $safeSelector . '")');
+    if ($isElement) {
+        $this->exts->log('Element Found');
+        return true;
+    } else {
+        $this->exts->log('Element not Found');
+        return false;
+    }
+}
+
+public function waitFor($selector, $seconds = 7)
+{
+    for ($wait = 0; $wait < 2 && $this->exts->executeSafeScript("return !!document.querySelector('" . $selector . "');") != 1; $wait++) {
+        $this->exts->log('Waiting for Selectors.....');
+        sleep($seconds);
+    }
+}
+
 private function checkFillLogin()
 {
+    $this->waitFor($this->password_selector);
+    
     if ($this->exts->getElement($this->password_selector) != null) {
         $this->exts->capture("2-login-page");
 
@@ -253,7 +278,7 @@ public function processTwoFactorAuth($two_fa_selector, $trusted_btn_selector)
 
                 $codeString = strval($two_factor_code);
                 $digitsArray = str_split($codeString);
-                $this->log("SIGNIN_PAGE: Entering two_factor_code.");
+                $this->exts->log("SIGNIN_PAGE: Entering two_factor_code.");
                 foreach ($digitsArray as $key => $value) {
                     $this->exts->moveToElementAndType('.twoFa-code-input__input input.separated-input__field:nth-child(' . ($key + 1) . ')', $digitsArray[$key]);
                 }
@@ -368,13 +393,13 @@ private function checkFill2FA()
             }
         } else {
             if (gettype($two_factor_code) == 'integer') {
-                if ($this->exts->exists('div[class*="instruction__alternative-link"] a')) {
+                if ($this->isExists('div[class*="instruction__alternative-link"] a')) {
                     $this->exts->moveToElementAndClick('div[class*="instruction__alternative-link"] a');
                     sleep(3);
-                    if ($this->exts->exists('a[href*="PhoneAlternativesContainer"]')) {
+                    if ($this->isExists('a[href*="PhoneAlternativesContainer"]')) {
                         $this->exts->moveToElementAndClick('a[href*="PhoneAlternativesContainer"]');
                         sleep(5);
-                        if ($this->exts->exists('form[id="mtanStartPageForm"] button') || $this->exts->exists('button[name="sendSmsCode"]')) {
+                        if ($this->isExists('form[id="mtanStartPageForm"] button') || $this->isExists('button[name="sendSmsCode"]')) {
                             $this->exts->moveToElementAndClick('form[id="mtanStartPageForm"] button, button[name="sendSmsCode"]');
                             sleep(3);
                             $this->checkFillTwoFactor();
