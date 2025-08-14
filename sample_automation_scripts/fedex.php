@@ -1,35 +1,41 @@
-<?php // replace waitTillPresent to waitFor added checkLogin() function to chck user logged in or not 
- // optimized download code by increasing the time
+<?php // 
 /**
  * Chrome Remote via Chrome devtool protocol script, for specific process/portal
  *
- * @package uwa
+ * @package	uwa
  *
- * @copyright   GetMyInvoices
+ * @copyright	GetMyInvoices
  */
 
-define('KERNEL_ROOT', '/var/www/remote-chrome/utils/');
+define('KERNEL_ROOT', '/var/www/vhosts/worker/httpdocs/src/');
 
-$gmi_browser_core = realpath('/var/www/remote-chrome/utils/GmiChromeManager.php');
-require_once($gmi_browser_core);
+$gmi_selenium_core = realpath(KERNEL_ROOT . 'modules/cust_gmi_worker/includes/GmiChromeManager.php');
+require_once($gmi_selenium_core);
+
 class PortalScriptCDP
 {
 
-    private $exts;
-    public $setupSuccess = false;
+    private    $exts;
+    public    $setupSuccess = false;
     private $chrome_manage;
-    private $username;
-    private $password;
+    private    $username;
+    private    $password;
+    public $support_restart = true;
+    public $portal_domain = '';
 
     public function __construct($mode, $portal_name, $process_uid, $username, $password)
     {
-        $this->username = $username;
-        $this->password = $password;
+
+        $this->username = base64_decode($username);
+        $this->password = base64_decode($password);
 
         $this->exts = new GmiChromeManager();
-        $this->exts->screen_capture_location = '/var/www/remote-chrome/screens/';
-        $this->exts->init($mode, $portal_name, $process_uid, $username, $password);
+        $this->exts->screen_capture_location = '/var/www/vhosts/worker/httpdocs/fs/cdo/process/2/2673482/screens/';
+        $this->exts->init($mode, $portal_name, $process_uid, $this->username, $this->password);
         $this->setupSuccess = true;
+        if (!empty($this->exts->config_array['portal_domain'])) {
+            $this->portal_domain = $this->exts->config_array['portal_domain'];
+        }
     }
 
     /**
@@ -38,28 +44,33 @@ class PortalScriptCDP
     public function run()
     {
         if ($this->setupSuccess) {
+            file_put_contents($this->exts->screen_capture_location . '.script_execution_started', time());
             try {
+                // load cookies from file for desktop app
+                if (!empty($this->exts->config_array["without_password"])) {
+                    $this->exts->loadCookiesFromFile();
+                }
                 // Start portal script execution
                 $this->initPortal(0);
+
+                $this->exts->dump_session_files();
             } catch (\Exception $exception) {
-                $this->exts->log('Exception: ' . $exception->getMessage());
+                $this->exts->log('Selenium Exception: ' . $exception->getMessage());
                 $this->exts->capture("error");
                 var_dump($exception);
             }
 
-
             $this->exts->log('Execution completed');
 
             $this->exts->process_completed();
-            $this->exts->dump_session_files();
         } else {
             echo 'Script execution failed.. ' . "\n";
         }
     }
 
-    // Server-Portal-ID: 137156 - Last modified: 15.05.2025 14:08:56 UTC - User: 1
+    // Server-Portal-ID: 137156 - Last modified: 07.08.2025 14:49:28 UTC - User: 1
 
-    public $baseUrl = 'https://www.fedex.com/en-us/billing-online.html';
+    public $baseUrl = 'https://www.fedex.com/online/billing/cbs/invoice';
     public $loginUrl = 'https://www.fedex.com/en-us/billing-online.html';
     public $invoicePageUrl = 'https://www.fedex.com/online/billing/cbs/invoices';
 
@@ -91,13 +102,13 @@ class PortalScriptCDP
         $this->exts->capture('1-init-page');
 
         // If user hase not logged in from cookie, clear cookie, open the login url and do login
-       
+
         if (!$this->checkLogin()) {
             $this->exts->log('NOT logged via cookie');
             $this->clearChrome();
 
             for ($i = 0; $i <= 5; $i++) {
-                $this->exts->openUrl($this->loginUrl);
+                $this->exts->openUrl($this->baseUrl);
                 $this->waitFor('.js-modal-close');
                 if ($this->exts->exists('.js-modal-close')) {
                     $this->exts->moveToElementAndClick('.js-modal-close');
@@ -110,7 +121,7 @@ class PortalScriptCDP
                 }
 
 
-                
+
                 $this->exts->moveToElementAndClick('div#global-login-wrapper');
                 $this->waitFor('a[href*="/secure-login"]');
                 $this->exts->moveToElementAndClick('a[href*="/secure-login"]');
@@ -272,12 +283,12 @@ class PortalScriptCDP
                 $resultCodes = str_split($two_factor_code);
                 $two_factor_selector = 'document.querySelector("fdx-authenticate").shadowRoot.querySelector("div[class*=\'fdx-c-single-digits__item\']")';
                 $this->exts->execute_javascript('
-				var inputs = document.querySelector("fdx-authenticate").shadowRoot.querySelectorAll(".fdx-c-single-digits__item input");
-				var resultCodes = "' . $two_factor_code . '";
-				for (var i = 0; i < inputs.length; i++) {
-					inputs[i].value = resultCodes[i] || ""; // If resultCodes[i] is undefined, set empty string
-				}
-			');
+			var inputs = document.querySelector("fdx-authenticate").shadowRoot.querySelectorAll(".fdx-c-single-digits__item input");
+			var resultCodes = "' . $two_factor_code . '";
+			for (var i = 0; i < inputs.length; i++) {
+				inputs[i].value = resultCodes[i] || ""; // If resultCodes[i] is undefined, set empty string
+			}
+		');
 
                 $this->exts->log("checkFillTwoFactor: Clicking submit button.");
                 sleep(3);
@@ -355,10 +366,10 @@ class PortalScriptCDP
 
                 // JS Fallback 
                 $this->exts->execute_javascript('
-                const selectBox = document.querySelector(\'select[id="account_dd"]\');
-                selectBox.value = document.querySelector(\'select[id="account_dd"] option[value="' . $accountNumber . '"]\').value;
-                selectBox.dispatchEvent(new Event("change"));
-            ');
+            const selectBox = document.querySelector(\'select[id="account_dd"]\');
+            selectBox.value = document.querySelector(\'select[id="account_dd"] option[value="' . $accountNumber . '"]\').value;
+            selectBox.dispatchEvent(new Event("change"));
+        ');
 
                 sleep(10);
                 $this->invoicePage();
@@ -381,11 +392,11 @@ class PortalScriptCDP
 
         $this->exts->moveToElementAndClick('div#tab-0');
         sleep(5);
-        $this->exts->click_element('//li//*[contains(text(), "Invoice Status")]');
+        $this->exts->click_element('.//li//*[contains(text(), "Invoice Status")]');
         sleep(5);
-        $this->exts->click_element('//li//*[contains(text(), "Closed")]');
+        $this->exts->click_element('.//li//*[contains(text(), "Closed")]');
         sleep(5);
-        $this->exts->click_element('//button[normalize-space(text()) = "APPLY"]');
+        $this->exts->click_element('.//button[normalize-space(text()) = "APPLY"]');
 
         sleep(15);
         $this->exts->capture("4-invoices-page");
@@ -431,8 +442,8 @@ class PortalScriptCDP
         $this->exts->log('Invoice FileName ====> : ' . $invoiceFileName);
         sleep(5);
 
-        if ($this->exts->getElement('//button//*[contains(text(), "PDF")]') != null) {
-            $this->exts->click_element('//button//*[contains(text(), "PDF")]');
+        if ($this->exts->getElement('.//button//*[contains(text(), "PDF")]') != null) {
+            $this->exts->click_element('.//button//*[contains(text(), "PDF")]');
         }
         sleep(10);
 
@@ -451,9 +462,5 @@ class PortalScriptCDP
     }
 }
 
-exec("docker rm -f selenium-node-111");
-exec("docker run -d --shm-size 2g -p 5902:5900 -p 9990:9999 -e TZ=Europe/Berlin -e SE_NODE_SESSION_TIMEOUT=86400 -e LANG=de -e GRID_TIMEOUT=0 -e GRID_BROWSER_TIMEOUT=0 -e SCREEN_WIDTH=1920 -e SCREEN_HEIGHT=1080 --name selenium-node-111 -v /var/www/remote-chrome/downloads:/home/seluser/Downloads/111 remote-chrome:v1");
-
-$browserSelected = 'chrome';
-$portal = new PortalScriptCDP($browserSelected, 'test_remote_chrome', '111', 'office@sayaq-adventures-muenchen.com', 'Sayaq#2022');
+$portal = new PortalScriptCDP("optimized-chrome-v2", 'Immowelt Kundenportal', '2673482', 'aW5mb0B0b20taW1tb2JpbGllbi5jb20=', 'UXQlb3FrV2VAKExSYjI=');
 $portal->run();
