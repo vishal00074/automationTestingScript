@@ -1,0 +1,340 @@
+<?php // updated empty invoiceName condition
+/**
+ * Chrome Remote via Chrome devtool protocol script, for specific process/portal
+ *
+ * @package uwa
+ *
+ * @copyright   GetMyInvoices
+ */
+
+define('KERNEL_ROOT', '/var/www/remote-chrome/utils/');
+
+$gmi_browser_core = realpath('/var/www/remote-chrome/utils/GmiChromeManager.php');
+require_once($gmi_browser_core);
+class PortalScriptCDP
+{
+
+    private $exts;
+    public $setupSuccess = false;
+    private $chrome_manage;
+    private $username;
+    private $password;
+
+    public function __construct($mode, $portal_name, $process_uid, $username, $password)
+    {
+        $this->username = $username;
+        $this->password = $password;
+
+        $this->exts = new GmiChromeManager();
+        $this->exts->screen_capture_location = '/var/www/remote-chrome/screens/';
+        $this->exts->init($mode, $portal_name, $process_uid, $username, $password);
+        $this->setupSuccess = true;
+    }
+
+    /**
+     * Method that called first for executing portal script, this method should not be altered by Users.
+     */
+    public function run()
+    {
+        if ($this->setupSuccess) {
+            try {
+                // Start portal script execution
+                $this->initPortal(0);
+            } catch (\Exception $exception) {
+                $this->exts->log('Exception: ' . $exception->getMessage());
+                $this->exts->capture("error");
+                var_dump($exception);
+            }
+
+
+            $this->exts->log('Execution completed');
+
+            $this->exts->process_completed();
+            $this->exts->dump_session_files();
+        } else {
+            echo 'Script execution failed.. ' . "\n";
+        }
+    }
+
+    // Server-Portal-ID: 102724 - Last modified: 19.02.2025 13:42:51 UTC - User: 1
+
+    public $baseUrl = 'https://app.commitly.com/';
+    public $loginUrl = 'https://app.commitly.com/';
+
+    public $username_selector = 'input#email';
+    public $password_selector = 'input#password';
+    public $remember_me_selector = 'ui-check-box.remember-me div.button';
+    public $submit_login_selector = 'ui-text-button.button-sign-in';
+
+    public $check_login_failed_selector = '.error-message';
+    public $check_login_success_selector = 'popover-user-profile a.link .text';
+
+    public $isNoInvoice = true;
+    /**
+     * Entry Method thats called for a portal
+     * @param Integer $count Number of times portal is retried.
+     */
+    private function initPortal($count)
+    {
+        $this->exts->log('Begin initPortal ' . $count);
+        $this->exts->openUrl($this->baseUrl);
+        sleep(1);
+
+        // Load cookies
+        $this->exts->loadCookiesFromFile();
+        sleep(1);
+        $this->exts->openUrl($this->baseUrl);
+        sleep(10);
+        $this->exts->capture('1-init-page');
+
+        // If user hase not logged in from cookie, clear cookie, open the login url and do login
+        if ($this->exts->getElement($this->check_login_success_selector) == null) {
+            $this->exts->log('NOT logged via cookie');
+            $this->exts->openUrl($this->loginUrl);
+            sleep(15);
+            $this->checkFillLogin();
+            sleep(30);
+            if ($this->exts->getElement($this->password_selector) != null && !$this->exts->exists($this->check_login_failed_selector)) {
+                $this->exts->openUrl($this->loginUrl);
+                sleep(15);
+                $this->checkFillLogin();
+                sleep(30);
+            }
+            $this->checkFillTwoFactor();
+        }
+
+
+        if ($this->exts->getElement($this->check_login_success_selector) != null) {
+            sleep(3);
+            $this->exts->log(__FUNCTION__ . '::User logged in');
+            $this->exts->capture("3-login-success");
+
+            // Open invoices url and download invoice
+            $this->exts->openUrl('https://app.commitly.com/#/settings-account');
+            sleep(10);
+            $this->exts->moveToElementAndClick('.billing-button');
+            sleep(15);
+            $this->exts->moveToElementAndClick('[data-cb-id="portal_billing_history"]');
+            sleep(10);
+            $this->processInvoices();
+
+            // Final, check no invoice
+            if ($this->isNoInvoice) {
+                $this->exts->no_invoice();
+            }
+            $this->exts->success();
+        } else {
+            $this->exts->log(__FUNCTION__ . '::Use login failed');
+            if ($this->exts->getElement($this->check_login_failed_selector) != null) {
+                $this->exts->loginFailure(1);
+            } else {
+                $this->exts->loginFailure();
+            }
+        }
+    }
+
+    private function checkFillLogin()
+    {
+        if ($this->exts->getElement($this->password_selector) != null) {
+            sleep(3);
+            $this->exts->capture("2-login-page");
+
+            $this->exts->waitTillPresent($this->username_selector, 10);
+            $this->exts->log("Enter Username");
+            $this->exts->moveToElementAndType($this->username_selector, $this->username);
+            sleep(2);
+
+            $this->exts->log("Enter Password");
+            $this->exts->moveToElementAndType($this->password_selector, $this->password);
+            sleep(2);
+
+            if ($this->remember_me_selector != '')
+                $this->exts->moveToElementAndClick($this->remember_me_selector);
+            sleep(2);
+
+            $this->exts->capture("2-login-page-filled");
+            $this->checkFillRecaptcha();
+            sleep(10);
+            if ($this->exts->exists($this->submit_login_selector)) {
+                $this->exts->moveToElementAndClick($this->submit_login_selector);
+            }
+        } else {
+            $this->exts->log(__FUNCTION__ . '::Login page not found');
+            $this->exts->capture("2-login-page-not-found");
+        }
+    }
+
+    private function checkFillRecaptcha()
+    {
+        $this->exts->log(__FUNCTION__);
+        $recaptcha_iframe_selector = 'iframe[src*="/recaptcha/api2/anchor?"]';
+        $recaptcha_textarea_selector = 'textarea[name="g-recaptcha-response"]';
+        if ($this->exts->exists($recaptcha_iframe_selector)) {
+            $iframeUrl = $this->exts->extract($recaptcha_iframe_selector, null, 'src');
+            $data_siteKey = explode('&', end(explode("&k=", $iframeUrl)))[0];
+            $this->exts->log("iframe url  - " . $iframeUrl);
+            $this->exts->log("SiteKey - " . $data_siteKey);
+
+            $isCaptchaSolved = $this->exts->processRecaptcha(urlencode($this->exts->getUrl()), $data_siteKey, false);
+            $this->exts->log("isCaptchaSolved - " . $isCaptchaSolved);
+
+            if ($isCaptchaSolved) {
+                // Step 1 fill answer to textarea
+                $this->exts->log(__FUNCTION__ . "::filling reCaptcha response..");
+                $recaptcha_textareas =  $this->exts->getElements($recaptcha_textarea_selector);
+                for ($i = 0; $i < count($recaptcha_textareas); $i++) {
+                    $this->exts->execute_javascript("arguments[0].innerHTML = '" . $this->exts->recaptcha_answer . "';", [$recaptcha_textareas[$i]]);
+                }
+                sleep(2);
+                $this->exts->capture('recaptcha-filled');
+
+                // Step 2, check if callback function need executed
+                $gcallbackFunction = $this->exts->execute_javascript('
+                if(document.querySelector("[data-callback]") != null){
+                    document.querySelector("[data-callback]").getAttribute("data-callback");
+                } else {
+                    var result = ""; var found = false;
+                    function recurse (cur, prop, deep) {
+                        if(deep > 5 || found){ return;}console.log(prop);
+                        try {
+                            if(cur == undefined || cur == null || cur instanceof Element || Object(cur) !== cur || Array.isArray(cur)){ return;}
+                            if(prop.indexOf(".callback") > -1){result = prop; found = true; return;
+                            } else { deep++;
+                                for (var p in cur) { recurse(cur[p], prop ? prop + "." + p : p, deep);}
+                            }
+                        } catch(ex) { console.log("ERROR in function: " + ex); return; }
+                    }
+
+                    recurse(___grecaptcha_cfg.clients[0], "", 0);
+                    return found ? "___grecaptcha_cfg.clients[0]." + result : null;
+                }
+            ');
+                $this->exts->log('Callback function: ' . $gcallbackFunction);
+                if ($gcallbackFunction != null) {
+                    $this->exts->execute_javascript($gcallbackFunction . '("' . $this->exts->recaptcha_answer . '");');
+                    sleep(10);
+                }
+            }
+        } else {
+            $this->exts->log(__FUNCTION__ . '::Not found reCaptcha');
+        }
+    }
+
+    private function checkFillTwoFactor()
+    {
+        $two_factor_selector = 'input#otp_token';
+        $two_factor_message_selector = 'div.page-auth .desc';
+        $two_factor_submit_selector = 'div.page-auth form .green';
+
+        if ($this->exts->getElement($two_factor_selector) != null && $this->exts->two_factor_attempts < 3) {
+            $this->exts->log("Two factor page found.");
+            $this->exts->capture("2.1-two-factor");
+
+            if ($this->exts->getElement($two_factor_message_selector) != null) {
+                $this->exts->two_factor_notif_msg_en = "";
+                for ($i = 0; $i < count($this->exts->getElements($two_factor_message_selector)); $i++) {
+                    $this->exts->two_factor_notif_msg_en = $this->exts->two_factor_notif_msg_en . $this->exts->getElements($two_factor_message_selector)[$i]->getAttribute('innerText') . "\n";
+                }
+                $this->exts->two_factor_notif_msg_en = trim($this->exts->two_factor_notif_msg_en);
+                $this->exts->two_factor_notif_msg_de = $this->exts->two_factor_notif_msg_en;
+                $this->exts->log("Message:\n" . $this->exts->two_factor_notif_msg_en);
+            }
+            if ($this->exts->two_factor_attempts == 2) {
+                $this->exts->two_factor_notif_msg_en = $this->exts->two_factor_notif_msg_en . ' ' . $this->exts->two_factor_notif_msg_retry_en;
+                $this->exts->two_factor_notif_msg_de = $this->exts->two_factor_notif_msg_de . ' ' . $this->exts->two_factor_notif_msg_retry_de;
+            }
+
+            $two_factor_code = trim($this->exts->fetchTwoFactorCode());
+            if (!empty($two_factor_code) && trim($two_factor_code) != '') {
+                $this->exts->log("checkFillTwoFactor: Entering two_factor_code." . $two_factor_code);
+                $this->exts->moveToElementAndType($two_factor_selector, $two_factor_code);
+
+                $this->exts->log("checkFillTwoFactor: Clicking submit button.");
+                sleep(3);
+                $this->exts->capture("2.2-two-factor-filled-" . $this->exts->two_factor_attempts);
+
+                $this->exts->moveToElementAndClick($two_factor_submit_selector);
+                sleep(15);
+
+                if ($this->exts->getElement($two_factor_selector) == null) {
+                    $this->exts->log("Two factor solved");
+                } else if ($this->exts->two_factor_attempts < 3) {
+                    $this->exts->notification_uid = "";
+                    $this->exts->two_factor_attempts++;
+                    $this->checkFillTwoFactor();
+                } else {
+                    $this->exts->log("Two factor can not solved");
+                }
+            } else {
+                $this->exts->log("Not received two factor code");
+            }
+        }
+    }
+
+    private function processInvoices()
+    {
+        sleep(20);
+        while ($this->exts->exists('.cb-history__more')) {
+            $this->exts->moveToElementAndClick('.cb-history__more');
+            sleep(5);
+        }
+
+        $this->exts->capture("4-invoices-page");
+        $invoices = [];
+
+        $rows = count($this->exts->getElements('.cb-history__list'));
+        for ($i = 0; $i < $rows; $i++) {
+            $row = $this->exts->getElements('.cb-history__list')[$i];
+            if ($this->exts->getElement('[data-cb-id="download_invoice"]', $row) != null) {
+                $this->isNoInvoice = false;
+                $download_button = $this->exts->getElement('[data-cb-id="download_invoice"]', $row);
+                $invoiceName = trim($this->exts->extract('.cb-invoice__details .cb-invoice__text', $row, 'innerText'));
+                $invoiceName = str_replace('.', '-', $invoiceName);
+                $invoiceName = str_replace(' ', '', $invoiceName);
+                $invoiceFileName = !empty($invoiceName) ? $invoiceName . '.pdf': '';
+                $invoiceDate = trim($this->exts->extract('.cb-invoice__details .cb-invoice__text', $row, 'innerText'));
+                $invoiceAmount = trim($this->exts->extract('.cb-invoice__details .cb-invoice__price', $row, 'innerText'));
+                $invoiceAmount = trim(preg_replace('/[^\d\.\,]/', '', $invoiceAmount)) . ' EUR';
+
+                $this->exts->log('--------------------------');
+                $this->exts->log('invoiceName: ' . $invoiceName);
+                $this->exts->log('invoiceDate: ' . $invoiceDate);
+                $this->exts->log('invoiceAmount: ' . $invoiceAmount);
+                $parsed_date = $this->exts->parse_date($invoiceDate, 'd. M. Y', 'Y-m-d');
+                if ($parsed_date = '') {
+                    $parsed_date = $this->exts->parse_date($invoiceDate, 'd. M Y', 'Y-m-d');
+                }
+                $this->exts->log('Date parsed: ' . $parsed_date);
+
+                // Download invoice if it not exisited
+                if ($this->exts->invoice_exists($invoiceName)) {
+                    $this->exts->log('Invoice existed ' . $invoiceFileName);
+                } else {
+                    try {
+                        $this->exts->log('Click download button');
+                        $download_button->click();
+                    } catch (\Exception $exception) {
+                        $this->exts->log('Click download button by javascript');
+                        $this->exts->execute_javascript("arguments[0].click()", [$download_button]);
+                    }
+                    sleep(5);
+                    $this->exts->wait_and_check_download('pdf');
+                    $downloaded_file = $this->exts->find_saved_file('pdf', $invoiceFileName);
+
+                    if (trim($downloaded_file) != '' && file_exists($downloaded_file)) {
+                        $this->exts->new_invoice($invoiceName, $parsed_date, $invoiceAmount, $invoiceFileName);
+                    } else {
+                        $this->exts->log(__FUNCTION__ . '::No download ' . $invoiceFileName);
+                    }
+                }
+            }
+        }
+    }
+}
+
+exec("docker rm -f selenium-node-111");
+exec("docker run -d --shm-size 2g -p 5902:5900 -p 9990:9999 -e TZ=Europe/Berlin -e SE_NODE_SESSION_TIMEOUT=86400 -e LANG=de -e GRID_TIMEOUT=0 -e GRID_BROWSER_TIMEOUT=0 -e SCREEN_WIDTH=1920 -e SCREEN_HEIGHT=1080 --name selenium-node-111 -v /var/www/remote-chrome/downloads:/home/seluser/Downloads/111 remote-chrome:v1");
+
+$browserSelected = 'chrome';
+$portal = new PortalScriptCDP($browserSelected, 'test_remote_chrome', '111', 'office@sayaq-adventures-muenchen.com', 'Sayaq#2022');
+$portal->run();
