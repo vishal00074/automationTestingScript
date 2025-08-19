@@ -8,6 +8,9 @@ public $submit_login_selector = 'form button[type="submit"]';
 public $check_login_failed_selector = 'small[data-testid="FormError"]';
 public $check_login_success_selector = 'div[data-testid="UserMenuRecruiterLabel"], a[href*="/user/profile"], a[href="/company/billing"], button[data-testid="UserMenuButton"]';
 public $isNoInvoice = true;
+public $restrictPages = 3;
+public $totalInvoices = 0;
+
 /**
     * Entry Method thats called for a portal
     * @param Integer $count Number of times portal is retried.
@@ -15,15 +18,18 @@ public $isNoInvoice = true;
 private function initPortal($count)
 {
     $this->exts->log('Begin initPortal ' . $count);
-
+    $this->restrictPages = isset($this->exts->config_array["restrictPages"]) ? (int) @$this->exts->config_array["restrictPages"] : 3;
     // Load cookies
     $this->exts->loadCookiesFromFile();
     sleep(1);
     $this->exts->openUrl($this->baseUrl);
     sleep(15);
-    $this->waitFor($this->check_login_success_selector, 10);
-
-    if ($this->exts->exists('div#cookiescript_accept')) {
+    for ($wait = 0; $wait < 15 && $this->exts->executeSafeScript("return !!document.querySelector('" . $this->check_login_success_selector . "');") != 1; $wait++) {
+        $this->exts->log('Waiting for login.....');
+        sleep(6);
+    }
+    sleep(1);
+    if ($this->isExists('div#cookiescript_accept')) {
         $this->exts->moveToElementAndClick('div#cookiescript_accept');
         sleep(1);
     }
@@ -33,7 +39,16 @@ private function initPortal($count)
         $this->exts->log('NOT logged via cookie');
         $this->checkFillLogin();
         sleep(5);
-        $this->waitFor($this->check_login_success_selector, 20);
+        for ($wait = 0; $wait < 15 && $this->exts->executeSafeScript("return !!document.querySelector('" . $this->check_login_success_selector . "');") != 1; $wait++) {
+            $this->exts->log('Waiting for login.....');
+            sleep(6);
+        }
+    }
+
+    sleep(1);
+    if ($this->isExists('.stn-close-widget-button')) {
+        $this->exts->click_element('.stn-close-widget-button');
+        sleep(5);
     }
 
     if ($this->exts->querySelector($this->check_login_success_selector) != null) {
@@ -43,7 +58,7 @@ private function initPortal($count)
         if (!empty($this->exts->config_array['allow_login_success_request'])) {
             $this->exts->triggerLoginSuccess();
         }
-
+        
         $this->exts->success();
     } else {
         $this->exts->log(__FUNCTION__ . '::Use login failed');
@@ -58,7 +73,7 @@ private function initPortal($count)
 
 private function checkFillLogin()
 {
-    if ($this->exts->exists($this->password_selector) != null) {
+    if ($this->isExists($this->password_selector) != null) {
         $this->exts->capture("2-login-page");
         $this->exts->log("Enter Username");
         $this->exts->moveToElementAndType($this->username_selector, $this->username);
@@ -67,7 +82,7 @@ private function checkFillLogin()
         sleep(1);
         $this->exts->capture("2-login-page-filled-password");
         $this->checkFillRecaptcha();
-        if ($this->exts->exists($this->submit_login_selector)) {
+        if ($this->isExists($this->submit_login_selector)) {
             $this->exts->moveToElementAndClick($this->submit_login_selector);
             sleep(5);
         }
@@ -78,13 +93,12 @@ private function checkFillLogin()
 }
 
 public $moreBtn = true;
-
 private function checkFillRecaptcha()
 {
     $this->exts->log(__FUNCTION__);
     $recaptcha_iframe_selector = 'iframe[src*="/recaptcha/api2/anchor?"]';
     $recaptcha_textarea_selector = 'textarea[name="g-recaptcha-response"]';
-    if ($this->exts->exists($recaptcha_iframe_selector)) {
+    if ($this->isExists($recaptcha_iframe_selector)) {
         $iframeUrl = $this->exts->extract($recaptcha_iframe_selector, null, 'src');
         $data_siteKey = explode('&', end(explode("&k=", $iframeUrl)))[0];
         $this->exts->log("iframe url  - " . $iframeUrl);
@@ -96,7 +110,7 @@ private function checkFillRecaptcha()
         if ($isCaptchaSolved) {
             // Step 1 fill answer to textarea
             $this->exts->log(__FUNCTION__ . "::filling reCaptcha response..");
-            $recaptcha_textareas =  $this->exts->querySelectorAll($recaptcha_textarea_selector);
+            $recaptcha_textareas = $this->exts->querySelectorAll($recaptcha_textarea_selector);
             for ($i = 0; $i < count($recaptcha_textareas); $i++) {
                 $this->exts->execute_javascript("arguments[0].innerHTML = '" . $this->exts->recaptcha_answer . "';", [$recaptcha_textareas[$i]]);
             }
@@ -105,25 +119,25 @@ private function checkFillRecaptcha()
 
             // Step 2, check if callback function need executed
             $gcallbackFunction = $this->exts->execute_javascript('
-    if(document.querySelector("[data-callback]") != null){
-        return document.querySelector("[data-callback]").getAttribute("data-callback");
-    }
+        if(document.querySelector("[data-callback]") != null){
+            return document.querySelector("[data-callback]").getAttribute("data-callback");
+        }
 
-    var result = ""; var found = false;
-    function recurse (cur, prop, deep) {
-        if(deep > 5 || found){ return;}console.log(prop);
-        try {
-            if(cur == undefined || cur == null || cur instanceof Element || Object(cur) !== cur || Array.isArray(cur)){ return;}
-            if(prop.indexOf(".callback") > -1){result = prop; found = true; return;
-            } else { deep++;
-                for (var p in cur) { recurse(cur[p], prop ? prop + "." + p : p, deep);}
-            }
-        } catch(ex) { console.log("ERROR in function: " + ex); return; }
-    }
+        var result = ""; var found = false;
+        function recurse (cur, prop, deep) {
+            if(deep > 5 || found){ return;}console.log(prop);
+            try {
+                if(cur == undefined || cur == null || cur instanceof Element || Object(cur) !== cur || Array.isArray(cur)){ return;}
+                if(prop.indexOf(".callback") > -1){result = prop; found = true; return;
+                } else { deep++;
+                    for (var p in cur) { recurse(cur[p], prop ? prop + "." + p : p, deep);}
+                }
+            } catch(ex) { console.log("ERROR in function: " + ex); return; }
+        }
 
-    recurse(___grecaptcha_cfg.clients[0], "", 0);
-    return found ? "___grecaptcha_cfg.clients[0]." + result : null;
-');
+        recurse(___grecaptcha_cfg.clients[0], "", 0);
+        return found ? "___grecaptcha_cfg.clients[0]." + result : null;
+    ');
             $this->exts->log('Callback function: ' . $gcallbackFunction);
             if ($gcallbackFunction != null) {
                 $this->exts->execute_javascript($gcallbackFunction . '("' . $this->exts->recaptcha_answer . '");');
@@ -135,10 +149,18 @@ private function checkFillRecaptcha()
     }
 }
 
-public function waitFor($selector, $seconds = 7)
+
+
+private function isExists($selector = '')
 {
-    for ($wait = 0; $wait < 2 && $this->exts->executeSafeScript("return !!document.querySelector('" . $selector . "');") != 1; $wait++) {
-        $this->exts->log('Waiting for Selectors.....');
-        sleep($seconds);
+    $safeSelector = addslashes($selector);
+    $this->exts->log('Element:: ' . $safeSelector);
+    $isElement = $this->exts->execute_javascript('!!document.querySelector("' . $safeSelector . '")');
+    if ($isElement) {
+        $this->exts->log('Element Found');
+        return true;
+    } else {
+        $this->exts->log('Element not Found');
+        return false;
     }
 }

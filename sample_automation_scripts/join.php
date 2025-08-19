@@ -1,4 +1,4 @@
-<?php // optimized the code increase sleep time to check login success selector
+<?php // replace eixsts to custom js isExists updated download code add code to load more invoices
 
 /**
  * Chrome Remote via Chrome devtool protocol script, for specific process/portal
@@ -56,7 +56,10 @@ class PortalScriptCDP
             echo 'Script execution failed.. ' . "\n";
         }
     }
-    // Server-Portal-ID: 210991 - Last modified: 27.06.2025 14:11:54 UTC - User: 1
+
+    // Server-Portal-ID: 210991 - Last modified: 06.08.2025 15:26:38 UTC - User: 1
+
+    // Start Script 
 
     public $baseUrl = 'https://join.com/dashboard';
     public $loginUrl = 'https://join.com/auth/login';
@@ -68,6 +71,9 @@ class PortalScriptCDP
     public $check_login_failed_selector = 'small[data-testid="FormError"]';
     public $check_login_success_selector = 'div[data-testid="UserMenuRecruiterLabel"], a[href*="/user/profile"], a[href="/company/billing"], button[data-testid="UserMenuButton"]';
     public $isNoInvoice = true;
+    public $restrictPages = 3;
+    public $totalInvoices = 0;
+
     /**
      * Entry Method thats called for a portal
      * @param Integer $count Number of times portal is retried.
@@ -75,15 +81,18 @@ class PortalScriptCDP
     private function initPortal($count)
     {
         $this->exts->log('Begin initPortal ' . $count);
-
+        $this->restrictPages = isset($this->exts->config_array["restrictPages"]) ? (int) @$this->exts->config_array["restrictPages"] : 3;
         // Load cookies
         $this->exts->loadCookiesFromFile();
         sleep(1);
         $this->exts->openUrl($this->baseUrl);
         sleep(15);
-        $this->waitFor($this->check_login_success_selector, 10);
-
-        if ($this->exts->exists('div#cookiescript_accept')) {
+        for ($wait = 0; $wait < 15 && $this->exts->executeSafeScript("return !!document.querySelector('" . $this->check_login_success_selector . "');") != 1; $wait++) {
+            $this->exts->log('Waiting for login.....');
+            sleep(6);
+        }
+        sleep(1);
+        if ($this->isExists('div#cookiescript_accept')) {
             $this->exts->moveToElementAndClick('div#cookiescript_accept');
             sleep(1);
         }
@@ -93,7 +102,16 @@ class PortalScriptCDP
             $this->exts->log('NOT logged via cookie');
             $this->checkFillLogin();
             sleep(5);
-            $this->waitFor($this->check_login_success_selector, 20);
+            for ($wait = 0; $wait < 15 && $this->exts->executeSafeScript("return !!document.querySelector('" . $this->check_login_success_selector . "');") != 1; $wait++) {
+                $this->exts->log('Waiting for login.....');
+                sleep(6);
+            }
+        }
+
+        sleep(1);
+        if ($this->isExists('.stn-close-widget-button')) {
+            $this->exts->click_element('.stn-close-widget-button');
+            sleep(5);
         }
 
         if ($this->exts->querySelector($this->check_login_success_selector) != null) {
@@ -103,18 +121,22 @@ class PortalScriptCDP
             // Open invoices url and download invoice
             $this->exts->openUrl($this->invoicePageUrl);
             $this->exts->log('Open invoices url and download invoice');
-
-            $this->waitFor('div[data-testid="BillingSettingsCard"] button', 20);
-
-            if ($this->exts->exists('div[data-testid="BillingSettingsCard"] button')) {
+            for ($wait = 0; $wait < 15 && $this->exts->executeSafeScript("return !!document.querySelector('div[data-testid=\"BillingSettingsCard\"] button');") !== true; $wait++) {
+                $this->exts->log('Waiting for login...');
+                sleep(2);
+            }
+            sleep(4);
+            if ($this->isExists('div[data-testid="BillingSettingsCard"] button')) {
                 $this->exts->click_element("div[data-testid='BillingSettingsCard'] button");
                 sleep(3);
                 $download_invoice_tab = $this->exts->findTabMatchedUrl(['stripe']);
                 if ($download_invoice_tab != null) {
                     $this->exts->switchToTab($download_invoice_tab);
                 }
+                sleep(8);
+                $this->exts->log('Waiting for open url...');
                 $this->processStripeInvoices();
-            } else if ($this->exts->exists('[data-testid = "BillingHistory"] a[href*="in.xero.com"], [data-testid = "BillingHistory"] a[href*="invoice"]')) {
+            } else if ($this->isExists('[data-testid = "BillingHistory"] a[href*="in.xero.com"], [data-testid = "BillingHistory"] a[href*="invoice"]')) {
                 $this->processInvoicesLatest();
                 sleep(3);
             } else {
@@ -122,7 +144,6 @@ class PortalScriptCDP
                 $this->exts->log('Open subscription url');
                 $this->processSubscriptions();
             }
-
             $this->processInvoices();
             // Final, check no invoice
             if ($this->isNoInvoice) {
@@ -142,7 +163,7 @@ class PortalScriptCDP
 
     private function checkFillLogin()
     {
-        if ($this->exts->exists($this->password_selector) != null) {
+        if ($this->isExists($this->password_selector) != null) {
             $this->exts->capture("2-login-page");
             $this->exts->log("Enter Username");
             $this->exts->moveToElementAndType($this->username_selector, $this->username);
@@ -151,7 +172,7 @@ class PortalScriptCDP
             sleep(1);
             $this->exts->capture("2-login-page-filled-password");
             $this->checkFillRecaptcha();
-            if ($this->exts->exists($this->submit_login_selector)) {
+            if ($this->isExists($this->submit_login_selector)) {
                 $this->exts->moveToElementAndClick($this->submit_login_selector);
                 sleep(5);
             }
@@ -162,13 +183,12 @@ class PortalScriptCDP
     }
 
     public $moreBtn = true;
-
     private function checkFillRecaptcha()
     {
         $this->exts->log(__FUNCTION__);
         $recaptcha_iframe_selector = 'iframe[src*="/recaptcha/api2/anchor?"]';
         $recaptcha_textarea_selector = 'textarea[name="g-recaptcha-response"]';
-        if ($this->exts->exists($recaptcha_iframe_selector)) {
+        if ($this->isExists($recaptcha_iframe_selector)) {
             $iframeUrl = $this->exts->extract($recaptcha_iframe_selector, null, 'src');
             $data_siteKey = explode('&', end(explode("&k=", $iframeUrl)))[0];
             $this->exts->log("iframe url  - " . $iframeUrl);
@@ -180,7 +200,7 @@ class PortalScriptCDP
             if ($isCaptchaSolved) {
                 // Step 1 fill answer to textarea
                 $this->exts->log(__FUNCTION__ . "::filling reCaptcha response..");
-                $recaptcha_textareas =  $this->exts->querySelectorAll($recaptcha_textarea_selector);
+                $recaptcha_textareas = $this->exts->querySelectorAll($recaptcha_textarea_selector);
                 for ($i = 0; $i < count($recaptcha_textareas); $i++) {
                     $this->exts->execute_javascript("arguments[0].innerHTML = '" . $this->exts->recaptcha_answer . "';", [$recaptcha_textareas[$i]]);
                 }
@@ -189,25 +209,25 @@ class PortalScriptCDP
 
                 // Step 2, check if callback function need executed
                 $gcallbackFunction = $this->exts->execute_javascript('
-        if(document.querySelector("[data-callback]") != null){
-            return document.querySelector("[data-callback]").getAttribute("data-callback");
-        }
+            if(document.querySelector("[data-callback]") != null){
+                return document.querySelector("[data-callback]").getAttribute("data-callback");
+            }
 
-        var result = ""; var found = false;
-        function recurse (cur, prop, deep) {
-            if(deep > 5 || found){ return;}console.log(prop);
-            try {
-                if(cur == undefined || cur == null || cur instanceof Element || Object(cur) !== cur || Array.isArray(cur)){ return;}
-                if(prop.indexOf(".callback") > -1){result = prop; found = true; return;
-                } else { deep++;
-                    for (var p in cur) { recurse(cur[p], prop ? prop + "." + p : p, deep);}
-                }
-            } catch(ex) { console.log("ERROR in function: " + ex); return; }
-        }
+            var result = ""; var found = false;
+            function recurse (cur, prop, deep) {
+                if(deep > 5 || found){ return;}console.log(prop);
+                try {
+                    if(cur == undefined || cur == null || cur instanceof Element || Object(cur) !== cur || Array.isArray(cur)){ return;}
+                    if(prop.indexOf(".callback") > -1){result = prop; found = true; return;
+                    } else { deep++;
+                        for (var p in cur) { recurse(cur[p], prop ? prop + "." + p : p, deep);}
+                    }
+                } catch(ex) { console.log("ERROR in function: " + ex); return; }
+            }
 
-        recurse(___grecaptcha_cfg.clients[0], "", 0);
-        return found ? "___grecaptcha_cfg.clients[0]." + result : null;
-    ');
+            recurse(___grecaptcha_cfg.clients[0], "", 0);
+            return found ? "___grecaptcha_cfg.clients[0]." + result : null;
+        ');
                 $this->exts->log('Callback function: ' . $gcallbackFunction);
                 if ($gcallbackFunction != null) {
                     $this->exts->execute_javascript($gcallbackFunction . '("' . $this->exts->recaptcha_answer . '");');
@@ -219,21 +239,18 @@ class PortalScriptCDP
         }
     }
 
-    public function waitFor($selector, $seconds = 7)
-    {
-        for ($wait = 0; $wait < 2 && $this->exts->executeSafeScript("return !!document.querySelector('" . $selector . "');") != 1; $wait++) {
-            $this->exts->log('Waiting for Selectors.....');
-            sleep($seconds);
-        }
-    }
-
     private function processInvoicesLatest($paging_count = 1)
     {
         sleep(3);
-        $this->waitFor('[data-testid = "BillingHistory"] a[href*="in.xero.com"], [data-testid = "BillingHistory"] a[href*="invoice"]');
+        for ($wait = 0; $wait < 15 && $this->exts->executeSafeScript("return !!document.querySelector('[data-testid=\"BillingHistory\"] a[href*=\"in.xero.com\"], [data-testid=\"BillingHistory\"] a[href*=\"invoice\"]');") !== true; $wait++) {
+            $this->exts->log('Waiting for selector...');
+            sleep(2);
+        }
+
+
         $this->exts->capture("4-invoices-page-latest");
 
-        for ($i = 0; $i < 20 && $this->exts->config_array["restrictPages"] == 0 && $this->exts->exists('button[data-testid="LoadMoreInvoices"]'); $i++) {
+        for ($i = 0; $i < 20 && $this->exts->config_array["restrictPages"] == 0 && $this->isExists('button[data-testid="LoadMoreInvoices"]'); $i++) {
             $this->exts->moveToElementAndClick('button[data-testid="LoadMoreInvoices"]');
             sleep(3);
         }
@@ -279,12 +296,30 @@ class PortalScriptCDP
         }
     }
 
+    private function isExists($selector = '')
+    {
+        $safeSelector = addslashes($selector);
+        $this->exts->log('Element:: ' . $safeSelector);
+        $isElement = $this->exts->execute_javascript('!!document.querySelector("' . $safeSelector . '")');
+        if ($isElement) {
+            $this->exts->log('Element Found');
+            return true;
+        } else {
+            $this->exts->log('Element not Found');
+            return false;
+        }
+    }
+
     private function processInvoices($paging_count = 1)
     {
-        $this->waitFor('div[data-testid="DataTable"] div[data-testid="data-table-row"]');
+        for ($wait = 0; $wait < 15 && $this->exts->executeSafeScript("return !!document.querySelector('div[data-testid=\"DataTable\"] div[data-testid=\"data-table-row\"]');") !== true; $wait++) {
+            $this->exts->log('Waiting for login...');
+            sleep(2);
+        }
+
         $this->exts->capture("4-invoices-page");
         $invoices = [];
-        if ($this->exts->exists('div[data-testid="DataTable"] div[data-testid="data-table-row"]')) {
+        if ($this->isExists('div[data-testid="DataTable"] div[data-testid="data-table-row"]')) {
             $rows = $this->exts->querySelectorAll('div[data-testid="DataTable"] div[data-testid="data-table-row"]');
             foreach ($rows as $row) {
                 $tags = $this->exts->querySelectorAll('div[data-testid*="data-table"]', $row);
@@ -361,13 +396,7 @@ class PortalScriptCDP
             $invoiceFileName = !empty($invoiceName) ? $invoiceName . '.pdf' : '';
             $count++;
             $invoiceUrl = $row->getAttribute("href");
-            // $this->exts->execute_javascript('window.open()');
-            // sleep(3);
-            // $handles = $this->exts->webdriver->getWindowHandles();
-            // $this->exts->webdriver->switchTo()->window(end($handles));
-            // $this->exts->openUrl($invoiceUrl);
-            // sleep(5);
-            if ($this->exts->exists('button.download__button')) {
+            if ($this->isExists('button.download__button')) {
                 $this->exts->moveToElementAndClick('button.download__button');
                 $invoiceFileName = $this->exts->extract('ul[role=listbox] li span', null, 'innerText');
                 $this->exts->log("---------------------------------");
@@ -398,14 +427,6 @@ class PortalScriptCDP
                     $this->exts->log(__FUNCTION__ . '::No download ' . $invoiceFileName);
                 }
             }
-
-            // $handles = $this->exts->webdriver->getWindowHandles();
-            // if (count($handles) > 1) {
-            //     $this->exts->webdriver->close();
-            //     $handles = $this->exts->webdriver->getWindowHandles();
-            //     $this->exts->webdriver->switchTo()->window(end($handles));
-            //     sleep(2);
-            // }
         }
         $paging_count++;
         if (
@@ -481,13 +502,7 @@ class PortalScriptCDP
                 $invoiceFileName = !empty($invoiceName) ? $invoiceName . '.pdf' : '';
                 $count++;
                 $invoiceUrl = $row->getAttribute("href");
-                // $this->exts->execute_javascript('window.open()');
-                // sleep(3);
-                // $handles = $this->exts->webdriver->getWindowHandles();
-                // $this->exts->webdriver->switchTo()->window(end($handles));
-                // $this->exts->openUrl($invoiceUrl);
-                // sleep(5);
-                if ($this->exts->exists('button.download__button')) {
+                if ($this->isExists('button.download__button')) {
                     $this->exts->moveToElementAndClick('button.download__button');
                     $invoiceFileName = $this->exts->extract('ul[role=listbox] li span', null, 'innerText');
                     $this->exts->log("---------------------------------");
@@ -521,14 +536,6 @@ class PortalScriptCDP
                         $this->exts->log(__FUNCTION__ . '::No download ' . $invoiceFileName);
                     }
                 }
-
-                // $handles = $this->exts->webdriver->getWindowHandles();
-                // if (count($handles) > 1) {
-                //     $this->exts->webdriver->close();
-                //     $handles = $this->exts->webdriver->getWindowHandles();
-                //     $this->exts->webdriver->switchTo()->window(end($handles));
-                //     sleep(2);
-                // }
             }
         }
 
@@ -543,11 +550,12 @@ class PortalScriptCDP
             $this->processSubscriptions($paging_count);
         }
     }
+
     private function processStripeInvoices($paging_count = 1)
     {
         for ($wait = 0; $wait < 15 && $this->exts->executeSafeScript("return !!document.querySelector('a[href*=\"invoice.stripe.com\"]');") != 1; $wait++) {
             $this->exts->log('Waiting for login.....');
-            sleep(10);
+            sleep(2);
         }
 
         sleep(2);
@@ -555,17 +563,26 @@ class PortalScriptCDP
         // Keep clicking more but maximum upto 10 times
         $maxAttempts = 10;
         $attempt = 0;
-
-        while ($attempt < $maxAttempts && $this->exts->exists('button[data-testid="view-more-button"]') && $this->exts->config_array["restrictPages"] == 0) {
-            $this->exts->execute_javascript('
-    var btn = document.querySelector("button[data-testid=\'view-more-button\']");
-    if(btn){
-        btn.click();
-    }
-');
-            $attempt++;
-            sleep(5);
+        if ($this->isExists('button[data-testid="view-more-button"]')) {
+            while ($attempt < $maxAttempts && $this->isExists('button[data-testid="view-more-button"]')) {
+                $this->exts->moveToElementAndClick('button[data-testid="view-more-button"]');
+                sleep(4);
+                $attempt++;
+            }
+        } else {
+            while ($attempt < $maxAttempts && $this->isExists('button[data-testid="view-more-button"]') && $this->exts->config_array["restrictPages"] == 0) {
+                $this->exts->execute_javascript('
+                    var btn = document.querySelector("button[data-testid=\'view-more-button\']");
+                    if(btn){
+                        btn.click();
+                    }
+                ');
+                $attempt++;
+                sleep(5);
+            }
         }
+        sleep(10);
+        $this->exts->capture("stripe-invoices");
         $invoices = [];
 
         $rows = $this->exts->querySelectorAll('a[href*="invoice.stripe.com"]');
@@ -576,9 +593,19 @@ class PortalScriptCDP
         }
         $this->exts->log('Invoices found: ' . count($invoices));
         foreach ($invoices as $invoice) {
+            if ($this->restrictPages != 0 && $this->totalInvoices >= 50) {
+                return;
+            };
             $this->exts->openUrl($invoice['invoiceUrl']);
             sleep(3);
-            $this->waitFor('div.InvoiceDetailsRow-Container > button:nth-child(1)', 20);
+
+            for ($wait = 0; $wait < 15 && $this->exts->executeSafeScript("return !!document.querySelector('div.InvoiceDetailsRow-Container > button:nth-child(1)');") !== true; $wait++) {
+                $this->exts->log('Waiting for selector...');
+                sleep(2);
+            }
+
+
+            sleep(1);
             if ($this->exts->querySelector('div.InvoiceDetailsRow-Container > button:nth-child(1)') != null) {
                 $invoiceName = $this->exts->extract('table.InvoiceDetails-table tr:nth-child(1) > td:nth-child(2)');
                 $invoiceDate = $this->exts->extract('table.InvoiceDetails-table tr:nth-child(2) > td:nth-child(2)');
@@ -601,6 +628,8 @@ class PortalScriptCDP
 
             if (trim($downloaded_file) != '' && file_exists($downloaded_file)) {
                 $this->exts->new_invoice($invoiceName, $invoiceDate, $invoiceAmount, $invoiceFileName);
+                sleep(1);
+                $this->totalInvoices++;
             } else {
                 $this->exts->log(__FUNCTION__ . '::No download ' . $invoiceFileName);
             }
