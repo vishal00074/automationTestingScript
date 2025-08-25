@@ -1,35 +1,42 @@
-<?php // migrated
+<?php // updated success selector and handle empty invoices case updated load more buton remove unused processInvoiceLatest function
 
 /**
  * Chrome Remote via Chrome devtool protocol script, for specific process/portal
  *
- * @package uwa
+ * @package	uwa
  *
- * @copyright   GetMyInvoices
+ * @copyright	GetMyInvoices
  */
 
-define('KERNEL_ROOT', '/var/www/remote-chrome/utils/');
+define('KERNEL_ROOT', '/var/www/vhosts/worker/httpdocs/src/');
 
-$gmi_browser_core = realpath('/var/www/remote-chrome/utils/GmiChromeManager.php');
-require_once($gmi_browser_core);
+$gmi_selenium_core = realpath(KERNEL_ROOT . 'modules/cust_gmi_worker/includes/GmiChromeManager.php');
+require_once($gmi_selenium_core);
+
 class PortalScriptCDP
 {
 
-    private $exts;
-    public $setupSuccess = false;
+    private    $exts;
+    public    $setupSuccess = false;
     private $chrome_manage;
-    private $username;
-    private $password;
+    private    $username;
+    private    $password;
+    public $support_restart = true;
+    public $portal_domain = '';
 
     public function __construct($mode, $portal_name, $process_uid, $username, $password)
     {
-        $this->username = $username;
-        $this->password = $password;
+
+        $this->username = base64_decode($username);
+        $this->password = base64_decode($password);
 
         $this->exts = new GmiChromeManager();
-        $this->exts->screen_capture_location = '/var/www/remote-chrome/screens/';
-        $this->exts->init($mode, $portal_name, $process_uid, $username, $password);
+        $this->exts->screen_capture_location = '/var/www/vhosts/worker/httpdocs/fs/cdo/process/2/2673461/screens/';
+        $this->exts->init($mode, $portal_name, $process_uid, $this->username, $this->password);
         $this->setupSuccess = true;
+        if (!empty($this->exts->config_array['portal_domain'])) {
+            $this->portal_domain = $this->exts->config_array['portal_domain'];
+        }
     }
 
     /**
@@ -38,28 +45,28 @@ class PortalScriptCDP
     public function run()
     {
         if ($this->setupSuccess) {
+            file_put_contents($this->exts->screen_capture_location . '.script_execution_started', time());
             try {
                 // Start portal script execution
                 $this->initPortal(0);
+
+                $this->exts->dump_session_files();
             } catch (\Exception $exception) {
-                $this->exts->log('Exception: ' . $exception->getMessage());
+                $this->exts->log('Selenium Exception: ' . $exception->getMessage());
                 $this->exts->capture("error");
                 var_dump($exception);
             }
 
-
             $this->exts->log('Execution completed');
 
             $this->exts->process_completed();
-            $this->exts->dump_session_files();
         } else {
             echo 'Script execution failed.. ' . "\n";
         }
     }
 
-    // Server-Portal-ID: 61478 - Last modified: 21.08.2024 14:35:38 UTC - User: 1
+    // Server-Portal-ID: 61478 - Last modified: 16.07.2025 13:51:50 UTC - User: 1
 
-    /*Define constants used in script*/
     public $baseUrl = 'https://balsamiq.cloud';
     public $loginUrl = 'https://balsamiq.cloud/#login';
     public $invoicePageUrl = 'https://balsamiq.cloud';
@@ -70,7 +77,7 @@ class PortalScriptCDP
     public $submit_login_btn = 'button#dialog-login-submit';
 
     public $checkLoginFailedSelector = '#dialog-login-error';
-    public $checkLoggedinSelector = '[data-cypress="user-avatar-menu"],div[class="lcBody"] div[class="logout"], div[data-testid="menu-User"]';
+    public $checkLoggedinSelector = 'div[class*="userview__myUser"], div.lcBody form[action="/logout"]';
 
     public $isNoInvoice = true;
     /**
@@ -142,7 +149,6 @@ class PortalScriptCDP
         }
     }
 
-
     private function waitForLogin()
     {
         sleep(10);
@@ -162,18 +168,37 @@ class PortalScriptCDP
         $this->exts->log('New URL :' . $new_url);
 
         $this->exts->openUrl($new_url);
-        sleep(10);
+        sleep(15);
 
-        if ($this->exts->getElement($this->checkLoggedinSelector) != null) {
+        if ($this->exts->getElement('button[data-testid="menubar-menuUser"]') != null) {
+            $this->exts->log('User logged in.');
+            $this->exts->capture("2-post-login");
+            $this->exts->moveToElementAndClick('button[data-testid="menubar-menuUser"]');
+            sleep(5);
+            $this->exts->moveToElementAndClick('div[data-testid="menu-item-Manage Subscription"]');
+            sleep(3);
+            $this->exts->switchToNewestActiveTab();
+            $this->exts->waitTillPresent('div.content  > div:nth-child(3) a');
+            if ($this->exts->exists('div.content  > div:nth-child(3) a')) {
+                $this->exts->moveToElementAndClick('div.content  > div:nth-child(3) a');
+                sleep(15);
+                $this->processInvoiceUpdated();
+            }
+
+            if ($this->isNoInvoice) {
+                $this->exts->no_invoice();
+            }
+            $this->exts->success();
+        } else if ($this->exts->getElement($this->checkLoggedinSelector) != null) {
             sleep(3);
             $this->exts->log('User logged in.');
             $this->exts->capture("2-post-login");
 
             sleep(2);
-            if ($this->exts->exists('div[class="content"] > div:nth-child(1) > div:nth-child(2)')) {
-                $this->exts->moveToElementAndClick('div[class="content"] > div:nth-child(1) > div:nth-child(2)');
+            if ($this->exts->queryXpath(".//a[@href='#' and normalize-space(text())='Manage Billing Info']")) {
+                $this->exts->moveToElementAndClick(".//a[@href='#' and normalize-space(text())='Manage Billing Info']");
                 sleep(15);
-                $this->processInvoiceLatest();
+                $this->processInvoiceUpdated();
             } else {
                 sleep(15);
                 // Open invoices url
@@ -207,87 +232,10 @@ class PortalScriptCDP
 
     public $moreBtn = true;
 
-    private function processInvoiceLatest()
-    {
-        $this->exts->log('Process Invoice : ');
-        $totalInvoices = $this->exts->getElements('a[data-testid="hip-link"]');
-        $this->exts->log('Initial No of Invoices : ' . count($totalInvoices));
-        $stop = 0;
-        while ($this->moreBtn &&  $stop < 50) {
-
-            if ($this->exts->exists('div button[class="UnstyledLink ButtonLink IconParent Flex-flex"]:nth-child(2)')) {
-                $this->viewMore();
-                sleep(3);
-            } else {
-
-                $this->moreBtn = false;
-            }
-            $stop++;
-        }
-
-        $totalInvoices = $this->exts->getElements('a[data-testid="hip-link"]');
-
-        $this->exts->log('Total No of Invoices : ' . count($totalInvoices));
-
-        foreach ($totalInvoices as $invoice) {
-
-            $invoiceBtn = $invoice;
-            if ($invoiceBtn != null) {
-                $invoiceBtn->click();
-            }
-            sleep(10);
-
-            $this->exts->log('open new window');
-            $newTab = $this->exts->openNewTab();
-
-            if ($this->exts->exists('div[class="App-InvoiceDetails flex-item width-grow flex-container direction-column"]')) {
-                $invoiceName = $this->exts->getElement('div[class="App-InvoiceDetails flex-item width-grow flex-container direction-column"] tr:nth-child(1) td:nth-child(2)')->getText();
-                $invoiceDate = $this->exts->getElement('div[class="App-InvoiceDetails flex-item width-grow flex-container direction-column"] tr:nth-child(2) td:nth-child(2)')->getText();
-                $invoiceFileName = $invoiceName . '.pdf';
-                $download_button =  $this->exts->getElement('div[class="InvoiceDetailsRow-Container"] button:nth-child(1)');
-
-                $this->exts->log('--------------------------');
-                $this->exts->log('invoiceFileName: ' . $invoiceFileName);
-                $this->exts->log('invoiceName: ' . $invoiceName);
-                $this->exts->log('invoiceDate: ' . $invoiceDate);
-
-
-                if ($this->exts->invoice_exists($invoiceName)) {
-                    $this->exts->log('Invoice existed ' . $invoiceFileName);
-                } else {
-                    try {
-                        $this->exts->log(__FUNCTION__ . ' trigger click.');
-
-                        $download_button->click();
-                    } catch (\Exception $exception) {
-                        $this->exts->log(__FUNCTION__ . ' by javascript' . $exception);
-                        $this->exts->executeSafeScript("arguments[0].click()", [$download_button]);
-                    }
-                    sleep(4);
-                    $this->exts->wait_and_check_download('pdf');
-                    $downloaded_file = $this->exts->find_saved_file('pdf', $invoiceFileName);
-
-                    if (trim($downloaded_file) != '' && file_exists($downloaded_file)) {
-                        $this->totalFiles += 1;
-                        $this->exts->new_invoice($invoiceName, $invoiceDate, '', $invoiceFileName);
-                    } else {
-                        $this->exts->log(__FUNCTION__ . '::No download ' . $invoiceFileName);
-                    }
-                }
-
-                $this->exts->log('close new window');
-                $this->exts->closeTab($newTab);
-                sleep(2);
-                $this->isNoInvoice = false;
-            }
-        }
-    }
-
     public function viewMore()
     {
         $this->exts->moveToElementAndClick('div button[class="UnstyledLink ButtonLink IconParent Flex-flex"]:nth-child(2)');
     }
-
 
     private function processInvoices()
     {
@@ -359,11 +307,68 @@ class PortalScriptCDP
             }
         }
     }
+
+    private function processInvoiceUpdated()
+    {
+        sleep(10);
+        $this->exts->capture("4-invoices-page");
+        // Keep clicking more but maximum upto 10 times
+
+        $restrictPages = isset($this->exts->config_array["restrictPages"]) ? (int) @$this->exts->config_array["restrictPages"] : 3;
+        if ($restrictPages == 0) {
+            $maxAttempts = 10;
+        } else {
+            $maxAttempts = $restrictPages;
+        }
+
+        $paging_count = 0;
+
+        while ($paging_count < $maxAttempts && $this->exts->exists('button[data-testid="view-more-button"]')) {
+            $this->exts->moveToElementAndClick('button[data-testid="view-more-button"]');
+            sleep(4);
+            $paging_count++;
+        }
+
+        $invoices = [];
+
+        $rows = $this->exts->querySelectorAll('a[href*="invoice.stripe.com"]');
+        foreach ($rows as $row) {
+            array_push($invoices, array(
+                'invoiceUrl' => $row->getAttribute('href')
+            ));
+        }
+        $this->exts->log('Invoices found: ' . count($invoices));
+        foreach ($invoices as $invoice) {
+            $this->exts->openUrl($invoice['invoiceUrl']);
+            sleep(5);
+            if ($this->exts->querySelector('div.InvoiceDetailsRow-Container > button:nth-child(1)') != null) {
+                $invoiceName = $this->exts->extract('table.InvoiceDetails-table tr:nth-child(1) > td:nth-child(2)');
+                $invoiceDate = $this->exts->extract('table.InvoiceDetails-table tr:nth-child(2) > td:nth-child(2)');
+                $invoiceAmount = $this->exts->extract('div[data-testid="invoice-summary-post-payment"] h1[data-testid="invoice-amount-post-payment"]');
+                $downloadBtn = $this->exts->querySelector('div.InvoiceDetailsRow-Container > button:nth-child(1)');
+
+                $this->exts->log('--------------------------');
+                $this->exts->log('invoiceName: ' . $invoiceName);
+                $this->exts->log('invoiceDate: ' . $invoiceDate);
+                $this->exts->log('invoiceAmount: ' . $invoiceAmount);
+                $this->exts->log('invoiceUrl: ' . $invoice['invoiceUrl']);
+                $this->isNoInvoice = false;
+            }
+            $invoiceFileName = !empty($invoiceName) ? $invoiceName . '.pdf' : '';
+            $invoice['invoiceDate'] = $this->exts->parse_date($invoiceDate, 'm.d.y', 'Y-m-d');
+            $this->exts->log('Date parsed: ' . $invoiceDate);
+
+            $downloaded_file = $this->exts->click_and_download($downloadBtn, 'pdf', $invoiceFileName);
+
+            if (trim($downloaded_file) != '' && file_exists($downloaded_file)) {
+                $this->exts->new_invoice($invoiceName, $invoiceDate, $invoiceAmount, $invoiceFileName);
+                sleep(1);
+            } else {
+                $this->exts->log(__FUNCTION__ . '::No download ' . $invoiceFileName);
+            }
+        }
+    }
 }
 
-exec("docker rm -f selenium-node-111");
-exec("docker run -d --shm-size 2g -p 5902:5900 -p 9990:9999 -e TZ=Europe/Berlin -e SE_NODE_SESSION_TIMEOUT=86400 -e LANG=de -e GRID_TIMEOUT=0 -e GRID_BROWSER_TIMEOUT=0 -e SCREEN_WIDTH=1920 -e SCREEN_HEIGHT=1080 --name selenium-node-111 -v /var/www/remote-chrome/downloads:/home/seluser/Downloads/111 remote-chrome:v1");
-
-$browserSelected = 'chrome';
-$portal = new PortalScriptCDP($browserSelected, 'test_remote_chrome', '111', 'office@sayaq-adventures-muenchen.com', 'Sayaq#2022');
+$portal = new PortalScriptCDP("optimized-chrome-v2", 'LR', '2673461', 'aW5mb0Bway1rb2VuaWcuZGU=', 'S2F0cmluMTgxMDM2');
 $portal->run();

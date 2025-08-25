@@ -8,7 +8,7 @@ public $remember_me_selector = '';
 public $submit_login_btn = 'button#dialog-login-submit';
 
 public $checkLoginFailedSelector = '#dialog-login-error';
-public $checkLoggedinSelector = '[data-cypress="user-avatar-menu"],div[class="lcBody"] div[class="logout"], div[data-testid="menu-User"]';
+public $checkLoggedinSelector = 'div[class*="userview__myUser"], div.lcBody form[action="/logout"]';
 
 public $isNoInvoice = true;
 /**
@@ -80,7 +80,6 @@ private function waitForLoginPage()
     }
 }
 
-
 private function waitForLogin()
 {
     sleep(10);
@@ -100,9 +99,19 @@ private function waitForLogin()
     $this->exts->log('New URL :' . $new_url);
 
     $this->exts->openUrl($new_url);
-    sleep(10);
+    sleep(15);
 
-    if ($this->exts->getElement($this->checkLoggedinSelector) != null) {
+    if ($this->exts->getElement('button[data-testid="menubar-menuUser"]') != null) {
+        $this->exts->log('User logged in.');
+        $this->exts->capture("2-post-login");
+        
+        if (!empty($this->exts->config_array['allow_login_success_request'])) {
+            $this->exts->triggerLoginSuccess();
+        }
+
+        $this->exts->success();
+
+    } else if ($this->exts->getElement($this->checkLoggedinSelector) != null) {
         sleep(3);
         $this->exts->log('User logged in.');
         $this->exts->capture("2-post-login");
