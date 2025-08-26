@@ -1,5 +1,5 @@
 <?php // updated checkLogin and handle empty invoiceName case replace waitTillPresent to waitFor added pagination logic
-// on test engine it show 
+// updated login code remove click  on submit button code after filing username updated download code us js click getting error on click_by_xtodotool
 /**
  * Chrome Remote via Chrome devtool protocol script, for specific process/portal
  *
@@ -132,8 +132,7 @@ class PortalScriptCDP
                 $this->exts->capture("1-pre-login");
                 $this->exts->log("Enter Username");
                 $this->exts->moveToElementAndType($this->username_selector, $this->username);
-                $this->exts->click_by_xdotool($this->submit_login_selector);
-                $this->waitFor($this->password_selector);
+                sleep(2);
                 $this->exts->log("Enter Password");
                 $this->exts->moveToElementAndType($this->password_selector, $this->password);
                 sleep(1);
@@ -199,46 +198,67 @@ class PortalScriptCDP
         $rows = $this->exts->querySelectorAll('table#kc-data-table tbody tr');
         foreach ($rows as $row) {
             if ($this->exts->querySelector('td:nth-child(6) a', $row) != null) {
-                $invoiceUrl = $this->exts->querySelector('td:nth-child(6) a')->getAttribute('href');
-                $invoiceName = $this->exts->extract('td:nth-child(1)', $row);
-                $invoiceAmount =   $this->exts->extract('td:nth-child(5)', $row);
-                $invoiceDate =  $this->exts->extract('td:nth-child(2)', $row);
+                $invoiceLink = $this->exts->querySelector('td:nth-child(6) a', $row);
+                if ($invoiceLink != null) {
+                    $invoiceUrl =  $invoiceLink->getAttribute('href');
+                    $invoiceName = $this->exts->extract('td:nth-child(1)', $row);
+                    $invoiceAmount =   $this->exts->extract('td:nth-child(5)', $row);
+                    $invoiceDate =  $this->exts->extract('td:nth-child(2)', $row);
 
-                $downloadBtn = '';
+                    $downloadBtn = '';
 
-                array_push($invoices, array(
-                    'invoiceName' => $invoiceName,
-                    'invoiceDate' => $invoiceDate,
-                    'invoiceAmount' => $invoiceAmount,
-                    'invoiceUrl' => $invoiceUrl,
-                    'downloadBtn' => $downloadBtn
-                ));
-                $this->isNoInvoice = false;
+                    array_push($invoices, array(
+                        'invoiceName' => $invoiceName,
+                        'invoiceDate' => $invoiceDate,
+                        'invoiceAmount' => $invoiceAmount,
+                        'invoiceUrl' => $invoiceUrl,
+                        'downloadBtn' => $downloadBtn
+                    ));
+                    $this->isNoInvoice = false;
+                }
             }
         }
 
+        $newTab = $this->exts->openNewTab();
+        sleep(4);
         // Download all invoices
         $this->exts->log('Invoices found: ' . count($invoices));
         foreach ($invoices as $invoice) {
 
-            $newTab = $this->exts->openNewTab($invoice['invoiceUrl']);
-
+            $this->exts->openUrl($invoice['invoiceUrl']);
+            sleep(5);
             $this->exts->log('--------------------------');
-            $this->exts->log('invoiceName: ' . $invoice['invoiceName']);
             $this->exts->log('invoiceDate: ' . $invoice['invoiceDate']);
             $this->exts->log('invoiceAmount: ' . $invoice['invoiceAmount']);
 
 
-            $invoiceFileName = !empty($invoice['invoiceName']) ? $invoice['invoiceName'] . '.pdf' : '';
             $invoice['invoiceDate'] = $this->exts->parse_date($invoice['invoiceDate'], 'd.m.y', 'Y-m-d');
             $this->exts->log('Date parsed: ' . $invoice['invoiceDate']);
             $this->waitFor('a[href*="invoice"]', 15);
-
-            if ($this->exts->querySelector('a[href*="invoice"]') != null) {
+            $downloadBtn = $this->exts->querySelector('a[href*="invoice"]');
+            if ($downloadBtn  != null) {
                 $downloadUrl = $this->exts->querySelector('a[href*="invoice"]')->getAttribute('href');
-
                 $this->exts->log('invoiceUrl: ' . $downloadUrl);
-                $downloaded_file = $this->exts->direct_download($downloadUrl, 'pdf', $invoiceFileName);
+
+
+                $this->exts->execute_javascript("arguments[0].click();", [$downloadBtn]);
+                sleep(5);
+
+
+                $this->exts->wait_and_check_download('pdf');
+                $downloaded_file = $this->exts->find_saved_file('pdf');
+                $invoiceFileName = basename($downloaded_file);
+
+                $invoice['invoiceName'] = substr($invoiceFileName, 0, strrpos($invoiceFileName, '.'));
+
+                $this->exts->log('invoiceName: ' . $invoice['invoiceName']);
+
+
+                if ($this->exts->invoice_exists($invoice['invoiceName'])) {
+                    $this->exts->log('Invoice existed ' . $invoiceFileName);
+                    continue;
+                }
+
 
                 if (trim($downloaded_file) != '' && file_exists($downloaded_file)) {
                     $this->exts->new_invoice($invoice['invoiceName'], $invoice['invoiceDate'], $invoice['invoiceAmount'], $invoiceFileName);
@@ -247,12 +267,10 @@ class PortalScriptCDP
                     $this->exts->log(__FUNCTION__ . '::No download ' . $invoiceFileName);
                 }
             } else {
-                $this->exts->log(__FUNCTION__ . '::No download ' . $invoiceFileName);
+                $this->exts->log(__FUNCTION__ . '::No download ');
             }
-
-            $this->exts->closeTab($newTab);
-            sleep(2);
         }
+        $this->exts->closeTab($newTab);
 
         sleep(5);
         $restrictPages = isset($this->exts->config_array["restrictPages"]) ? (int)@$this->exts->config_array["restrictPages"] : 3;

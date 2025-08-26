@@ -65,8 +65,7 @@ function fillForm($count)
             $this->exts->capture("1-pre-login");
             $this->exts->log("Enter Username");
             $this->exts->moveToElementAndType($this->username_selector, $this->username);
-            $this->exts->click_by_xdotool($this->submit_login_selector);
-            $this->waitFor($this->password_selector);
+            sleep(2);
             $this->exts->log("Enter Password");
             $this->exts->moveToElementAndType($this->password_selector, $this->password);
             sleep(1);
