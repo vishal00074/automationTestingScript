@@ -1,4 +1,4 @@
-<?php // replaced waitTIllPresetnt to waitFor and optimized the download code and added click_and_download make changes according to download ui
+<?php // replaced waitTIllPresetnt to waitFor and optimized the download code
 
 // added pagination logic
 /**
@@ -199,11 +199,24 @@ class PortalScriptCDP
                 $this->exts->log('--------------------------');
                 $this->exts->log('invoiceDate: ' . $invoiceDate);
                 $this->exts->log('amount: ' . $amount);
-                $this->exts->log('invoiceName: ' . $invoiceName);
 
-                $invoiceFileName = !empty($invoiceName) ? $invoiceName . '.pdf' : '';
-                $downloaded_file = $this->exts->click_and_download($downloadBtn, 'pdf', $invoiceFileName);
+                $invoiceFileName = '';
+
+                try {
+                    $downloadBtn->click();
+                } catch (\Exception $exception) {
+                    $this->exts->execute_javascript('arguments[0].click();', [$downloadBtn]);
+                }
+
+                $this->exts->wait_and_check_download('pdf');
+                $downloaded_file = $this->exts->find_saved_file('pdf', $invoiceFileName);
                 if (trim($downloaded_file) != '' && file_exists($downloaded_file)) {
+
+                    //get invoiceName from downloaded file getting issue with ui invoiceName for few invoices
+
+                    $invoiceName = basename($downloaded_file, '.pdf');
+
+                    $this->exts->log('invoiceName: ' . $invoiceName);
                     $this->exts->new_invoice($invoiceName, $invoiceDate, $amount, $invoiceFileName);
                     sleep(1);
                 } else {

@@ -1,4 +1,4 @@
-<?php //
+<?php
 
 /**
  * Chrome Remote via Chrome devtool protocol script, for specific process/portal
@@ -57,6 +57,9 @@ class PortalScriptCDP
         }
     }
 
+
+    // Server-Portal-ID: 6095 - Last modified: 11.07.2025 14:32:58 UTC - User: 1
+
     public $baseUrl = 'https://my.izettle.com';
     public $loginUrl = 'https://my.izettle.com';
     public $invoicePageUrl = 'https://my.zettle.com/invoices/orders?status=PAID';
@@ -79,6 +82,8 @@ class PortalScriptCDP
     {
         $this->clearChrome();
         sleep(2);
+        $this->disable_extensions();
+        sleep(2);
         $this->restrictPages = isset($this->exts->config_array["restrictPages"]) ? (int) @$this->exts->config_array["restrictPages"] : 3;
         $this->download_monthly_report = isset($this->exts->config_array["download_monthly_report"]) ? (int) @$this->exts->config_array["download_monthly_report"] : 0;
         $this->download_daily_report = isset($this->exts->config_array["download_daily_report"]) ? (int) @$this->exts->config_array["download_daily_report"] : 0;
@@ -96,12 +101,18 @@ class PortalScriptCDP
             $this->exts->openUrl($this->loginUrl);
             $this->fillForm(0);
             sleep(10);
+
             if (stripos(strtolower($this->exts->extract('p.message')), 'suspicious behaviour') !== false) {
                 $this->exts->capture('suspicious-behaviour-detected');
                 $this->exts->log('Try to login in again!');
                 $this->clearChrome();
                 $this->exts->openUrl($this->loginUrl);
                 $this->fillForm(0);
+                sleep(10);
+            }
+
+             if ($this->exts->querySelector('button.resend-button') != null) {
+                $this->exts->moveToElementAndClick('button.resend-button');
                 sleep(10);
             }
 
@@ -216,6 +227,25 @@ class PortalScriptCDP
         }
     }
 
+    private function disable_extensions()
+    {
+        $this->exts->openUrl('chrome://extensions/'); // disable Block origin extension
+        sleep(2);
+        $this->exts->execute_javascript("
+        let manager = document.querySelector('extensions-manager');
+        if (manager && manager.shadowRoot) {
+            let itemList = manager.shadowRoot.querySelector('extensions-item-list');
+            if (itemList && itemList.shadowRoot) {
+                let items = itemList.shadowRoot.querySelectorAll('extensions-item');
+                items.forEach(item => {
+                    let toggle = item.shadowRoot.querySelector('#enableToggle[checked]');
+                    if (toggle) toggle.click();
+                });
+            }
+        }
+    ");
+    }
+
 
     private function fillForm($count)
     {
@@ -274,6 +304,12 @@ class PortalScriptCDP
                     sleep(10);
                 }
 
+                if ($this->exts->urlContains('otp')) {
+                    sleep(5);
+                    $this->exts->type_key_by_xdotool('Return');
+                    sleep(5);
+                }
+
                 $error_text = strtolower($this->exts->extract('p#inputError'));
                 $this->exts->log("Error text:: " . $error_text);
                 if (
@@ -313,7 +349,6 @@ class PortalScriptCDP
 
             $this->exts->log("Exception checking loggedin " . $exception);
         }
-
         return $isLoggedIn;
     }
 
@@ -497,26 +532,26 @@ class PortalScriptCDP
                 $this->exts->capture('recaptcha-filled');
 
                 $gcallbackFunction = $this->exts->execute_javascript('(function() { 
-                if(document.querySelector("[data-callback]") != null){
-                    return document.querySelector("[data-callback]").getAttribute("data-callback");
-                }
+        if(document.querySelector("[data-callback]") != null){
+            return document.querySelector("[data-callback]").getAttribute("data-callback");
+        }
 
-                var result = ""; var found = false;
-                function recurse (cur, prop, deep) {
-                    if(deep > 5 || found){ return;}console.log(prop);
-                    try {
-                        if(cur == undefined || cur == null || cur instanceof Element || Object(cur) !== cur || Array.isArray(cur)){ return;}
-                        if(prop.indexOf(".callback") > -1){result = prop; found = true; return;
-                        } else { deep++;
-                            for (var p in cur) { recurse(cur[p], prop ? prop + "." + p : p, deep);}
-                        }
-                    } catch(ex) { console.log("ERROR in function: " + ex); return; }
+        var result = ""; var found = false;
+        function recurse (cur, prop, deep) {
+            if(deep > 5 || found){ return;}console.log(prop);
+            try {
+                if(cur == undefined || cur == null || cur instanceof Element || Object(cur) !== cur || Array.isArray(cur)){ return;}
+                if(prop.indexOf(".callback") > -1){result = prop; found = true; return;
+                } else { deep++;
+                    for (var p in cur) { recurse(cur[p], prop ? prop + "." + p : p, deep);}
                 }
+            } catch(ex) { console.log("ERROR in function: " + ex); return; }
+        }
 
-                recurse(___grecaptcha_cfg.clients[0], "", 0);
-                return found ? "___grecaptcha_cfg.clients[0]." + result : null;
-            })();
-            ');
+        recurse(___grecaptcha_cfg.clients[0], "", 0);
+        return found ? "___grecaptcha_cfg.clients[0]." + result : null;
+    })();
+    ');
                 $this->exts->log('Callback function: ' . $gcallbackFunction);
                 $this->exts->log('Callback function: ' . $this->exts->recaptcha_answer);
                 if ($gcallbackFunction != null) {
