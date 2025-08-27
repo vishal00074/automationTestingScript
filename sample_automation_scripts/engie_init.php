@@ -42,6 +42,12 @@ private function initPortal($count)
 
         $this->checkFillLogin();
         sleep(10);
+
+        if ($this->exts->querySelector('input[name="factor_id"]') != null) {
+            $this->exts->moveToElementAndClick('input[name="factor_id"]');
+            sleep(10);
+        }
+
         if (
             $this->exts->oneExists([$this->username_selector, $this->password_selector]) &&
             !$this->exts->exists('.login-form-page .form-item--error-message')
@@ -154,6 +160,17 @@ private function checkFillLogin()
         $this->exts->capture("2-login-page-filled");
         $this->checkFillRecaptcha();
         $this->exts->click_by_xdotool($this->submit_login_selector);
+        sleep(4);
+
+        if($this->exts->querySelector($this->submit_login_selector) != null){
+            $this->exts->click_by_xdotool($this->submit_login_selector);
+            sleep(2);
+        } 
+        if($this->exts->querySelector($this->submit_login_selector) != null){
+            $this->exts->click_by_xdotool($this->submit_login_selector);
+            sleep(2);
+        }  
+
     } else {
         $this->exts->log(__FUNCTION__ . '::Login page not found');
         $this->exts->capture("2-login-page-not-found");
@@ -199,6 +216,21 @@ private function checkFillTwoFactor()
 
             $this->exts->moveToElementAndClick($two_factor_submit_selector);
             sleep(15);
+
+            $this->exts->log("checkFillTwoFactor: Clicking submit button.");
+            sleep(3);
+            $this->exts->capture("2.2-two-factor-filled-" . $this->exts->two_factor_attempts);
+
+
+            if ($this->exts->querySelector($two_factor_selector) == null) {
+                $this->exts->log("Two factor solved");
+            } else if ($this->exts->two_factor_attempts < 3) {
+                $this->exts->notification_uid = "";
+                $this->exts->two_factor_attempts++;
+                $this->checkFillTwoFactor();
+            } else {
+                $this->exts->log("Two factor can not solved");
+            }
         } else {
             $this->exts->log("Not received two factor code");
         }

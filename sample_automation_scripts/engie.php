@@ -1,4 +1,4 @@
-<?php //  adjust sleep time to reduce execution time and handle empty invoice case  updated 2fa code
+<?php // updated login code added code to click on submit button again and click on verify email inpput after filling the form
 /**
  * Chrome Remote via Chrome devtool protocol script, for specific process/portal
  *
@@ -116,6 +116,12 @@ class PortalScriptCDP
 
             $this->checkFillLogin();
             sleep(10);
+
+            if ($this->exts->querySelector('input[name="factor_id"]') != null) {
+                $this->exts->moveToElementAndClick('input[name="factor_id"]');
+                sleep(10);
+            }
+
             if (
                 $this->exts->oneExists([$this->username_selector, $this->password_selector]) &&
                 !$this->exts->exists('.login-form-page .form-item--error-message')
@@ -242,6 +248,17 @@ class PortalScriptCDP
             $this->exts->capture("2-login-page-filled");
             $this->checkFillRecaptcha();
             $this->exts->click_by_xdotool($this->submit_login_selector);
+            sleep(4);
+
+            if($this->exts->querySelector($this->submit_login_selector) != null){
+                $this->exts->click_by_xdotool($this->submit_login_selector);
+                sleep(2);
+            } 
+            if($this->exts->querySelector($this->submit_login_selector) != null){
+                $this->exts->click_by_xdotool($this->submit_login_selector);
+                sleep(2);
+            }  
+
         } else {
             $this->exts->log(__FUNCTION__ . '::Login page not found');
             $this->exts->capture("2-login-page-not-found");
