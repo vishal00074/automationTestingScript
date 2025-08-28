@@ -1,4 +1,5 @@
-<?php // replaced waitTIllPresetnt to waitFor and optimized the download code
+<?php // replaced waitTIllPresetnt to waitFor and chenge the download invocies process accoridng to ui 
+// and use click_and_download instead on js click and download 
 
 // added pagination logic
 /**
@@ -98,6 +99,7 @@ class PortalScriptCDP
             $this->exts->log(">>>>>>>>>>>>>>>Login successful!!!!");
             $this->exts->capture("LoginSuccess");
             $this->exts->openUrl($this->invoicePageUrl);
+            sleep(5);
             $this->processInvoices();
             if ($this->isNoInvoice) {
                 $this->exts->no_invoice();
@@ -184,51 +186,70 @@ class PortalScriptCDP
 
         foreach ($rows as $row) {
             $this->isNoInvoice = false;
+
+            $documentFormat = $this->exts->extract('datatable-body-cell:nth-child(3)', $row);
+
+            $this->exts->log('documentFormat: ' . $documentFormat);
+
+            if (trim($documentFormat) == 'DMS-XLS') {
+                continue;
+            }
+
             $invoiceName = $this->exts->extract('datatable-body-cell:nth-child(2) a', $row);
             $invoiceName = str_replace(' ', '', $invoiceName);
             $invoiceDate = $row->querySelector('datatable-body-cell:nth-child(1)');
+
+
+
             if ($invoiceDate != null) {
                 $invoiceDateText = $invoiceDate->getText();
                 $invoiceDate = $this->exts->parse_date($invoiceDateText, '', 'Y-m-d');
             }
-            $amount = '';
+            $invoiceAmount =  '';
 
-            $downloadBtn = $row->querySelector('datatable-body-row > div:last-child i:last-child');
+            $invoiceBtn = $this->exts->getElement('datatable-body-cell:nth-child(2) a', $row);
+            if ($invoiceBtn == null) {
+                continue;
+            }
+            try {
+                $this->exts->log('Click download button');
+                $invoiceBtn->click();
+            } catch (\Exception $exception) {
+                $this->exts->log('Click download button by javascript');
+                $this->exts->execute_javascript("arguments[0].click()", [$invoiceBtn]);
+            }
+            sleep(5);
+
+            $this->waitFor('section.afn-file-preview-toolbar a.items-baseline', 3);
+            $this->waitFor('section.afn-file-preview-toolbar a.items-baseline', 3);
+            $this->waitFor('section.afn-file-preview-toolbar a.items-baseline', 3);
+
+            $downloadBtn = $this->exts->querySelector('section.afn-file-preview-toolbar a.items-baseline');
 
             if ($downloadBtn != null) {
                 $this->exts->log('--------------------------');
+                $this->exts->log('invoiceName: ' . $invoiceName);
                 $this->exts->log('invoiceDate: ' . $invoiceDate);
-                $this->exts->log('amount: ' . $amount);
+                $this->exts->log('invoiceAmount: ' . $invoiceAmount);
 
-                $invoiceFileName = '';
+                $invoiceFileName =  !empty($invoiceName) ? $invoiceName . '.pdf' : '';
 
-                try {
-                    $downloadBtn->click();
-                } catch (\Exception $exception) {
-                    $this->exts->execute_javascript('arguments[0].click();', [$downloadBtn]);
-                }
-
-                $this->exts->wait_and_check_download('pdf');
-                $downloaded_file = $this->exts->find_saved_file('pdf', $invoiceFileName);
+                $downloaded_file = $this->exts->click_and_download('section.afn-file-preview-toolbar a.items-baseline', 'pdf', $invoiceFileName);
+                sleep(5);
                 if (trim($downloaded_file) != '' && file_exists($downloaded_file)) {
-
-                    //get invoiceName from downloaded file getting issue with ui invoiceName for few invoices
-
-                    $invoiceName = basename($downloaded_file, '.pdf');
-
-                    $this->exts->log('invoiceName: ' . $invoiceName);
-                    $this->exts->new_invoice($invoiceName, $invoiceDate, $amount, $invoiceFileName);
+                    $this->exts->new_invoice($invoiceName, $invoiceDate, $invoiceAmount, $invoiceFileName);
                     sleep(1);
                 } else {
                     $this->exts->log(__FUNCTION__ . '::No download ' . $invoiceFileName);
                 }
             }
+            if ($this->exts->querySelector('section.afn-file-preview-toolbar a.items-center') != null) {
+                $this->exts->click_element('section.afn-file-preview-toolbar a.items-center');
+                sleep(4);
+            }
         }
         sleep(5);
-        $this->exts->switchToOldestActiveTab();
-        sleep(5);
-        $this->exts->closeAllTabsExcept();
-        sleep(5);
+
         $restrictPages = isset($this->exts->config_array["restrictPages"]) ? (int)@$this->exts->config_array["restrictPages"] : 3;
 
         $this->exts->log(__FUNCTION__ . '::restrictPages ' . $restrictPages);

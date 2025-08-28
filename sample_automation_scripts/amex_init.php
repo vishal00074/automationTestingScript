@@ -1,21 +1,12 @@
 public $baseUrl = "https://portal.amex-online.de/startseite";
-
 public $loginUrl = "https://portal.amex-online.de";
-
 public $invoicePageUrl = 'https://portal.amex-online.de/dokumente';
-
 public $username_selector = 'input[id="Email"]';
-
 public $password_selector = 'input[id="Password"]';
-
 public $submit_button_selector = 'button[id="btnLogin"]';
-
 public $check_login_failed_selector = 'div.validation-summary-errors ul li';
-
 public $check_login_success_selector = 'section[name="profil"]';
-
 public $login_tryout = 0;
-
 public $isNoInvoice = true;
 
 /**
@@ -45,7 +36,7 @@ private function initPortal($count)
         if (!empty($this->exts->config_array['allow_login_success_request'])) {
             $this->exts->triggerLoginSuccess();
         }
-        
+
         $this->exts->success();
     } else {
         $this->waitFor($this->check_login_failed_selector, 10);
