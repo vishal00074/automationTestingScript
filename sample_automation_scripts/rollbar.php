@@ -1,6 +1,7 @@
 <?php // replace exists to isExists and handle empty invoice name and added  undefined processTwoFactorAuth function 
 // added restrct page logic to download invocies added login success selector, updtaed username, password and button selector
-// updated google login code
+// updated google login code updated form filling code added custom js code to wait for to load invoice button 
+
 
 /**
  * Chrome Remote via Chrome devtool protocol script, for specific process/portal
@@ -159,6 +160,12 @@ class PortalScriptCDP
             $this->exts->moveToElementAndClick('a[id="nav-accountSettings"][href*="/settings"],a[href*="/settings/accounts"] ~ div a[href*="/subscription"]');
             sleep(10);
 
+            $selector = 'a[href*="/invoices"],a[href*="/settings/accounts/Hotelmeister/invoices"]';
+            for ($wait = 0; $wait < 4 && $this->exts->executeSafeScript("return !!document.querySelector('" . $selector . "');") != 1; $wait++) {
+                $this->exts->log('Waiting for Selectors.....');
+                sleep(3);
+            }
+
             $this->exts->moveToElementAndClick('a[href*="/invoices"],a[href*="/settings/accounts/Hotelmeister/invoices"]');
             sleep(10);
             $this->downloadInvoice(0);
@@ -195,16 +202,24 @@ class PortalScriptCDP
                 $this->exts->capture("1-pre-login");
 
                 $this->exts->log("Enter Username");
-                $this->exts->moveToElementAndType($this->username_selector, $this->username, 5);
+                // $this->exts->moveToElementAndType($this->username_selector, $this->username, 5);
+                $this->exts->click_by_xdotool($this->username_selector);
+                $this->exts->type_key_by_xdotool("ctrl+a");
+                $this->exts->type_key_by_xdotool("Delete");
+                $this->exts->type_text_by_xdotool($this->username);
 
                 $this->exts->log("Enter Password");
-                $this->exts->moveToElementAndType($this->password_selector, $this->password, 5);
+                // $this->exts->moveToElementAndType($this->password_selector, $this->password, 5);
+                $this->exts->click_by_xdotool($this->password_selector);
+                $this->exts->type_key_by_xdotool("ctrl+a");
+                $this->exts->type_key_by_xdotool("Delete");
+                $this->exts->type_text_by_xdotool($this->password);
 
                 $this->exts->capture("1-pre-login-1");
                 $this->checkFillRecaptcha(0);
 
                 if ($this->isExists($this->submit_btn)) {
-                    $this->exts->moveToElementAndClick($this->submit_btn);
+                    $this->exts->click_by_xdotool($this->submit_btn);
                 }
                 sleep(10);
             } else if ($this->isExists('iframe[src*="https://www.google.com/recaptcha/api2/anchor?"],  iframe[src*="/recaptcha/enterprise/anchor?"]') && $this->isExists("textarea[name=\"g-recaptcha-response\"]")) {
