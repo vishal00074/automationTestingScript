@@ -1,130 +1,94 @@
-public $baseUrl = 'https://login-tk.ewe.de/pages/login';
-public $loginUrl = 'https://login-tk.ewe.de/pages/login';
-public $invoicePageUrl = 'https://tkpk.mein.ewe.de/eCare/billing';
-
-public $invoicePageUrlNew = 'https://mein.ewe.de/ewetelcss/secure/billingOverview.xhtml';
-
-public $username_selector = 'form#frm_login input#username';
-public $password_selector = 'form#frm_login input#password';
-public $remember_me_selector = '';
-public $submit_login_selector = 'form#frm_login button[type="submit"]';
-
-public $check_login_failed_selector = 'div#error_INVALID';
-public $check_login_success_selector = 'button[class*="logout"], a#logoutLink';
-
+public $baseUrl = 'https://mein.ewe.de/ewetelcss/secure/billingOverview.xhtml';
+public $loginUrl = 'https://mein.ewe.de/ewetelcss/secure/billingOverview.xhtml';
+public $invoiceECarePageUrl = 'https://tkgk.mein.ewe.de/eCare/billing';
+public $invoicePageUrl = 'https://mein.ewe.de/ewetelcss/secure/billingOverview.xhtml';
+public $username_selector = 'div#formLogin input#username';
+public $password_selector = 'div#formLogin input#password';
+public $submit_login_selector = 'div#formLogin button[type="submit"]';
+public $check_login_failed_selector = 'form#frm_login .css__errorbubble, #error_INVALID';
+public $check_login_e_care_success_selector = 'button[class*="_header-ecare_btnLogout"]';
+public $check_login_success_selector = 'a[id="logoutLink"]';
 public $isNoInvoice = true;
-
+public $err_msg = '';
+public $metadataError = 'fieldset';
 /**
-
     * Entry Method thats called for a portal
-
     * @param Integer $count Number of times portal is retried.
-
     */
 private function initPortal($count)
 {
-
     $this->exts->log('Begin initPortal ' . $count);
+    $this->exts->openUrl($this->baseUrl);
+    sleep(2);
     $this->exts->loadCookiesFromFile();
-    $this->exts->openUrl($this->loginUrl);
-    if (!$this->checkLogin()) {
+    // Load cookies
+    sleep(20);
+    $this->exts->capture('1-init-page');
+
+    // If user hase not logged in from cookie, clear cookie, open the login url and do login
+    $this->exts->waitTillAnyPresent([$this->check_login_e_care_success_selector, $this->check_login_success_selector], 20);
+    if ($this->exts->querySelector($this->check_login_e_care_success_selector) == null || $this->exts->querySelector($this->check_login_success_selector) == null) {
         $this->exts->log('NOT logged via cookie');
-        $this->exts->clearCookies();
         $this->exts->openUrl($this->loginUrl);
-        $this->fillForm(0);
+        sleep(15);
+        if ($this->exts->exists('button#CybotCookiebotDialogBodyLevelButtonLevelOptinAllowAll')) {
+            $this->exts->moveToElementAndClick('button#CybotCookiebotDialogBodyLevelButtonLevelOptinAllowAll');
+            sleep(5);
+        }
+        $this->checkFillLogin();
+        sleep(10);
     }
 
-    if ($this->checkLogin()) {
-        $this->exts->log(">>>>>>>>>>>>>>>Login successful!!!!");
-        $this->exts->capture("LoginSuccess");
-        
+    sleep(20);
+    $this->exts->waitTillAnyPresent([$this->check_login_e_care_success_selector, $this->check_login_success_selector], 20);
+    if ($this->exts->querySelector($this->check_login_e_care_success_selector) != null || $this->exts->querySelector($this->check_login_success_selector) != null) {
+        sleep(3);
+        $this->exts->log(__FUNCTION__ . '::User logged in');
+        $this->exts->capture("3-login-success");
+
         if (!empty($this->exts->config_array['allow_login_success_request'])) {
             $this->exts->triggerLoginSuccess();
         }
 
         $this->exts->success();
     } else {
-        if (stripos(strtolower($this->exts->extract($this->check_login_failed_selector)), 'nicht korrekt') !== false) {
-            $this->exts->log("Wrong credential !!!!");
+        $this->exts->log(__FUNCTION__ . '::Use login failed');
+        if (stripos($this->exts->extract($this->check_login_failed_selector, null, 'innerText'), 'die eingegebenen zugangsdaten sind nicht korrekt') !== false) {
             $this->exts->loginFailure(1);
+        } else if (stripos($this->err_msg, 'Die eingegebenen Zugangsdaten sind nicht korrekt.') !== false) {
+            $this->exts->loginFailure(1);
+        } else if (stripos($this->exts->extract($this->metadataError, null, 'innerText'), 'Metadata not found') !== false) {
+            $this->exts->account_not_ready();
         } else {
             $this->exts->loginFailure();
         }
     }
 }
 
-
-function fillForm($count)
+private function checkFillLogin()
 {
-    $this->exts->log("Begin fillForm " . $count);
-    $this->waitFor($this->username_selector, 5);
-    try {
-        if ($this->exts->querySelector($this->username_selector) != null) {
+    $this->exts->waitTillPresent($this->password_selector, 20);
+    if ($this->exts->querySelector($this->password_selector) != null) {
+        sleep(3);
+        $this->exts->capture("2-login-page");
 
-            $this->exts->capture("1-pre-login");
-            $this->exts->log("Enter Username");
-            $this->exts->moveToElementAndType($this->username_selector, $this->username);
+        $this->exts->log("Enter Username");
+        $this->exts->moveToElementAndType($this->username_selector, $this->username);
+        sleep(1);
 
-            $this->exts->log("Enter Password");
-            $this->exts->moveToElementAndType($this->password_selector, $this->password);
-            sleep(1);
+        $this->exts->log("Enter Password");
+        $this->exts->moveToElementAndType($this->password_selector, $this->password);
+        sleep(2);
 
-            if ($this->exts->exists($this->remember_me_selector)) {
-                $this->exts->click_by_xdotool($this->remember_me_selector);
-                sleep(1);
-            }
+        $this->exts->capture("2-login-page-filled");
+        $this->exts->moveToElementAndClick($this->submit_login_selector);
+        sleep(2);
 
-            $this->exts->click_by_xdotool($this->submit_login_selector);
-            sleep(2); // Portal itself has one second delay after showing toast
+        if ($this->exts->exists($this->check_login_failed_selector, 15)) {
+            $this->err_msg = $this->exts->extract($this->check_login_failed_selector, null, 'innerText');
         }
-    } catch (\Exception $exception) {
-
-        $this->exts->log("Exception filling loginform " . $exception->getMessage());
+    } else {
+        $this->exts->log(__FUNCTION__ . '::Login page not found');
+        $this->exts->capture("2-login-page-not-found");
     }
-}
-
-public function waitFor($selector, $seconds = 7)
-{
-    for ($wait = 0; $wait < 2 && $this->exts->executeSafeScript("return !!document.querySelector('" . $selector . "');") != 1; $wait++) {
-        $this->exts->log('Waiting for Selectors.....');
-        sleep($seconds);
-    }
-}
-
-
-/**
-
-    * Method to Check where user is logged in or not
-
-    * return boolean true/false
-
-    */
-function checkLogin()
-{
-    $this->exts->log("Begin checkLogin ");
-    $isLoggedIn = false;
-    try {
-        $this->waitFor($this->check_login_success_selector, 10);
-        if ($this->exts->exists($this->check_login_success_selector)) {
-
-            $this->exts->log(">>>>>>>>>>>>>>>Login successful!!!!");
-
-            $isLoggedIn = true;
-        }
-    } catch (Exception $exception) {
-
-        $this->exts->log("Exception checking loggedin " . $exception);
-    }
-
-
-
-    if ($isLoggedIn) {
-
-        if (!empty($this->exts->config_array['allow_login_success_request'])) {
-
-            $this->exts->triggerLoginSuccess();
-        }
-    }
-
-    return $isLoggedIn;
 }

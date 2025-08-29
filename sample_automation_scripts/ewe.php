@@ -1,4 +1,5 @@
-<?php // replace waitTillPresent to waitFor and handle empty invoice name case
+<?php // updated download code added code to load more invoices  update download button selector 
+//
 /**
  * Chrome Remote via Chrome devtool protocol script, for specific process/portal
  *
@@ -56,267 +57,243 @@ class PortalScriptCDP
         }
     }
 
-    // Server-Portal-ID: 1374753 - Last modified: 17.07.2025 20:21:51 UTC - User: 1
+    // Server-Portal-ID: 9248 - Last modified: 12.08.2025 15:14:31 UTC - User: 1
 
-    /*Define constants used in script*/
-
-    public $baseUrl = 'https://login-tk.ewe.de/pages/login';
-    public $loginUrl = 'https://login-tk.ewe.de/pages/login';
-    public $invoicePageUrl = 'https://tkpk.mein.ewe.de/eCare/billing';
-
-    public $invoicePageUrlNew = 'https://mein.ewe.de/ewetelcss/secure/billingOverview.xhtml';
-
-    public $username_selector = 'form#frm_login input#username';
-    public $password_selector = 'form#frm_login input#password';
-    public $remember_me_selector = '';
-    public $submit_login_selector = 'form#frm_login button[type="submit"]';
-
-    public $check_login_failed_selector = 'div#error_INVALID';
-    public $check_login_success_selector = 'button[class*="logout"], a#logoutLink';
-
+    public $baseUrl = 'https://mein.ewe.de/ewetelcss/secure/billingOverview.xhtml';
+    public $loginUrl = 'https://mein.ewe.de/ewetelcss/secure/billingOverview.xhtml';
+    public $invoiceECarePageUrl = 'https://tkgk.mein.ewe.de/eCare/billing';
+    public $invoicePageUrl = 'https://mein.ewe.de/ewetelcss/secure/billingOverview.xhtml';
+    public $username_selector = 'div#formLogin input#username';
+    public $password_selector = 'div#formLogin input#password';
+    public $submit_login_selector = 'div#formLogin button[type="submit"]';
+    public $check_login_failed_selector = 'form#frm_login .css__errorbubble, #error_INVALID';
+    public $check_login_e_care_success_selector = 'button[class*="_header-ecare_btnLogout"]';
+    public $check_login_success_selector = 'a[id="logoutLink"]';
     public $isNoInvoice = true;
-
+    public $err_msg = '';
+    public $metadataError = 'fieldset';
     /**
-
      * Entry Method thats called for a portal
-
      * @param Integer $count Number of times portal is retried.
-
      */
     private function initPortal($count)
     {
-
         $this->exts->log('Begin initPortal ' . $count);
+        $this->exts->openUrl($this->baseUrl);
+        sleep(2);
         $this->exts->loadCookiesFromFile();
-        $this->exts->openUrl($this->loginUrl);
-        if (!$this->checkLogin()) {
+        // Load cookies
+        sleep(20);
+        $this->exts->capture('1-init-page');
+
+        // If user hase not logged in from cookie, clear cookie, open the login url and do login
+        $this->exts->waitTillAnyPresent([$this->check_login_e_care_success_selector, $this->check_login_success_selector], 20);
+        if ($this->exts->querySelector($this->check_login_e_care_success_selector) == null || $this->exts->querySelector($this->check_login_success_selector) == null) {
             $this->exts->log('NOT logged via cookie');
-            $this->exts->clearCookies();
             $this->exts->openUrl($this->loginUrl);
-            $this->fillForm(0);
+            sleep(15);
+            if ($this->exts->exists('button#CybotCookiebotDialogBodyLevelButtonLevelOptinAllowAll')) {
+                $this->exts->moveToElementAndClick('button#CybotCookiebotDialogBodyLevelButtonLevelOptinAllowAll');
+                sleep(5);
+            }
+            $this->checkFillLogin();
+            sleep(10);
         }
 
-        if ($this->checkLogin()) {
-            $this->exts->log(">>>>>>>>>>>>>>>Login successful!!!!");
-            $this->exts->capture("LoginSuccess");
-            $this->exts->success();
-            sleep(2);
+        sleep(20);
+        $this->exts->waitTillAnyPresent([$this->check_login_e_care_success_selector, $this->check_login_success_selector], 20);
+        if ($this->exts->querySelector($this->check_login_e_care_success_selector) != null || $this->exts->querySelector($this->check_login_success_selector) != null) {
+            sleep(3);
+            $this->exts->log(__FUNCTION__ . '::User logged in');
+            $this->exts->capture("3-login-success");
 
-            $this->exts->openUrl($this->invoicePageUrl);
-            $this->processInvoices();
+            //Open invoices url and download invoice
+            if ($this->exts->querySelector($this->check_login_e_care_success_selector) != null) {
+                $this->exts->openUrl($this->invoiceECarePageUrl);
+                $this->processECareInvoices();
+            } else {
+                $this->exts->openUrl($this->invoicePageUrl);
+                $this->processInvoices();
+            }
 
-
-            $this->exts->openUrl($this->invoicePageUrlNew);
-            $this->processInvoicesNew();
             // Final, check no invoice
             if ($this->isNoInvoice) {
                 $this->exts->no_invoice();
             }
             $this->exts->success();
         } else {
-            if (stripos(strtolower($this->exts->extract($this->check_login_failed_selector)), 'nicht korrekt') !== false) {
-                $this->exts->log("Wrong credential !!!!");
+            $this->exts->log(__FUNCTION__ . '::Use login failed');
+            if (stripos($this->exts->extract($this->check_login_failed_selector, null, 'innerText'), 'die eingegebenen zugangsdaten sind nicht korrekt') !== false) {
                 $this->exts->loginFailure(1);
+            } else if (stripos($this->err_msg, 'Die eingegebenen Zugangsdaten sind nicht korrekt.') !== false) {
+                $this->exts->loginFailure(1);
+            } else if (stripos($this->exts->extract($this->metadataError, null, 'innerText'), 'Metadata not found') !== false) {
+                $this->exts->account_not_ready();
             } else {
                 $this->exts->loginFailure();
             }
         }
     }
 
-
-    function fillForm($count)
+    private function checkFillLogin()
     {
-        $this->exts->log("Begin fillForm " . $count);
-        $this->waitFor($this->username_selector, 5);
-        try {
-            if ($this->exts->querySelector($this->username_selector) != null) {
+        $this->exts->waitTillPresent($this->password_selector, 20);
+        if ($this->exts->querySelector($this->password_selector) != null) {
+            sleep(3);
+            $this->exts->capture("2-login-page");
 
-                $this->exts->capture("1-pre-login");
-                $this->exts->log("Enter Username");
-                $this->exts->moveToElementAndType($this->username_selector, $this->username);
+            $this->exts->log("Enter Username");
+            $this->exts->moveToElementAndType($this->username_selector, $this->username);
+            sleep(1);
 
-                $this->exts->log("Enter Password");
-                $this->exts->moveToElementAndType($this->password_selector, $this->password);
-                sleep(1);
+            $this->exts->log("Enter Password");
+            $this->exts->moveToElementAndType($this->password_selector, $this->password);
+            sleep(2);
 
-                if ($this->exts->exists($this->remember_me_selector)) {
-                    $this->exts->click_by_xdotool($this->remember_me_selector);
+            $this->exts->capture("2-login-page-filled");
+            $this->exts->moveToElementAndClick($this->submit_login_selector);
+            sleep(2);
+
+            if ($this->exts->exists($this->check_login_failed_selector, 15)) {
+                $this->err_msg = $this->exts->extract($this->check_login_failed_selector, null, 'innerText');
+            }
+        } else {
+            $this->exts->log(__FUNCTION__ . '::Login page not found');
+            $this->exts->capture("2-login-page-not-found");
+        }
+    }
+
+    private function processECareInvoices($count = 1)
+    {
+        sleep(25);
+
+        $this->exts->log('Begin Process Invoices');
+        if ($this->exts->querySelector('div[class*="ecare-recent-bills-box_ecare-recent-bills-box"]  div[class*="content-box_bottom-link"]') != null) {
+            $this->exts->execute_javascript("document.querySelector(\"div[class*='ecare-recent-bills-box_ecare-recent-bills-box'] div[class*='content-box_bottom-link'] a\").click();");
+            sleep(5);
+        }
+
+        $this->exts->waitTillPresent('table > tbody > tr', 20);
+        $this->exts->capture("1 invoice page");
+        $rows = $this->exts->querySelectorAll('table > tbody > tr');
+
+        $restrictPages = isset($this->exts->config_array["restrictPages"]) ? (int)$this->exts->config_array["restrictPages"] : 3;
+        $restrictDate = $restrictPages == 0 ? date('Y-m-d', strtotime('-2 years')) : date('Y-m-d', strtotime('-3 months'));
+        $dateRestriction = true;
+
+        $maxInvoices = 5;
+        $invoiceCount = 0;
+
+        foreach ($rows as $row) {
+            $this->isNoInvoice = false;
+            $invoiceName = $this->exts->extract('td:nth-child(6)', $row);
+            $invoiceDate = $row->querySelector('td:nth-child(5)');
+            if ($invoiceDate != null) {
+                $invoiceDateText = $invoiceDate->getText();
+                $invoiceDate = $this->exts->parse_date($invoiceDateText, '', 'Y-m-d');
+            }
+
+            $amount = $row->querySelector('td:nth-child(3)');
+            if ($amount != null) {
+                $amount = $amount->getText();
+            }
+
+            $downloadBtn = $this->exts->querySelector('td:nth-child(8) a', $row);
+
+            if ($downloadBtn != null) {
+                $this->exts->log('--------------------------');
+                $this->exts->log('invoiceDate: ' . $invoiceDate);
+                $this->exts->log('amount: ' . $amount);
+
+                $this->exts->execute_javascript("arguments[0].click();", [$downloadBtn]);
+                sleep(5);
+                $this->exts->wait_and_check_download('pdf');
+                $downloaded_file = $this->exts->find_saved_file('pdf');
+                $invoiceFileName = basename($downloaded_file);
+
+                $invoiceName = substr($invoiceFileName, 0, strrpos($invoiceFileName, '.'));
+
+                $this->exts->log('invoiceName: ' . $invoiceName);
+                sleep(2);
+                if (trim($downloaded_file) != '' && file_exists($downloaded_file)) {
+                    $this->exts->new_invoice($invoiceName,  $invoiceDate, $amount, $downloaded_file);
                     sleep(1);
+                } else {
+                    $this->exts->log(__FUNCTION__ . '::No download ' . $invoiceFileName);
                 }
-
-                $this->exts->click_by_xdotool($this->submit_login_selector);
-                sleep(2); // Portal itself has one second delay after showing toast
             }
-        } catch (\Exception $exception) {
 
-            $this->exts->log("Exception filling loginform " . $exception->getMessage());
-        }
-    }
+            $lastDate = !empty($invoiceDate) && $invoiceDate <= $restrictDate;
 
-    public function waitFor($selector, $seconds = 7)
-    {
-        for ($wait = 0; $wait < 2 && $this->exts->executeSafeScript("return !!document.querySelector('" . $selector . "');") != 1; $wait++) {
-            $this->exts->log('Waiting for Selectors.....');
-            sleep($seconds);
-        }
-    }
-
-
-    /**
-
-     * Method to Check where user is logged in or not
-
-     * return boolean true/false
-
-     */
-    function checkLogin()
-    {
-        $this->exts->log("Begin checkLogin ");
-        $isLoggedIn = false;
-        try {
-            $this->waitFor($this->check_login_success_selector, 10);
-            if ($this->exts->exists($this->check_login_success_selector)) {
-
-                $this->exts->log(">>>>>>>>>>>>>>>Login successful!!!!");
-
-                $isLoggedIn = true;
-            }
-        } catch (Exception $exception) {
-
-            $this->exts->log("Exception checking loggedin " . $exception);
-        }
-
-
-
-        if ($isLoggedIn) {
-
-            if (!empty($this->exts->config_array['allow_login_success_request'])) {
-
-                $this->exts->triggerLoginSuccess();
+            if ($restrictPages != 0 && ($invoiceCount == $maxInvoices || ($dateRestriction && $lastDate))) {
+                break;
+            } else if ($restrictPages == 0 && $dateRestriction && $lastDate) {
+                break;
             }
         }
-
-        return $isLoggedIn;
     }
 
     private function processInvoices($paging_count = 1)
     {
-        $this->waitFor('table tbody tr', 10);
-        $this->exts->capture("4-invoices-page");
-        $invoices = [];
+        sleep(15);
+        $this->exts->log('Begin Process Invoices');
+        $this->exts->waitTillPresent('table.tableBorder > tbody > tr', 20);
+        $this->exts->capture("1 invoice page");
+        $rows = $this->exts->querySelectorAll('table.tableBorder > tbody > tr');
 
-        $rows = $this->exts->querySelectorAll('table tbody tr');
+        $restrictPages = isset($this->exts->config_array["restrictPages"]) ? (int)$this->exts->config_array["restrictPages"] : 3;
+        $restrictDate = $restrictPages == 0 ? date('Y-m-d', strtotime('-2 years')) : date('Y-m-d', strtotime('-3 months'));
+        $dateRestriction = true;
+
+        $maxInvoices = 5;
+        $invoiceCount = 0;
+
         foreach ($rows as $row) {
-            if ($this->exts->querySelector('td:nth-child(8) a', $row) != null) {
-                $invoiceUrl = '';
-                $invoiceName = $this->exts->extract('td:nth-child(6)', $row);
-                $invoiceAmount =  $this->exts->extract('td:nth-child(3)', $row);
-                $invoiceDate =  $this->exts->extract('td:nth-child(2)', $row);
-                $downloadBtn = $this->exts->querySelector('td:nth-child(8) a', $row);
+            $this->isNoInvoice = false;
 
-                array_push($invoices, array(
-                    'invoiceName' => $invoiceName,
-                    'invoiceDate' => $invoiceDate,
-                    'invoiceAmount' => $invoiceAmount,
-                    'invoiceUrl' => $invoiceUrl,
-                    'downloadBtn' => $downloadBtn
-                ));
-                $this->isNoInvoice = false;
+            $invoiceDate = $row->querySelector('td:nth-child(3)');
+            if ($invoiceDate != null) {
+                $invoiceDateText = $invoiceDate->getText();
+                $invoiceDate = $this->exts->parse_date($invoiceDateText, '', 'Y-m-d');
             }
-        }
 
-        // Download all invoices
-        $this->exts->log('Invoices found: ' . count($invoices));
-        foreach ($invoices as $invoice) {
-            $this->exts->log('--------------------------');
-            $this->exts->log('invoiceName: ' . $invoice['invoiceName']);
-            $this->exts->log('invoiceDate: ' . $invoice['invoiceDate']);
-            $this->exts->log('invoiceAmount: ' . $invoice['invoiceAmount']);
-            $this->exts->log('invoiceUrl: ' . $invoice['invoiceUrl']);
-
-            $invoiceFileName = !empty($invoice['invoiceName']) ? $invoice['invoiceName'] . '.pdf' : '';
-            $invoice['invoiceDate'] = $this->exts->parse_date($invoice['invoiceDate'], 'd/m/y', 'Y-m-d');
-            $this->exts->log('Date parsed: ' . $invoice['invoiceDate']);
-            $this->exts->execute_javascript("arguments[0].click()", [$invoice['downloadBtn']]);
-            $this->exts->wait_and_check_download('pdf');
-            $downloaded_file = $this->exts->find_saved_file('pdf', $invoiceFileName);
-
-            // $downloaded_file = $this->exts->direct_download($invoice['invoiceUrl'], 'pdf', $invoiceFileName);
-            // $downloaded_file = $this->exts->click_and_download($downloadBtn, 'pdf', $invoiceFileName);
-
-            if (trim($downloaded_file) != '' && file_exists($downloaded_file)) {
-                $this->exts->new_invoice($invoice['invoiceName'], $invoice['invoiceDate'], $invoice['invoiceAmount'], $invoiceFileName);
-                sleep(1);
-            } else {
-                $this->exts->log(__FUNCTION__ . '::No download ' . $invoiceFileName);
+            $amount = $row->querySelector('td:nth-child(6)');
+            if ($amount != null) {
+                $amount = $amount->getText();
             }
-        }
 
-        // next page
-        $restrictPages = isset($this->exts->config_array["restrictPages"]) ? (int)@$this->exts->config_array["restrictPages"] : 3;
-        if (
-            $restrictPages == 0 &&
-            $paging_count < 50 &&
-            $this->exts->querySelector('ul[class*="paginate"] li:last-child:not([class*="disable"])') != null
-        ) {
-            $paging_count++;
-            $this->exts->log('Next invoice page found');
-            $this->exts->click_by_xdotool('ul[class*="paginate"] li:last-child:not([class*="disable"])');
-            sleep(5);
-            $this->processInvoices($paging_count);
-        }
-    }
+            $downloadBtn = $row->querySelector('td:nth-child(7) a');
 
-    private function processInvoicesNew($paging_count = 1)
-    {
-        $this->waitFor('table tbody.ui-datatable-data tr', 10);
-        $this->exts->capture("4-invoices-page");
-        $invoices = [];
+            if ($downloadBtn != null) {
+                $this->exts->log('--------------------------');
+                $this->exts->log('invoiceDate: ' . $invoiceDate);
+                $this->exts->log('amount: ' . $amount);
 
-        $rows = $this->exts->querySelectorAll('table tbody.ui-datatable-data tr');
-        foreach ($rows as $row) {
-            if ($this->exts->querySelector('td:nth-child(7) a', $row) != null) {
-                $invoiceUrl = $this->exts->querySelector('td:nth-child(7) a')->getAttribute('href');
-                $invoiceName = $this->exts->extract('td:nth-child(4)', $row);
-                $invoiceAmount =  $this->exts->extract('td:nth-child(6)', $row);
-                $invoiceDate =  $this->exts->extract('td:nth-child(3)', $row);
-                $downloadBtn = $this->exts->querySelector('td:nth-child(7) a', $row);
+                $this->exts->execute_javascript("arguments[0].click();", [$downloadBtn]);
+                sleep(5);
+                $this->exts->wait_and_check_download('pdf');
+                $downloaded_file = $this->exts->find_saved_file('pdf');
+                $invoiceFileName = basename($downloaded_file);
 
-                array_push($invoices, array(
-                    'invoiceName' => $invoiceName,
-                    'invoiceDate' => $invoiceDate,
-                    'invoiceAmount' => $invoiceAmount,
-                    'invoiceUrl' => $invoiceUrl,
-                    'downloadBtn' => $downloadBtn
-                ));
-                $this->isNoInvoice = false;
+                $invoiceName = substr($invoiceFileName, 0, strrpos($invoiceFileName, '.'));
+
+                $this->exts->log('invoiceName: ' . $invoiceName);
+
+                if (trim($downloaded_file) != '' && file_exists($downloaded_file)) {
+                    $this->exts->new_invoice($invoiceName, $invoiceDate, $amount, $invoiceFileName);
+                    sleep(1);
+                    $invoiceCount++;
+                } else {
+                    $this->exts->log(__FUNCTION__ . '::No download ' . $invoiceFileName);
+                }
             }
-        }
 
-        // Download all invoices
-        $this->exts->log('Invoices found: ' . count($invoices));
-        foreach ($invoices as $invoice) {
-            $this->exts->log('--------------------------');
-            $this->exts->log('invoiceName: ' . $invoice['invoiceName']);
-            $this->exts->log('invoiceDate: ' . $invoice['invoiceDate']);
-            $this->exts->log('invoiceAmount: ' . $invoice['invoiceAmount']);
-            $this->exts->log('invoiceUrl: ' . $invoice['invoiceUrl']);
+            $lastDate = !empty($invoiceDate) && $invoiceDate <= $restrictDate;
 
-            $invoiceFileName = !empty($invoice['invoiceName']) ? $invoice['invoiceName'] . '.pdf': '';
-            $invoice['invoiceDate'] = $this->exts->parse_date($invoice['invoiceDate'], 'd.m.y', 'Y-m-d');
-            $this->exts->log('Date parsed: ' . $invoice['invoiceDate']);
-            $this->exts->execute_javascript("arguments[0].click()", [$invoice['downloadBtn']]);
-            $this->exts->wait_and_check_download('pdf');
-            $downloaded_file = $this->exts->find_saved_file('pdf', $invoiceFileName);
-
-            // $downloaded_file = $this->exts->direct_download($invoice['invoiceUrl'], 'pdf', $invoiceFileName);
-            // $downloaded_file = $this->exts->click_and_download($downloadBtn, 'pdf', $invoiceFileName);
-
-            if (trim($downloaded_file) != '' && file_exists($downloaded_file)) {
-                $this->exts->new_invoice($invoice['invoiceName'], $invoice['invoiceDate'], $invoice['invoiceAmount'], $invoiceFileName);
-                sleep(1);
-            } else {
-                $this->exts->log(__FUNCTION__ . '::No download ' . $invoiceFileName);
+            if ($restrictPages != 0 && ($invoiceCount == $maxInvoices || ($dateRestriction && $lastDate))) {
+                break;
+            } else if ($restrictPages == 0 && $dateRestriction && $lastDate) {
+                break;
             }
         }
     }
@@ -325,6 +302,5 @@ class PortalScriptCDP
 exec("docker rm -f selenium-node-111");
 exec("docker run -d --shm-size 2g -p 5902:5900 -p 9990:9999 -e TZ=Europe/Berlin -e SE_NODE_SESSION_TIMEOUT=86400 -e LANG=de -e GRID_TIMEOUT=0 -e GRID_BROWSER_TIMEOUT=0 -e SCREEN_WIDTH=1920 -e SCREEN_HEIGHT=1080 --name selenium-node-111 -v /var/www/remote-chrome/downloads:/home/seluser/Downloads/111 remote-chrome:v1");
 
-$browserSelected = 'chrome';
-$portal = new PortalScriptCDP($browserSelected, 'test_remote_chrome', '111', 'office@sayaq-adventures-muenchen.com', 'Sayaq#2022');
+$portal = new PortalScriptCDP("optimized-chrome-v2", 'grover business', '2673335', 'Y2hyaXN0b3BoQGJsYWNrY2FiaW4uZGU=', 'NTAwNlRpZ2VyMjAyMCE=');
 $portal->run();
