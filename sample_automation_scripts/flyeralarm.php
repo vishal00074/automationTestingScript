@@ -1,4 +1,4 @@
-<?php // updated login success logic
+<?php // updated download accorinding to updated portal IU added click_and_print instead of js click
 
 /**
  * Chrome Remote via Chrome devtool protocol script, for specific process/portal
@@ -57,7 +57,9 @@ class PortalScriptCDP
         }
     }
 
-    // Server-Portal-ID: 2239 - Last modified: 25.04.2025 13:19:53 UTC - User: 1
+    // Server-Portal-ID: 2239 - Last modified: 28.08.2025 13:16:35 UTC - User: 1
+
+    // Start Script 
 
     public $baseUrl = 'https://www.flyeralarm.com/de/shop/customer/orders';
     public $username_selector = 'input[name="username"]';
@@ -65,13 +67,14 @@ class PortalScriptCDP
     public $remember_me_selector = 'input[name="rememberMe"]:not(:checked) + label';
     public $submit_login_selector = 'button[type="submit"]';
     public $check_login_success_selector = '.simplesubmenu a[href*="/index/logout"], a[href*="/logout"]';
-
     public $isNoInvoice = true;
     public $download_overview = 0;
+
     /**
      * Entry Method thats called for a portal
      * @param Integer $count Number of times portal is retried.
      */
+
     private function initPortal($count)
     {
         $this->exts->log('Begin initPortal ' . $count);
@@ -80,7 +83,8 @@ class PortalScriptCDP
         sleep(1);
         $this->exts->openUrl($this->baseUrl);
         sleep(5);
-        $this->exts->waitTillAnyPresent([$this->username_selector, $this->check_login_success_selector]);
+
+        $this->waitFor($this->check_login_success_selector, 20);
         $this->exts->capture('1-init-page');
 
         $this->download_overview = isset($this->exts->config_array["download_overview"]) ? (int) $this->exts->config_array["download_overview"] : 0;
@@ -91,6 +95,7 @@ class PortalScriptCDP
             $this->checkFillLogin();
             sleep(30);
         }
+
         if ($this->exts->exists('button.iubenda-cs-accept-btn')) {
             $this->exts->moveToElementAndClick('button.iubenda-cs-accept-btn');
             sleep(10);
@@ -106,6 +111,7 @@ class PortalScriptCDP
                 $this->exts->openUrl($this->baseUrl);
                 $this->processInvoices();
             }
+
             $this->exts->openUrl('https://www.flyeralarm.com/de/customer-account/orders');
             sleep(5);
             $this->processOrders();
@@ -127,14 +133,22 @@ class PortalScriptCDP
             }
         }
     }
+
     private function checkFillLogin()
     {
         if ($this->exts->querySelector($this->password_selector) != null) {
             $this->exts->capture("2-login-page");
 
             $this->exts->log("Enter Username");
-            $this->exts->moveToElementAndType($this->username_selector, $this->username);
-            sleep(3);
+            $this->exts->click_by_xdotool($this->username_selector);
+            sleep(2);
+            $this->exts->type_key_by_xdotool('ctrl+a');
+            sleep(2);
+            $this->exts->type_key_by_xdotool('Delete');
+            sleep(2);
+            $this->exts->type_text_by_xdotool($this->username);
+            // $this->exts->moveToElementAndType($this->username_selector, $this->username);
+            sleep(5);
 
             $this->exts->log("Enter Password");
             $this->exts->click_by_xdotool($this->password_selector);
@@ -158,14 +172,34 @@ class PortalScriptCDP
 
     private function processInvoices()
     {
+        $restrictPages = isset($this->exts->config_array["restrictPages"]) ? (int)$this->exts->config_array["restrictPages"] : 3;
+        $this->exts->log('Restrict Pages: ' . $restrictPages);
+
+        $restrictDate = $restrictPages == 0 ? date('Y-m-d', strtotime('-2 years')) : date('Y-m-d', strtotime('-3 months'));
+        $dateRestriction = true; // (true) in case of date filter
+        $this->exts->log('Restrict Date: ' . $restrictDate);
+
+        $maxInvoices = 10;
+        $invoiceCount = 0;
+        $terminateLoop = false;
+
+
         $this->exts->waitTillPresent('tr.orderRow.orderListHeader', 20);
         $this->exts->capture("4-order-page");
+
         for ($paging_count = 1; $paging_count < 100; $paging_count++) {
+
             $invoices = [];
             $rows = $this->exts->querySelectorAll('tr.orderRow.orderListHeader');
+
             foreach ($rows as $row) {
+
                 $order_detail_link = $this->exts->querySelector('a[href*="/orderprint/orderId/"]', $row);
+
                 if ($order_detail_link != null) {
+
+                    $invoiceCount++;
+
                     $order_url = $order_detail_link->getAttribute("href");
                     if (stripos($order_url, 'https://www.flyeralarm.com') === false) {
                         $order_url = 'https://www.flyeralarm.com' . $order_url;
@@ -184,7 +218,20 @@ class PortalScriptCDP
                         'invoiceAmount' => $invoiceAmount,
                         'order_url' => $order_url
                     ));
+
                     $this->isNoInvoice = false;
+
+
+                    $parsedInvoiceDate = $this->exts->parse_date($invoiceDate, 'd.m.Y', 'Y-m-d');
+                    $lastDate = !empty($parsedInvoiceDate) && $parsedInvoiceDate <= $restrictDate;
+
+                    if ($restrictPages != 0 && ($invoiceCount == $maxInvoices || ($dateRestriction && $lastDate))) {
+                        $terminateLoop = true;
+                        break;
+                    } else if ($restrictPages == 0 && $dateRestriction && $lastDate) {
+                        $terminateLoop = true;
+                        break;
+                    }
                 }
             }
 
@@ -201,7 +248,7 @@ class PortalScriptCDP
                 $this->exts->openUrl($invoice['order_url']);
                 $this->exts->waitTillPresent('span[onclick*="window.print"]');
                 sleep(1);
-                $invoiceFileName = !empty($invoice['invoiceName']) ? $invoice['invoiceName'] . '.pdf': '';
+                $invoiceFileName = !empty($invoice['invoiceName']) ? $invoice['invoiceName'] . '.pdf' : '';
                 $downloaded_file = $this->exts->click_and_print('span[onclick*="window.print"]', $invoiceFileName);
                 if (trim($downloaded_file) != '' && file_exists($downloaded_file)) {
                     $this->exts->new_invoice($invoice['invoiceName'], $invoice['invoiceDate'], $invoice['invoiceAmount'], $downloaded_file);
@@ -210,7 +257,12 @@ class PortalScriptCDP
                     $this->exts->log(__FUNCTION__ . '::No download ' . $invoiceFileName);
                 }
             }
+
             $this->exts->closeTab($newTab);
+
+            if ($terminateLoop) {
+                break;
+            }
 
             if ($this->exts->config_array["restrictPages"] == '0' && $this->exts->exists('#shop-ordertable-paginator .shop-ordertable-paginator-currentPage + span a[href*="/pageCurrent"]')) {
                 $this->exts->moveToElementAndClick('#shop-ordertable-paginator .shop-ordertable-paginator-currentPage + span a[href*="/pageCurrent"]');
@@ -226,39 +278,21 @@ class PortalScriptCDP
         $this->exts->waitTillPresent('div.card a[href*="/invoice/"][href*="displayorderinvoice"], div.card a[href*="invoice/download?orderId="], div.card a[href*="orderprint/orderId/"]');
         $this->exts->capture("4-Orders-page");
         $invoices = [];
-        $order_details_link = false;
-        $rows = $this->exts->querySelectorAll('div.card');
+
+        $rows = $this->exts->querySelectorAll('div.card div.grid-x');
         foreach ($rows as $row) {
             sleep(2);
-            if ($this->exts->querySelector('a[href*="/invoice/"][href*="displayorderinvoice"]', $row) != null) {
-                $invoiceUrl = $this->exts->querySelector('a[href*="/invoice/"][href*="displayorderinvoice"]', $row)->getAttribute("href");
-                $temp = $this->exts->extract('a[href*="orderprint/orderId/"]', $row, 'href');
-                $this->exts->log($temp);
-                $invoiceName = explode(
-                    '/',
-                    array_pop(explode('/orderId/', $temp))
-                )[0];
-                $invoiceDate = '';
-                $invoiceAmount = trim(preg_replace('/[^\d\.\,]/', '', $this->exts->extract('div.text-right p', $row, 'text'))) . ' EUR';
+            if ($this->exts->querySelector('a[href*="orderprint/orderId/"]', $row) != null) {
 
-                array_push($invoices, array(
-                    'invoiceName' => $invoiceName,
-                    'invoiceDate' => $invoiceDate,
-                    'invoiceAmount' => $invoiceAmount,
-                    'invoiceUrl' => $invoiceUrl
-                ));
-                $this->isNoInvoice = false;
-            } else if ($this->exts->querySelector('a[href*="invoice/download?orderId="]', $row) != null) {
-                $invoiceUrl = $this->exts->querySelector('a[href*="invoice/download?orderId="]', $row)->getAttribute("href");
-                $temp = $this->exts->extract('a[href*="invoice/download?orderId="]', $row, 'href');
-                $this->exts->log($temp);
+                $invoiceUrl = $this->exts->querySelector('a[href*="orderprint/orderId/"]')->getAttribute('href');
+                $this->exts->log($invoiceUrl);
                 $invoiceName = explode(
-                    '%',
-                    array_pop(explode('orderId=', $temp))
+                    '?',
+                    array_pop(explode('orderId/', $invoiceUrl))
                 )[0];
                 $invoiceName = explode('/', $invoiceName)[0];
                 $invoiceDate = '';
-                $invoiceAmount = trim(preg_replace('/[^\d\.\,]/', '', $this->exts->extract('div.text-right p', $row, 'text'))) . ' EUR';
+                $invoiceAmount = trim(preg_replace('/[^\d\.\,]/', '', $this->exts->extract('div.medium-shrink:not(.text-right) p.-text-sub span', $row))) . ' EUR';
 
                 array_push($invoices, array(
                     'invoiceName' => $invoiceName,
@@ -267,84 +301,45 @@ class PortalScriptCDP
                     'invoiceUrl' => $invoiceUrl
                 ));
                 $this->isNoInvoice = false;
-            } else if ($this->exts->querySelector('a[href*="orderprint/orderId/"]', $row) != null) {
-                $temp = $this->exts->extract('a[href*="orderprint/orderId/"]', $row, 'href');
-                $this->exts->log($temp);
-                $invoiceName = explode(
-                    '?',
-                    array_pop(explode('orderId/', $temp))
-                )[0];
-                $modalBtn = $this->exts->querySelector('a[href*="invoices-modal"]', $row);
-                if ($modalBtn) {
-                    $this->exts->execute_javascript("arguments[0].click();", [$modalBtn]);
-                    $this->exts->waitTillPresent('a[href*="api/invoice"]');
-                    if ($this->exts->exists('a[href*="api/invoice"]')) {
-                        sleep(2);
-                        $invoiceUrl = $this->exts->querySelector('a[href*="api/invoice"]')->getAttribute('href');
-                        // close modal
-                        if ($this->exts->exists('div[class*=overlay] button.close-button')) {
-                            $this->exts->log('Clicking on Modal Close button');
-                            $this->exts->click_element('div[class*=overlay] button.close-button');
-                        }
-                        sleep(2);
-                        $invoiceName = explode('/', $invoiceName)[0];
-                        $invoiceDate = '';
-                        $invoiceAmount = trim(preg_replace('/[^\d\.\,]/', '', $this->exts->extract('div.medium-shrink:not(.text-right) p.-text-sub span', $row))) . ' EUR';
-                        $order_details_link = false;
-                        array_push($invoices, array(
-                            'invoiceName' => $invoiceName,
-                            'invoiceDate' => $invoiceDate,
-                            'invoiceAmount' => $invoiceAmount,
-                            'invoiceUrl' => $invoiceUrl
-                        ));
-                        $this->isNoInvoice = false;
-                    }
-                }
             }
         }
+
+        $invoiceCount = 0;
 
         // Download all invoices
         $this->exts->log('Invoices found: ' . count($invoices));
         foreach ($invoices as $invoice) {
+
             $this->exts->log('--------------------------');
             $this->exts->log('invoiceName: ' . $invoice['invoiceName']);
             $this->exts->log('invoiceDate: ' . $invoice['invoiceDate']);
             $this->exts->log('invoiceAmount: ' . $invoice['invoiceAmount']);
             $this->exts->log('invoiceUrl: ' . $invoice['invoiceUrl']);
 
-            $invoiceFileName = !empty($invoice['invoiceName']) ? $invoice['invoiceName'] . '.pdf': '';
+            $invoiceFileName = !empty($invoice['invoiceName']) ? $invoice['invoiceName'] . '.pdf' : '';
             $invoice['invoiceDate'] = $this->exts->parse_date($invoice['invoiceDate'], 'd.m.Y', 'Y-m-d');
             $this->exts->log('Date parsed: ' . $invoice['invoiceDate']);
-            if ($order_details_link) {
-                $newTab = $this->exts->openNewTab();
-                sleep(1);
+            $invoiceCount++;
 
-                if ($this->exts->invoice_exists($invoice['invoiceName'])) {
-                    $this->exts->log('Invoice existed ' . $invoiceFileName);
-                } else {
-                    $this->exts->openUrl($invoice['invoiceUrl']);
-                    sleep(8);
-                    $this->exts->moveToElementAndClick('span[onclick="window.print();"]');
-                    sleep(5);
-                    $this->exts->wait_and_check_download('pdf');
-                    $downloaded_file = $this->exts->find_saved_file('pdf', $invoiceFileName);
+            $newTab = $this->exts->openNewTab();
+            sleep(1);
 
-                    if (trim($downloaded_file) != '' && file_exists($downloaded_file)) {
-                        $this->exts->new_invoice($invoiceName, $parsed_date, $invoiceAmount, $invoiceFileName);
-                    } else {
-                        $this->exts->log(__FUNCTION__ . '::No download ' . $invoiceFileName);
-                    }
-                }
-                $this->exts->closeTab($newTab);
+            if ($this->exts->invoice_exists($invoice['invoiceName'])) {
+                $this->exts->log('Invoice existed ' . $invoiceFileName);
             } else {
-                $downloaded_file = $this->exts->direct_download($invoice['invoiceUrl'], 'pdf', $invoiceFileName);
+                $this->exts->openUrl($invoice['invoiceUrl']);
+                sleep(8);
+                $downloaded_file = $this->exts->click_and_print('span[onclick="window.print();"]', $invoiceFileName);
+                sleep(2);
                 if (trim($downloaded_file) != '' && file_exists($downloaded_file)) {
                     $this->exts->new_invoice($invoice['invoiceName'], $invoice['invoiceDate'], $invoice['invoiceAmount'], $invoiceFileName);
                 } else {
                     $this->exts->log(__FUNCTION__ . '::No download ' . $invoiceFileName);
                 }
             }
+            $this->exts->closeTab($newTab);
         }
+        sleep(7);
 
         // next page
         $restrictPages = isset($this->exts->config_array["restrictPages"]) ? (int) @$this->exts->config_array["restrictPages"] : 3;
@@ -357,6 +352,23 @@ class PortalScriptCDP
             $this->exts->moveToElementAndClick('li.pagination-next a:not(.disabled)');
             sleep(5);
             $this->processOrders($paging_count);
+        } else if (
+            $restrictPages != 0 &&
+            $invoiceCount < 30 &&
+            $this->exts->querySelector('li.pagination-next a:not(.disabled)') != null
+        ) {
+            $paging_count++;
+            $this->exts->moveToElementAndClick('li.pagination-next a:not(.disabled)');
+            sleep(5);
+            $this->processOrders($paging_count);
+        }
+    }
+
+    private function waitFor($selector, $seconds = 30)
+    {
+        for ($i = 1; $i <= $seconds && $this->exts->querySelector($selector) == null; $i++) {
+            $this->exts->log('Waiting for Selector (' . $i . '): ' . $selector);
+            sleep(1);
         }
     }
 }
@@ -364,6 +376,6 @@ class PortalScriptCDP
 exec("docker rm -f selenium-node-111");
 exec("docker run -d --shm-size 2g -p 5902:5900 -p 9990:9999 -e TZ=Europe/Berlin -e SE_NODE_SESSION_TIMEOUT=86400 -e LANG=de -e GRID_TIMEOUT=0 -e GRID_BROWSER_TIMEOUT=0 -e SCREEN_WIDTH=1920 -e SCREEN_HEIGHT=1080 --name selenium-node-111 -v /var/www/remote-chrome/downloads:/home/seluser/Downloads/111 remote-chrome:v1");
 
-$browserSelected = 'chrome';
-$portal = new PortalScriptCDP($browserSelected, 'test_remote_chrome', '111', 'office@sayaq-adventures-muenchen.com', 'Sayaq#2022');
+
+$portal = new PortalScriptCDP("optimized-chrome-v2", 'flyeralarm', '2673722', 'Zmx5ZXJhbGFybUBhbHRlb3MuY29t', 'UjJaVmpXa29UOXktc2U5OUZDWkJtRGNo');
 $portal->run();

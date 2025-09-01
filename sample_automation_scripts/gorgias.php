@@ -1,4 +1,4 @@
-<?php // replaced waitTillPresent to waitFOr and remove unused function checkFillRecaptcha
+<?php // locally script working fine triggring loginfailedConfirmed Data mismatch on test engine
 
 /**
  * Chrome Remote via Chrome devtool protocol script, for specific process/portal
@@ -57,8 +57,7 @@ class PortalScriptCDP
         }
     }
 
-
-    // Server-Portal-ID: 51056 - Last modified: 31.07.2025 13:53:25 UTC - User: 1
+    // Server-Portal-ID: 51056 - Last modified: 12.08.2025 14:35:08 UTC - User: 1
 
     public $baseUrl = 'https://www.gorgias.com/';
     public $username_selector = 'input#email';
@@ -187,7 +186,7 @@ class PortalScriptCDP
             $this->exts->capture("2-login-page-filled");
             $this->exts->moveToElementAndClick($this->submit_login_selector);
             sleep(10);
-            
+
             if (stripos($this->exts->extract($this->check_login_failed_selector, null, 'innerText'), 'passwor') !== false) {
                 $this->exts->loginFailure(1);
             }
@@ -584,21 +583,21 @@ class PortalScriptCDP
     private function overwrite_user_agent($user_agent_string = 'DN')
     {
         $userAgentScript = "
-    (function() {
-        if ('userAgentData' in navigator) {
-            navigator.userAgentData.getHighEntropyValues({}).then(() => {
-                Object.defineProperty(navigator, 'userAgent', { 
-                    value: '{$user_agent_string}', 
-                    configurable: true 
-                });
-            });
-        } else {
+(function() {
+    if ('userAgentData' in navigator) {
+        navigator.userAgentData.getHighEntropyValues({}).then(() => {
             Object.defineProperty(navigator, 'userAgent', { 
                 value: '{$user_agent_string}', 
                 configurable: true 
             });
-        }
-    })();
+        });
+    } else {
+        Object.defineProperty(navigator, 'userAgent', { 
+            value: '{$user_agent_string}', 
+            configurable: true 
+        });
+    }
+})();
 ";
         $this->exts->execute_javascript($userAgentScript);
     }
@@ -1088,6 +1087,6 @@ class PortalScriptCDP
 exec("docker rm -f selenium-node-111");
 exec("docker run -d --shm-size 2g -p 5902:5900 -p 9990:9999 -e TZ=Europe/Berlin -e SE_NODE_SESSION_TIMEOUT=86400 -e LANG=de -e GRID_TIMEOUT=0 -e GRID_BROWSER_TIMEOUT=0 -e SCREEN_WIDTH=1920 -e SCREEN_HEIGHT=1080 --name selenium-node-111 -v /var/www/remote-chrome/downloads:/home/seluser/Downloads/111 remote-chrome:v1");
 
-$browserSelected = 'chrome';
-$portal = new PortalScriptCDP($browserSelected, 'test_remote_chrome', '111', 'office@sayaq-adventures-muenchen.com', 'Sayaq#2022');
+
+$portal = new PortalScriptCDP("optimized-chrome-v2", 'JLCPCB', '2673809', 'YWNjb3VudHNAaWZwLXNvZnR3YXJlLmRl', 'cGVmem81LXhpYndpYy16VWR2YW0=');
 $portal->run();

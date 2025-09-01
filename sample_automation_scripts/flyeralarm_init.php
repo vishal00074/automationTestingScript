@@ -4,13 +4,14 @@ public $password_selector = 'input[name="password"]';
 public $remember_me_selector = 'input[name="rememberMe"]:not(:checked) + label';
 public $submit_login_selector = 'button[type="submit"]';
 public $check_login_success_selector = '.simplesubmenu a[href*="/index/logout"], a[href*="/logout"]';
-
 public $isNoInvoice = true;
 public $download_overview = 0;
+
 /**
     * Entry Method thats called for a portal
     * @param Integer $count Number of times portal is retried.
     */
+
 private function initPortal($count)
 {
     $this->exts->log('Begin initPortal ' . $count);
@@ -19,7 +20,8 @@ private function initPortal($count)
     sleep(1);
     $this->exts->openUrl($this->baseUrl);
     sleep(5);
-    $this->exts->waitTillAnyPresent([$this->username_selector, $this->check_login_success_selector]);
+
+    $this->waitFor($this->check_login_success_selector, 20);
     $this->exts->capture('1-init-page');
 
     $this->download_overview = isset($this->exts->config_array["download_overview"]) ? (int) $this->exts->config_array["download_overview"] : 0;
@@ -30,6 +32,7 @@ private function initPortal($count)
         $this->checkFillLogin();
         sleep(30);
     }
+
     if ($this->exts->exists('button.iubenda-cs-accept-btn')) {
         $this->exts->moveToElementAndClick('button.iubenda-cs-accept-btn');
         sleep(10);
@@ -57,14 +60,22 @@ private function initPortal($count)
         }
     }
 }
+
 private function checkFillLogin()
 {
     if ($this->exts->querySelector($this->password_selector) != null) {
         $this->exts->capture("2-login-page");
 
         $this->exts->log("Enter Username");
-        $this->exts->moveToElementAndType($this->username_selector, $this->username);
-        sleep(3);
+        $this->exts->click_by_xdotool($this->username_selector);
+        sleep(2);
+        $this->exts->type_key_by_xdotool('ctrl+a');
+        sleep(2);
+        $this->exts->type_key_by_xdotool('Delete');
+        sleep(2);
+        $this->exts->type_text_by_xdotool($this->username);
+        // $this->exts->moveToElementAndType($this->username_selector, $this->username);
+        sleep(5);
 
         $this->exts->log("Enter Password");
         $this->exts->click_by_xdotool($this->password_selector);
@@ -83,5 +94,12 @@ private function checkFillLogin()
     } else {
         $this->exts->log(__FUNCTION__ . '::Login page not found');
         $this->exts->capture("2-login-page-not-found");
+    }
+}
+private function waitFor($selector, $seconds = 30)
+{
+    for ($i = 1; $i <= $seconds && $this->exts->querySelector($selector) == null; $i++) {
+        $this->exts->log('Waiting for Selector (' . $i . '): ' . $selector);
+        sleep(1);
     }
 }

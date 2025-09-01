@@ -117,7 +117,7 @@ private function checkFillLogin()
         $this->exts->capture("2-login-page-filled");
         $this->exts->moveToElementAndClick($this->submit_login_selector);
         sleep(10);
-        // $this->checkFillRecaptcha();
+
         if (stripos($this->exts->extract($this->check_login_failed_selector, null, 'innerText'), 'passwor') !== false) {
             $this->exts->loginFailure(1);
         }
@@ -515,19 +515,19 @@ private function overwrite_user_agent($user_agent_string = 'DN')
 {
     $userAgentScript = "
 (function() {
-    if ('userAgentData' in navigator) {
-        navigator.userAgentData.getHighEntropyValues({}).then(() => {
-            Object.defineProperty(navigator, 'userAgent', { 
-                value: '{$user_agent_string}', 
-                configurable: true 
-            });
-        });
-    } else {
+if ('userAgentData' in navigator) {
+    navigator.userAgentData.getHighEntropyValues({}).then(() => {
         Object.defineProperty(navigator, 'userAgent', { 
             value: '{$user_agent_string}', 
             configurable: true 
         });
-    }
+    });
+} else {
+    Object.defineProperty(navigator, 'userAgent', { 
+        value: '{$user_agent_string}', 
+        configurable: true 
+    });
+}
 })();
 ";
     $this->exts->execute_javascript($userAgentScript);
