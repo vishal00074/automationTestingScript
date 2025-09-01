@@ -29,7 +29,7 @@ class Hcaptcha
     private function check_solve_hcaptcha_challenge()
     {
         $this->exts->log("Start Solving Captcha");
-        $unsolved_hcaptcha_submit_selector = 'iframe[src*="hcaptcha.com/captcha"][title*="checkbox"][data-hcaptcha-response=""]'; // script selector
+        $unsolved_hcaptcha_submit_selector = 'iframe[src*="hcaptcha.com/captcha"]'; // script selector
         $hcaptcha_challenger_wraper_selector = 'div[style*="visibility: visible"] > div  >  iframe[src*="frame=challenge"]'; // script selector
         if ($this->exts->exists($unsolved_hcaptcha_submit_selector) || $this->exts->exists($hcaptcha_challenger_wraper_selector)) { // if exist hcaptcha and it isn't solved
             // Check if challenge images hasn't showed yet, Click checkbox to show images challenge
