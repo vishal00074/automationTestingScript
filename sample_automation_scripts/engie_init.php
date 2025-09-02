@@ -21,13 +21,17 @@ private function initPortal($count)
     $this->disable_extensions();
 
     $this->exts->openUrl($this->baseUrl);
-    sleep(1);
+    sleep(5);
     $this->exts->capture('1-init-page');
+
+    $this->exts->loadCookiesFromFile();
+    $this->exts->openUrl($this->baseUrl);
+    sleep(10);
 
     // If user hase not logged in from cookie, clear cookie, open the login url and do login
     if ($this->exts->querySelector($this->check_login_success_selector) == null) {
         $this->exts->log('NOT logged via cookie');
-        // $this->exts->clearCookies();
+        $this->exts->clearCookies();
         $this->exts->openUrl($this->loginUrl);
         // die;
         if ($this->exts->exists('div#popin_tc_privacy_container_button button[type="button"]')) {
@@ -42,12 +46,6 @@ private function initPortal($count)
 
         $this->checkFillLogin();
         sleep(10);
-
-        if ($this->exts->querySelector('input[name="factor_id"]') != null) {
-            $this->exts->moveToElementAndClick('input[name="factor_id"]');
-            sleep(10);
-        }
-
         if (
             $this->exts->oneExists([$this->username_selector, $this->password_selector]) &&
             !$this->exts->exists('.login-form-page .form-item--error-message')
@@ -142,7 +140,6 @@ private function checkFillLogin()
         $this->exts->capture("2-login-page");
 
         $this->exts->log("Enter Username");
-        // $this->exts->moveToElementAndType($this->username_selector, $this->username);
         $this->exts->click_by_xdotool($this->username_selector);
         $this->exts->type_key_by_xdotool("ctrl+a");
         $this->exts->type_key_by_xdotool("Delete");
@@ -150,27 +147,14 @@ private function checkFillLogin()
         sleep(1);
 
         $this->exts->log("Enter Password");
-        // $this->exts->moveToElementAndType($this->password_selector, $this->password);
         $this->exts->click_by_xdotool($this->password_selector);
         $this->exts->type_key_by_xdotool("ctrl+a");
         $this->exts->type_key_by_xdotool("Delete");
         $this->exts->type_text_by_xdotool($this->password);
         sleep(1);
-        // $this->checkFillRecaptcha();
         $this->exts->capture("2-login-page-filled");
         $this->checkFillRecaptcha();
         $this->exts->click_by_xdotool($this->submit_login_selector);
-        sleep(4);
-
-        if($this->exts->querySelector($this->submit_login_selector) != null){
-            $this->exts->click_by_xdotool($this->submit_login_selector);
-            sleep(2);
-        } 
-        if($this->exts->querySelector($this->submit_login_selector) != null){
-            $this->exts->click_by_xdotool($this->submit_login_selector);
-            sleep(2);
-        }  
-
     } else {
         $this->exts->log(__FUNCTION__ . '::Login page not found');
         $this->exts->capture("2-login-page-not-found");
@@ -216,21 +200,6 @@ private function checkFillTwoFactor()
 
             $this->exts->moveToElementAndClick($two_factor_submit_selector);
             sleep(15);
-
-            $this->exts->log("checkFillTwoFactor: Clicking submit button.");
-            sleep(3);
-            $this->exts->capture("2.2-two-factor-filled-" . $this->exts->two_factor_attempts);
-
-
-            if ($this->exts->querySelector($two_factor_selector) == null) {
-                $this->exts->log("Two factor solved");
-            } else if ($this->exts->two_factor_attempts < 3) {
-                $this->exts->notification_uid = "";
-                $this->exts->two_factor_attempts++;
-                $this->checkFillTwoFactor();
-            } else {
-                $this->exts->log("Two factor can not solved");
-            }
         } else {
             $this->exts->log("Not received two factor code");
         }
@@ -263,27 +232,27 @@ private function checkFillRecaptcha($count = 1)
             $this->exts->capture('recaptcha-filled');
 
             $gcallbackFunction = $this->exts->execute_javascript('
-            (function() { 
-                if(document.querySelector("[data-callback]") != null){
-                    return document.querySelector("[data-callback]").getAttribute("data-callback");
-                }
+        (function() { 
+            if(document.querySelector("[data-callback]") != null){
+                return document.querySelector("[data-callback]").getAttribute("data-callback");
+            }
 
-                var result = ""; var found = false;
-                function recurse (cur, prop, deep) {
-                    if(deep > 5 || found){ return;}console.log(prop);
-                    try {
-                        if(cur == undefined || cur == null || cur instanceof Element || Object(cur) !== cur || Array.isArray(cur)){ return;}
-                        if(prop.indexOf(".callback") > -1){result = prop; found = true; return;
-                        } else { deep++;
-                            for (var p in cur) { recurse(cur[p], prop ? prop + "." + p : p, deep);}
-                        }
-                    } catch(ex) { console.log("ERROR in function: " + ex); return; }
-                }
+            var result = ""; var found = false;
+            function recurse (cur, prop, deep) {
+                if(deep > 5 || found){ return;}console.log(prop);
+                try {
+                    if(cur == undefined || cur == null || cur instanceof Element || Object(cur) !== cur || Array.isArray(cur)){ return;}
+                    if(prop.indexOf(".callback") > -1){result = prop; found = true; return;
+                    } else { deep++;
+                        for (var p in cur) { recurse(cur[p], prop ? prop + "." + p : p, deep);}
+                    }
+                } catch(ex) { console.log("ERROR in function: " + ex); return; }
+            }
 
-                recurse(___grecaptcha_cfg.clients[0], "", 0);
-                return found ? "___grecaptcha_cfg.clients[0]." + result : null;
-            })();
-        ');
+            recurse(___grecaptcha_cfg.clients[0], "", 0);
+            return found ? "___grecaptcha_cfg.clients[0]." + result : null;
+        })();
+    ');
             $this->exts->log('Callback function: ' . $gcallbackFunction);
             $this->exts->log('Callback function: ' . $this->exts->recaptcha_answer);
             if ($gcallbackFunction != null) {
@@ -307,17 +276,17 @@ private function disable_extensions()
     $this->exts->openUrl('chrome://extensions/'); // disable Block origin extension
     sleep(2);
     $this->exts->execute_javascript("
-    let manager = document.querySelector('extensions-manager');
-    if (manager && manager.shadowRoot) {
-        let itemList = manager.shadowRoot.querySelector('extensions-item-list');
-        if (itemList && itemList.shadowRoot) {
-            let items = itemList.shadowRoot.querySelectorAll('extensions-item');
-            items.forEach(item => {
-                let toggle = item.shadowRoot.querySelector('#enableToggle[checked]');
-                if (toggle) toggle.click();
-            });
-        }
+let manager = document.querySelector('extensions-manager');
+if (manager && manager.shadowRoot) {
+    let itemList = manager.shadowRoot.querySelector('extensions-item-list');
+    if (itemList && itemList.shadowRoot) {
+        let items = itemList.shadowRoot.querySelectorAll('extensions-item');
+        items.forEach(item => {
+            let toggle = item.shadowRoot.querySelector('#enableToggle[checked]');
+            if (toggle) toggle.click();
+        });
     }
+}
 ");
 }
 
