@@ -1,35 +1,42 @@
-<?php // replace waitTillPresent to waitFor and adjust sleep time
+<?php // replace exists with custom js isExists function to prevent client read timeout issue
 
 /**
  * Chrome Remote via Chrome devtool protocol script, for specific process/portal
  *
- * @package uwa
+ * @package	uwa
  *
- * @copyright   GetMyInvoices
+ * @copyright	GetMyInvoices
  */
 
-define('KERNEL_ROOT', '/var/www/remote-chrome/utils/');
+define('KERNEL_ROOT', '/var/www/vhosts/worker/httpdocs/src/');
 
-$gmi_browser_core = realpath('/var/www/remote-chrome/utils/GmiChromeManager.php');
-require_once($gmi_browser_core);
+$gmi_selenium_core = realpath(KERNEL_ROOT . 'modules/cust_gmi_worker/includes/GmiChromeManager.php');
+require_once($gmi_selenium_core);
+
 class PortalScriptCDP
 {
 
-    private $exts;
-    public $setupSuccess = false;
+    private    $exts;
+    public    $setupSuccess = false;
     private $chrome_manage;
-    private $username;
-    private $password;
+    private    $username;
+    private    $password;
+    public $support_restart = true;
+    public $portal_domain = '';
 
     public function __construct($mode, $portal_name, $process_uid, $username, $password)
     {
-        $this->username = $username;
-        $this->password = $password;
+
+        $this->username = base64_decode($username);
+        $this->password = base64_decode($password);
 
         $this->exts = new GmiChromeManager();
-        $this->exts->screen_capture_location = '/var/www/remote-chrome/screens/';
-        $this->exts->init($mode, $portal_name, $process_uid, $username, $password);
+        $this->exts->screen_capture_location = '/var/www/vhosts/worker/httpdocs/fs/cdo/process/2/2673461/screens/';
+        $this->exts->init($mode, $portal_name, $process_uid, $this->username, $this->password);
         $this->setupSuccess = true;
+        if (!empty($this->exts->config_array['portal_domain'])) {
+            $this->portal_domain = $this->exts->config_array['portal_domain'];
+        }
     }
 
     /**
@@ -38,26 +45,27 @@ class PortalScriptCDP
     public function run()
     {
         if ($this->setupSuccess) {
+            file_put_contents($this->exts->screen_capture_location . '.script_execution_started', time());
             try {
                 // Start portal script execution
                 $this->initPortal(0);
+
+                $this->exts->dump_session_files();
             } catch (\Exception $exception) {
-                $this->exts->log('Exception: ' . $exception->getMessage());
+                $this->exts->log('Selenium Exception: ' . $exception->getMessage());
                 $this->exts->capture("error");
                 var_dump($exception);
             }
 
-
             $this->exts->log('Execution completed');
 
             $this->exts->process_completed();
-            $this->exts->dump_session_files();
         } else {
             echo 'Script execution failed.. ' . "\n";
         }
     }
 
-    // Server-Portal-ID: 1183939 - Last modified: 30.07.2025 14:34:19 UTC - User: 1
+    // Server-Portal-ID: 1183939 - Last modified: 29.08.2025 14:28:37 UTC - User: 1
 
     public $baseUrl = 'https://dash.pricehubble.com/';
     public $loginUrl = 'https://dash.pricehubble.com/login';
@@ -86,7 +94,7 @@ class PortalScriptCDP
 
         sleep(10);
         // Accecpt cookies
-        if ($this->exts->exists('div[class*="consent__message"]')) {
+        if ($this->isExists('div[class*="consent__message"]')) {
             $this->exts->moveToElementAndClick('button[class*="consent__button"]');
             sleep(2);
         }
@@ -96,7 +104,7 @@ class PortalScriptCDP
             $this->exts->openUrl($this->loginUrl);
             sleep(10);
             // Accecpt cookies
-            if ($this->exts->exists('div[class*="consent__message"]')) {
+            if ($this->isExists('div[class*="consent__message"]')) {
                 $this->exts->moveToElementAndClick('button[class*="consent__button"]');
                 sleep(2);
             }
@@ -136,14 +144,14 @@ class PortalScriptCDP
                 $this->exts->moveToElementAndType($this->password_selector, $this->password);
                 sleep(2);
 
-                if ($this->exts->exists($this->remember_me_selector)) {
+                if ($this->isExists($this->remember_me_selector)) {
                     $this->exts->click_by_xdotool($this->remember_me_selector);
                     sleep(2);
                 }
 
                 $this->exts->capture("1-login-page-filled");
 
-                if ($this->exts->exists($this->submit_login_selector)) {
+                if ($this->isExists($this->submit_login_selector)) {
                     $this->exts->click_by_xdotool($this->submit_login_selector);
                     sleep(10);
                 }
@@ -162,6 +170,20 @@ class PortalScriptCDP
         }
     }
 
+    private function isExists($selector = '')
+    {
+        $safeSelector = addslashes($selector);
+        $this->exts->log('Element:: ' . $safeSelector);
+        $isElement = $this->exts->execute_javascript('!!document.querySelector("' . $safeSelector . '")');
+        if ($isElement) {
+            $this->exts->log('Element Found');
+            return true;
+        } else {
+            $this->exts->log('Element not Found');
+            return false;
+        }
+    }
+
     /**
      * Method to Check where user is logged in or not
      * return boolean true/false
@@ -175,7 +197,7 @@ class PortalScriptCDP
             $this->waitFor($this->check_login_success_selector, 5);
             $this->waitFor($this->check_login_success_selector, 5);
             $this->waitFor($this->check_login_success_selector, 5);
-            if ($this->exts->exists($this->check_login_success_selector)) {
+            if ($this->isExists($this->check_login_success_selector)) {
 
                 $this->exts->log(">>>>>>>>>>>>>>>Login successful!!!!");
 
@@ -189,8 +211,6 @@ class PortalScriptCDP
     }
 }
 
-exec("docker rm -f selenium-node-111");
-exec("docker run -d --shm-size 2g -p 5902:5900 -p 9990:9999 -e TZ=Europe/Berlin -e SE_NODE_SESSION_TIMEOUT=86400 -e LANG=de -e GRID_TIMEOUT=0 -e GRID_BROWSER_TIMEOUT=0 -e SCREEN_WIDTH=1920 -e SCREEN_HEIGHT=1080 --name selenium-node-111 -v /var/www/remote-chrome/downloads:/home/seluser/Downloads/111 remote-chrome:v1");
 
-$portal = new PortalScriptCDP("optimized-chrome-v2", 'pricehubble.com', '2673833', 'ZGFuaWVsQHBoaS1udW1iZXJzLmRl', 'dmF5aXk3cXV3ZWRv');
+$portal = new PortalScriptCDP("optimized-chrome-v2", 'pricehubble.com', '2673691', 'VGhvbWFzQGJyZWhtZXIxLmRl', 'Vm5kR1U1M2NzaA==');
 $portal->run();

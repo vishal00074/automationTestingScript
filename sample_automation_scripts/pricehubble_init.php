@@ -25,7 +25,7 @@ private function initPortal($count)
 
     sleep(10);
     // Accecpt cookies
-    if ($this->exts->exists('div[class*="consent__message"]')) {
+    if ($this->isExists('div[class*="consent__message"]')) {
         $this->exts->moveToElementAndClick('button[class*="consent__button"]');
         sleep(2);
     }
@@ -35,7 +35,7 @@ private function initPortal($count)
         $this->exts->openUrl($this->loginUrl);
         sleep(10);
         // Accecpt cookies
-        if ($this->exts->exists('div[class*="consent__message"]')) {
+        if ($this->isExists('div[class*="consent__message"]')) {
             $this->exts->moveToElementAndClick('button[class*="consent__button"]');
             sleep(2);
         }
@@ -44,7 +44,7 @@ private function initPortal($count)
     if ($this->checkLogin()) {
         $this->exts->log(">>>>>>>>>>>>>>>Login successful!!!!");
         $this->exts->capture("LoginSuccess");
-        
+
         if (!empty($this->exts->config_array['allow_login_success_request'])) {
             $this->exts->triggerLoginSuccess();
         }
@@ -76,14 +76,14 @@ private function fillForm($count)
             $this->exts->moveToElementAndType($this->password_selector, $this->password);
             sleep(2);
 
-            if ($this->exts->exists($this->remember_me_selector)) {
+            if ($this->isExists($this->remember_me_selector)) {
                 $this->exts->click_by_xdotool($this->remember_me_selector);
                 sleep(2);
             }
 
             $this->exts->capture("1-login-page-filled");
 
-            if ($this->exts->exists($this->submit_login_selector)) {
+            if ($this->isExists($this->submit_login_selector)) {
                 $this->exts->click_by_xdotool($this->submit_login_selector);
                 sleep(10);
             }
@@ -102,6 +102,20 @@ public function waitFor($selector, $seconds = 7)
     }
 }
 
+private function isExists($selector = '')
+{
+    $safeSelector = addslashes($selector);
+    $this->exts->log('Element:: ' . $safeSelector);
+    $isElement = $this->exts->execute_javascript('!!document.querySelector("' . $safeSelector . '")');
+    if ($isElement) {
+        $this->exts->log('Element Found');
+        return true;
+    } else {
+        $this->exts->log('Element not Found');
+        return false;
+    }
+}
+
 /**
     * Method to Check where user is logged in or not
     * return boolean true/false
@@ -115,7 +129,7 @@ private function checkLogin()
         $this->waitFor($this->check_login_success_selector, 5);
         $this->waitFor($this->check_login_success_selector, 5);
         $this->waitFor($this->check_login_success_selector, 5);
-        if ($this->exts->exists($this->check_login_success_selector)) {
+        if ($this->isExists($this->check_login_success_selector)) {
 
             $this->exts->log(">>>>>>>>>>>>>>>Login successful!!!!");
 
