@@ -34,7 +34,7 @@ private function initPortal($count)
     if ($this->checkLogin()) {
         $this->exts->log(">>>>>>>>>>>>>>>Login successful!!!!");
         $this->exts->capture("LoginSuccess");
-        
+
         if (!empty($this->exts->config_array['allow_login_success_request'])) {
             $this->exts->triggerLoginSuccess();
         }
@@ -106,6 +106,11 @@ private function checkLogin()
         $this->waitFor($this->check_login_success_selector, 10);
         if ($this->isExists($this->check_login_success_selector)) {
             $this->exts->log(">>>>>>>>>>>>>>>Login successful!!!!");
+            $isLoggedIn = true;
+        }
+
+
+        if ($this->exts->queryXpath(".//button[contains(@class,'inline-flex') and .//div[normalize-space(.)='Ausloggen']]") != null) {
             $isLoggedIn = true;
         }
     } catch (Exception $exception) {

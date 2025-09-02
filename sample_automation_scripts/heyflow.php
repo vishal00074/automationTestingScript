@@ -1,4 +1,4 @@
-<?php // replace waitTillPresent to custom js waitFor function to prevent client read timout and handle empty invoices name
+<?php // added selector  to check user logged in or not in checkLogin function added restrict page condition to  download invoices
 
 /**
  * Chrome Remote via Chrome devtool protocol script, for specific process/portal
@@ -31,7 +31,7 @@ class PortalScriptCDP
         $this->password = base64_decode($password);
 
         $this->exts = new GmiChromeManager();
-        $this->exts->screen_capture_location = '/var/www/vhosts/worker/httpdocs/fs/cdo/process/2/2673482/screens/';
+        $this->exts->screen_capture_location = '/var/www/vhosts/worker/httpdocs/fs/cdo/process/2/2673461/screens/';
         $this->exts->init($mode, $portal_name, $process_uid, $this->username, $this->password);
         $this->setupSuccess = true;
         if (!empty($this->exts->config_array['portal_domain'])) {
@@ -47,10 +47,6 @@ class PortalScriptCDP
         if ($this->setupSuccess) {
             file_put_contents($this->exts->screen_capture_location . '.script_execution_started', time());
             try {
-                // load cookies from file for desktop app
-                if (!empty($this->exts->config_array["without_password"])) {
-                    $this->exts->loadCookiesFromFile();
-                }
                 // Start portal script execution
                 $this->initPortal(0);
 
@@ -69,7 +65,7 @@ class PortalScriptCDP
         }
     }
 
-    // Server-Portal-ID: 920850 - Last modified: 01.08.2025 13:39:07 UTC - User: 1
+    // Server-Portal-ID: 920850 - Last modified: 18.08.2025 14:48:30 UTC - User: 1
 
     public $baseUrl = 'https://app.heyflow.com/login/';
     public $loginUrl = 'https://app.heyflow.com/login/';
@@ -155,7 +151,7 @@ class PortalScriptCDP
             $this->exts->log("Exception filling loginform " . $exception->getMessage());
         }
     }
-    
+
 
     public function waitFor($selector, $seconds = 7)
     {
@@ -184,6 +180,11 @@ class PortalScriptCDP
                 $this->exts->log(">>>>>>>>>>>>>>>Login successful!!!!");
                 $isLoggedIn = true;
             }
+
+
+            if ($this->exts->queryXpath(".//button[contains(@class,'inline-flex') and .//div[normalize-space(.)='Ausloggen']]") != null) {
+                $isLoggedIn = true;
+            }
         } catch (Exception $exception) {
 
             $this->exts->log("Exception checking loggedin " . $exception);
@@ -210,7 +211,7 @@ class PortalScriptCDP
         $this->waitFor('table tbody tr a[href*="invoice"]', 10);
         $this->exts->capture("4-invoices-page");
         $invoices = [];
-
+        $restrictPages = isset($this->exts->config_array["restrictPages"]) ? (int)@$this->exts->config_array["restrictPages"] : 3;
         $rows = $this->exts->getElements("table tbody tr");
         foreach ($rows as $row) {
             if ($this->exts->querySelector('a[href*="invoice"]', $row) != null) {
@@ -235,13 +236,16 @@ class PortalScriptCDP
         // Download all invoices
         $this->exts->log('Invoices found: ' . count($invoices));
         foreach ($invoices as $invoice) {
+            if ($restrictPages != 0 && $this->totalInvoices >= 50) {
+                return;
+            }
             $this->exts->log('--------------------------');
             $this->exts->log('invoiceName: ' . $invoice['invoiceName']);
             $this->exts->log('invoiceDate: ' . $invoice['invoiceDate']);
             $this->exts->log('invoiceAmount: ' . $invoice['invoiceAmount']);
             $this->exts->log('invoiceUrl: ' . $invoice['invoiceUrl']);
 
-            $invoiceFileName = !empty($invoice['invoiceName']) ? $invoice['invoiceName'] . '.pdf': '';
+            $invoiceFileName = !empty($invoice['invoiceName']) ? $invoice['invoiceName'] . '.pdf' : '';
             $invoice['invoiceDate'] = $this->exts->parse_date($invoice['invoiceDate'], 'm.d.y', 'Y-m-d');
             $this->exts->log('Date parsed: ' . $invoice['invoiceDate']);
 
@@ -250,6 +254,7 @@ class PortalScriptCDP
             if (trim($downloaded_file) != '' && file_exists($downloaded_file)) {
                 $this->exts->new_invoice($invoice['invoiceName'], $invoice['invoiceDate'], $invoice['invoiceAmount'], $invoiceFileName);
                 sleep(1);
+                $this->totalInvoices++;
             } else {
                 $this->exts->log(__FUNCTION__ . '::No download ' . $invoiceFileName);
             }
@@ -257,5 +262,6 @@ class PortalScriptCDP
     }
 }
 
-$portal = new PortalScriptCDP("optimized-chrome-v2", 'Immowelt Kundenportal', '2673482', 'aW5mb0B0b20taW1tb2JpbGllbi5jb20=', 'UXQlb3FrV2VAKExSYjI=');
+
+$portal = new PortalScriptCDP("optimized-chrome-v2", 'heyflow', '2673417', 'Zi56aW1tZXJAaXRiLW9ubGluZS5kZQ==', 'Yml6amVWLWRpc2tlMS1kaXp6b3c=');
 $portal->run();
