@@ -1,4 +1,5 @@
-<?php // 
+<?php // this user has only type close invoices and script is not downloading the close type invoices I have commented the code to download close type invoices 
+// if there is condition to not downloading the close type invoices let me know I will manage the code to not  download invoices type is close
 /**
  * Chrome Remote via Chrome devtool protocol script, for specific process/portal
  *
@@ -30,7 +31,7 @@ class PortalScriptCDP
         $this->password = base64_decode($password);
 
         $this->exts = new GmiChromeManager();
-        $this->exts->screen_capture_location = '/var/www/vhosts/worker/httpdocs/fs/cdo/process/2/2673482/screens/';
+        $this->exts->screen_capture_location = '/var/www/vhosts/worker/httpdocs/fs/cdo/process/2/2673461/screens/';
         $this->exts->init($mode, $portal_name, $process_uid, $this->username, $this->password);
         $this->setupSuccess = true;
         if (!empty($this->exts->config_array['portal_domain'])) {
@@ -46,10 +47,6 @@ class PortalScriptCDP
         if ($this->setupSuccess) {
             file_put_contents($this->exts->screen_capture_location . '.script_execution_started', time());
             try {
-                // load cookies from file for desktop app
-                if (!empty($this->exts->config_array["without_password"])) {
-                    $this->exts->loadCookiesFromFile();
-                }
                 // Start portal script execution
                 $this->initPortal(0);
 
@@ -68,7 +65,7 @@ class PortalScriptCDP
         }
     }
 
-    // Server-Portal-ID: 137156 - Last modified: 07.08.2025 14:49:28 UTC - User: 1
+    // Server-Portal-ID: 137156 - Last modified: 18.08.2025 13:45:27 UTC - User: 1
 
     public $baseUrl = 'https://www.fedex.com/online/billing/cbs/invoice';
     public $loginUrl = 'https://www.fedex.com/en-us/billing-online.html';
@@ -283,12 +280,12 @@ class PortalScriptCDP
                 $resultCodes = str_split($two_factor_code);
                 $two_factor_selector = 'document.querySelector("fdx-authenticate").shadowRoot.querySelector("div[class*=\'fdx-c-single-digits__item\']")';
                 $this->exts->execute_javascript('
-			var inputs = document.querySelector("fdx-authenticate").shadowRoot.querySelectorAll(".fdx-c-single-digits__item input");
-			var resultCodes = "' . $two_factor_code . '";
-			for (var i = 0; i < inputs.length; i++) {
-				inputs[i].value = resultCodes[i] || ""; // If resultCodes[i] is undefined, set empty string
-			}
-		');
+        var inputs = document.querySelector("fdx-authenticate").shadowRoot.querySelectorAll(".fdx-c-single-digits__item input");
+        var resultCodes = "' . $two_factor_code . '";
+        for (var i = 0; i < inputs.length; i++) {
+            inputs[i].value = resultCodes[i] || ""; // If resultCodes[i] is undefined, set empty string
+        }
+    ');
 
                 $this->exts->log("checkFillTwoFactor: Clicking submit button.");
                 sleep(3);
@@ -364,12 +361,12 @@ class PortalScriptCDP
                 sleep(2);
                 $this->exts->click_by_xdotool('select[id="account_dd"] option[value="' . $accountNumber . '"]');
 
-                // JS Fallback 
+                // JS Fallback
                 $this->exts->execute_javascript('
-            const selectBox = document.querySelector(\'select[id="account_dd"]\');
-            selectBox.value = document.querySelector(\'select[id="account_dd"] option[value="' . $accountNumber . '"]\').value;
-            selectBox.dispatchEvent(new Event("change"));
-        ');
+        const selectBox = document.querySelector(\'select[id="account_dd"]\');
+        selectBox.value = document.querySelector(\'select[id="account_dd"] option[value="' . $accountNumber . '"]\').value;
+        selectBox.dispatchEvent(new Event("change"));
+    ');
 
                 sleep(10);
                 $this->invoicePage();
@@ -394,8 +391,8 @@ class PortalScriptCDP
         sleep(5);
         $this->exts->click_element('.//li//*[contains(text(), "Invoice Status")]');
         sleep(5);
-        $this->exts->click_element('.//li//*[contains(text(), "Closed")]');
-        sleep(5);
+        // $this->exts->click_element('.//li//*[contains(text(), "Closed")]');
+        // sleep(5);
         $this->exts->click_element('.//button[normalize-space(text()) = "APPLY"]');
 
         sleep(15);
@@ -455,12 +452,12 @@ class PortalScriptCDP
         if (trim($downloaded_file) != '' && file_exists($downloaded_file)) {
             $this->exts->new_invoice($invoiceName, '', '', $downloaded_file);
             sleep(1);
+            $this->isNoInvoice = false;
         } else {
             $this->exts->log(__FUNCTION__ . '::No download ' . $invoiceFileName);
         }
-        $this->isNoInvoice = false;
     }
 }
 
-$portal = new PortalScriptCDP("optimized-chrome-v2", 'Immowelt Kundenportal', '2673482', 'aW5mb0B0b20taW1tb2JpbGllbi5jb20=', 'UXQlb3FrV2VAKExSYjI=');
+$portal = new PortalScriptCDP("optimized-chrome-v2", 'stadtmobil.de - carsharing', '2673553', 'aW5mbzIuMEBrdXJhc2FuLWthcmxzcnVoZS5kZQ==', 'UGh5c2lvIEtB');
 $portal->run();

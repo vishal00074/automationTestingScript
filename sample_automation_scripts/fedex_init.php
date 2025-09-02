@@ -1,4 +1,4 @@
-public $baseUrl = 'https://www.fedex.com/en-us/billing-online.html';
+public $baseUrl = 'https://www.fedex.com/online/billing/cbs/invoice';
 public $loginUrl = 'https://www.fedex.com/en-us/billing-online.html';
 public $invoicePageUrl = 'https://www.fedex.com/online/billing/cbs/invoices';
 
@@ -30,13 +30,13 @@ private function initPortal($count)
     $this->exts->capture('1-init-page');
 
     // If user hase not logged in from cookie, clear cookie, open the login url and do login
-    
+
     if (!$this->checkLogin()) {
         $this->exts->log('NOT logged via cookie');
         $this->clearChrome();
 
         for ($i = 0; $i <= 5; $i++) {
-            $this->exts->openUrl($this->loginUrl);
+            $this->exts->openUrl($this->baseUrl);
             $this->waitFor('.js-modal-close');
             if ($this->exts->exists('.js-modal-close')) {
                 $this->exts->moveToElementAndClick('.js-modal-close');
@@ -49,7 +49,7 @@ private function initPortal($count)
             }
 
 
-            
+
             $this->exts->moveToElementAndClick('div#global-login-wrapper');
             $this->waitFor('a[href*="/secure-login"]');
             $this->exts->moveToElementAndClick('a[href*="/secure-login"]');
@@ -82,6 +82,16 @@ private function initPortal($count)
     if ($this->checkLogin()) {
         $this->exts->log(__FUNCTION__ . '::User logged in');
         $this->exts->capture("3-login-success");
+        $this->exts->openUrl($this->invoicePageUrl);
+        sleep(15);
+        if ($this->exts->urlContains('login')) {
+            $this->exts->openUrl($this->invoicePageUrl);
+            sleep(15);
+        }
+        if ($this->exts->exists('button[aria-label*="close"]')) {
+            $this->exts->moveToElementAndClick('button[aria-label*="close"]');
+            sleep(5);
+        }
         $this->checkMultiAccounts();
     } else {
         $this->exts->log(__FUNCTION__ . '::Use login failed');
@@ -201,12 +211,12 @@ private function checkFillTwoFactor()
             $resultCodes = str_split($two_factor_code);
             $two_factor_selector = 'document.querySelector("fdx-authenticate").shadowRoot.querySelector("div[class*=\'fdx-c-single-digits__item\']")';
             $this->exts->execute_javascript('
-            var inputs = document.querySelector("fdx-authenticate").shadowRoot.querySelectorAll(".fdx-c-single-digits__item input");
-            var resultCodes = "' . $two_factor_code . '";
-            for (var i = 0; i < inputs.length; i++) {
-                inputs[i].value = resultCodes[i] || ""; // If resultCodes[i] is undefined, set empty string
-            }
-        ');
+    var inputs = document.querySelector("fdx-authenticate").shadowRoot.querySelectorAll(".fdx-c-single-digits__item input");
+    var resultCodes = "' . $two_factor_code . '";
+    for (var i = 0; i < inputs.length; i++) {
+        inputs[i].value = resultCodes[i] || ""; // If resultCodes[i] is undefined, set empty string
+    }
+');
 
             $this->exts->log("checkFillTwoFactor: Clicking submit button.");
             sleep(3);
@@ -268,5 +278,6 @@ private function checkMultiAccounts()
     if (!empty($this->exts->config_array['allow_login_success_request'])) {
         $this->exts->triggerLoginSuccess();
     }
+
     $this->exts->success();
 }
