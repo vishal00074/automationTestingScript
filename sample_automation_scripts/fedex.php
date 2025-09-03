@@ -1,5 +1,5 @@
-<?php // this user has only type close invoices and script is not downloading the close type invoices I have commented the code to download close type invoices 
-// if there is condition to not downloading the close type invoices let me know I will manage the code to not  download invoices type is close
+<?php // added code to select all close status  checkbox in invoice list filter   added loadCookiesFromFile
+// added accecpt cookies code
 /**
  * Chrome Remote via Chrome devtool protocol script, for specific process/portal
  *
@@ -97,6 +97,17 @@ class PortalScriptCDP
         $this->exts->openUrl($this->baseUrl);
         sleep(5);
         $this->exts->capture('1-init-page');
+        $this->exts->loadCookiesFromFile();
+
+        $this->exts->openUrl($this->baseUrl);
+        sleep(7);
+
+        $this->exts->execute_javascript('
+                var shadow = document.querySelector("#usercentrics-cmp-ui");
+                if(shadow){
+                    shadow.shadowRoot.querySelector(\'button#accept\').click();
+                }
+            ');
 
         // If user hase not logged in from cookie, clear cookie, open the login url and do login
 
@@ -106,6 +117,7 @@ class PortalScriptCDP
 
             for ($i = 0; $i <= 5; $i++) {
                 $this->exts->openUrl($this->baseUrl);
+                sleep(7);
                 $this->waitFor('.js-modal-close');
                 if ($this->exts->exists('.js-modal-close')) {
                     $this->exts->moveToElementAndClick('.js-modal-close');
@@ -116,6 +128,13 @@ class PortalScriptCDP
                     $this->exts->moveToElementAndClick('button.fxg-gdpr__accept-all-btn');
                     sleep(5);
                 }
+
+                $this->exts->execute_javascript('
+                    var shadow = document.querySelector("#usercentrics-cmp-ui");
+                    if(shadow){
+                        shadow.shadowRoot.querySelector(\'button#accept\').click();
+                    }
+                ');
 
 
 
@@ -391,8 +410,26 @@ class PortalScriptCDP
         sleep(5);
         $this->exts->click_element('.//li//*[contains(text(), "Invoice Status")]');
         sleep(5);
-        // $this->exts->click_element('.//li//*[contains(text(), "Closed")]');
-        // sleep(5);
+
+        if ($this->exts->querySelector('input[value="Closed"]:not(:checked)') != null) {
+            $this->exts->click_element('.//li//*[contains(text(), "Closed")]');
+            sleep(2);
+        }
+        if ($this->exts->querySelector('input[value="Closed - Approved"]:not(:checked)') != null) {
+            $this->exts->click_element(".//input[@type='checkbox' and @value='Closed - Approved']");
+            sleep(2);
+        }
+
+        if ($this->exts->querySelector('input[value="Closed in Dispute"]:not(:checked)') != null) {
+            $this->exts->click_element(".//input[@type='checkbox' and @value='Closed in Dispute']");
+            sleep(2);
+        }
+
+        if ($this->exts->querySelector('input[value="Closed in Dispute - Approved"]:not(:checked)') != null) {
+            $this->exts->click_element(".//input[@type='checkbox' and @value='Closed in Dispute - Approved']");
+            sleep(2);
+        }
+        sleep(2);
         $this->exts->click_element('.//button[normalize-space(text()) = "APPLY"]');
 
         sleep(15);

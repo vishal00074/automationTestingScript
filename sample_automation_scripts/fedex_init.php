@@ -28,6 +28,17 @@ private function initPortal($count)
     $this->exts->openUrl($this->baseUrl);
     sleep(5);
     $this->exts->capture('1-init-page');
+    $this->exts->loadCookiesFromFile();
+
+    $this->exts->openUrl($this->baseUrl);
+    sleep(7);
+
+    $this->exts->execute_javascript('
+            var shadow = document.querySelector("#usercentrics-cmp-ui");
+            if(shadow){
+                shadow.shadowRoot.querySelector(\'button#accept\').click();
+            }
+        ');
 
     // If user hase not logged in from cookie, clear cookie, open the login url and do login
 
@@ -37,6 +48,7 @@ private function initPortal($count)
 
         for ($i = 0; $i <= 5; $i++) {
             $this->exts->openUrl($this->baseUrl);
+            sleep(7);
             $this->waitFor('.js-modal-close');
             if ($this->exts->exists('.js-modal-close')) {
                 $this->exts->moveToElementAndClick('.js-modal-close');
@@ -47,6 +59,13 @@ private function initPortal($count)
                 $this->exts->moveToElementAndClick('button.fxg-gdpr__accept-all-btn');
                 sleep(5);
             }
+
+            $this->exts->execute_javascript('
+                var shadow = document.querySelector("#usercentrics-cmp-ui");
+                if(shadow){
+                    shadow.shadowRoot.querySelector(\'button#accept\').click();
+                }
+            ');
 
 
 
