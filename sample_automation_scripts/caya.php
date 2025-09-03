@@ -1,4 +1,5 @@
-<?php // updated login code
+<?php // 
+
 /**
  * Chrome Remote via Chrome devtool protocol script, for specific process/portal
  *
@@ -56,9 +57,7 @@ class PortalScriptCDP
         }
     }
 
-    // Server-Portal-ID: 29237 - Last modified: 06.05.2025 13:56:00 UTC - User: 1
-
-    // start script
+    // Server-Portal-ID: 29237 - Last modified: 02.09.2025 14:36:24 UTC - User: 1
 
     public $baseUrl = "https://app.caya.com/app/folder/inbox";
     public $username_selector = 'input[name="username"]';
@@ -76,6 +75,8 @@ class PortalScriptCDP
     public $inbox_fetch = 0;
     public $archive_fetch = 0;
     public $no_invoice = true;
+    public $check_login_failed_selector = 'div[data-testid="login-form-error-message"]';
+    public $check_login_success_selector = "div[data-testid='logout'], button[data-testid='user-account-menu']";
 
 
     /**
@@ -137,7 +138,13 @@ class PortalScriptCDP
                 $this->exts->switchToTab($handles[0]);
             } else {
                 $this->fillForm(0);
-                sleep(10);
+                sleep(20);
+                $this->exts->waitTillPresent("button[data-testid='user-account-menu']", 15);
+                if ($this->exts->exists("button[data-testid='user-account-menu']")) {
+                    sleep(8);
+                    $this->exts->click_element("button[data-testid='user-account-menu']");
+                }
+                sleep(20);
                 if ($this->exts->exists('.ant-modal-wrap button.ant-btn') && $this->exts->exists('.ant-modal-wrap button.ant-btn')) {
                     $this->exts->moveToElementAndClick('.ant-modal-wrap button.ant-btn');
                     sleep(2);
@@ -145,14 +152,13 @@ class PortalScriptCDP
             }
         }
 
-
         if ($this->checkLogin()) {
 
             if ($this->exts->exists('.ant-modal-wrap button.ant-btn') && $this->exts->exists('.ant-modal-wrap button.ant-btn')) {
                 $this->exts->moveToElementAndClick('.ant-modal-wrap button.ant-btn');
                 sleep(2);
             }
-
+            sleep(20);
             $this->exts->capture("LoginSuccess");
 
             // If portal script supports restart docker and resume portal execution
@@ -163,8 +169,7 @@ class PortalScriptCDP
             $this->exts->success();
         } else {
             $this->exts->log(__FUNCTION__ . '::Use login failed');
-            $logged_in_failed_selector = $this->exts->getElementByText('div', ['password', 'Passwort'], null, false);
-            if ($logged_in_failed_selector != null) {
+            if ($this->exts->exists($this->check_login_failed_selector)) {
                 $this->exts->loginFailure(1);
             } else {
                 $this->exts->loginFailure();
@@ -172,7 +177,7 @@ class PortalScriptCDP
         }
     }
 
-    function relocated_row($searching_text, $selector, $scroll_parent_selector)
+    private function relocated_row($searching_text, $selector, $scroll_parent_selector)
     {
         $searching_element = null;
         $rows_after_refreshing = $this->exts->getElements($selector);
@@ -188,9 +193,9 @@ class PortalScriptCDP
                 $this->exts->log('Scroll down to find row.');
                 $scroll_bar = $this->exts->getElement($scroll_parent_selector);
                 $this->exts->executeSafeScript('
-                var scrollBar = arguments[0];
-                scrollBar.scrollTop = scrollBar.scrollTop + 3*46;
-            ', [$scroll_bar]);
+            var scrollBar = arguments[0];
+            scrollBar.scrollTop = scrollBar.scrollTop + 3*46;
+        ', [$scroll_bar]);
                 sleep(1);
                 $rows_after_refreshing = $this->exts->getElements($selector);
                 foreach ($rows_after_refreshing as $row_looping) {
@@ -208,25 +213,6 @@ class PortalScriptCDP
         }
         return $searching_element;
     }
-
-    // function moveToElement($selector_or_object, $parent = null, $offset_x=null, $offset_y=null) {
-    //     if($selector_or_object == null){
-    //         $this->exts->log(__FUNCTION__.' Can not click null');
-    //         return;
-    //     }
-    //     if(is_string($selector_or_object)){
-    //         $selector_or_object = $this->exts->getElement($selector_or_object, $parent);
-    //     }
-
-    //     if($selector_or_object != null) {
-    //         try {
-    //             $this->exts->webdriver->getMouse()->mouseMove($selector_or_object->getCoordinates(), $offset_x, $offset_y);
-    //         } catch(\Exception $ex) {
-    //             $this->exts->log(__FUNCTION__ . "::Exception " . $ex);
-    //         }
-    //         sleep(1);
-    //     }
-    // }
 
     private function fillForm($count)
     {
@@ -263,6 +249,7 @@ class PortalScriptCDP
     public $google_password_selector = 'input[name="password"], input[name="Passwd"]';
     public $google_submit_password_selector = '#passwordNext, #passwordNext button';
     public $google_solved_rejected_browser = false;
+
     private function loginGoogleIfRequired()
     {
         if ($this->exts->urlContains('google.')) {
@@ -342,6 +329,7 @@ class PortalScriptCDP
             $this->exts->capture("3-no-google-required");
         }
     }
+
     private function checkFillGoogleLogin()
     {
         if ($this->exts->exists('[data-view-id*="signInChooserView"] li [data-identifier]')) {
@@ -418,6 +406,7 @@ class PortalScriptCDP
             $this->exts->capture("2-google-password-page-not-found");
         }
     }
+
     private function check_solve_rejected_browser()
     {
         $this->exts->log(__FUNCTION__);
@@ -547,6 +536,7 @@ class PortalScriptCDP
             $this->checkFillLogin_undetected_mode($root_user_agent);
         }
     }
+
     private function overwrite_user_agent($user_agent_string = 'DN')
     {
         $userAgentScript = "
@@ -673,6 +663,7 @@ class PortalScriptCDP
             $this->exts->capture("2-google-password-page-not-found");
         }
     }
+
     private function checkGoogleTwoFactorMethod()
     {
         // Currently we met many two factor methods
@@ -917,6 +908,7 @@ class PortalScriptCDP
             $this->fillGoogleTwoFactor($input_selector, $message_selector, $submit_selector);
         }
     }
+
     private function fillGoogleTwoFactor($input_selector, $message_selector, $submit_selector, $submit_by_enter = false)
     {
         $this->exts->log(__FUNCTION__);
@@ -983,6 +975,7 @@ class PortalScriptCDP
             $this->exts->log("Not received two factor code");
         }
     }
+
     // -------------------- GOOGLE login END
 
     private function checkLogin()
@@ -990,8 +983,8 @@ class PortalScriptCDP
         $this->exts->log("Begin checkLogin ");
         $isLoggedIn = false;
         try {
-            $this->exts->waitTillPresent('button[data-testid="user-account-menu"]');
-            if ($this->exts->getElement('button[data-testid="user-account-menu"]') != null) {
+            $this->waitForSelectors($this->check_login_success_selector, 20, 2);
+            if ($this->exts->querySelector($this->check_login_success_selector) != null) {
                 $this->exts->log(">>>>>>>>>>>>>>>Login successful!!!!");
                 $isLoggedIn = true;
             }
@@ -1000,6 +993,18 @@ class PortalScriptCDP
         }
 
         return $isLoggedIn;
+    }
+
+    private function waitForSelectors($selector, $max_attempt, $sec)
+    {
+        for (
+            $wait = 0;
+            $wait < $max_attempt && $this->exts->executeSafeScript("return !!document.querySelector(\"" . $selector . "\");") != 1;
+            $wait++
+        ) {
+            $this->exts->log('Waiting for Selectors!!!!!!');
+            sleep($sec);
+        }
     }
 
     public function switchToFrame($query_string)
@@ -1022,34 +1027,35 @@ class PortalScriptCDP
 
         return false;
     }
-    function processAfterLogin($count)
+
+    private function processAfterLogin($count)
     {
         $this->exts->log("Begin processAfterLogin " . $count);
 
         if ($this->exts->exists('.ant-modal-wrap button.ant-btn')) {
             $this->exts->moveToElementAndClick('.ant-modal-wrap button.ant-btn');
-            sleep(2);
+            sleep(8);
         }
         if ($this->exts->exists('div#cookiescript_accept')) {
             $this->exts->moveToElementAndClick('div#cookiescript_accept');
-            sleep(2);
+            sleep(8);
         }
 
         if ($this->portal_invoice == 1 || ($this->inbox_fetch == 0 && $this->portal_invoice == 0)) {
             $this->exts->openUrl("https://app.caya.com/app/settings/subscription");
-            sleep(20);
+            sleep(29);
             $this->processBilling();
         }
 
         if ($this->inbox_fetch == 1) {
             $this->exts->openUrl("https://app.caya.com/app/folder/inbox");
-            sleep(5);
+            sleep(15);
             $this->download_inbox_document();
         }
 
         if ($this->archive_fetch == 1) {
             $this->exts->openUrl("https://app.caya.com/app/archive");
-            sleep(20);
+            sleep(29);
             // Archive folder maybe contains tree of sub-folder, we dont loop through all sub-folder, we switch to search by tags and download from flat page instead.
             if ($this->exts->exists('#caya-archivescreen-table [class*="FolderRow__Container"]')) {
                 $this->download_archive_by_searching_tags();
@@ -1070,7 +1076,8 @@ class PortalScriptCDP
             $this->exts->no_invoice();
         }
     }
-    function getElementsInnerTextByJS($selector, $parent = null, $type = "css")
+
+    private function getElementsInnerTextByJS($selector, $parent = null, $type = "css")
     {
         $elements = $this->exts->getElements($selector, $parent, $type);
         array_walk($elements, function (&$element) {
@@ -1078,7 +1085,8 @@ class PortalScriptCDP
         });
         return $elements;
     }
-    function download_inbox_document()
+
+    private function download_inbox_document()
     {
         sleep(20);
         $this->exts->capture('inbox-page');
@@ -1090,12 +1098,13 @@ class PortalScriptCDP
         }
         return blocked_guis.length > 0;			
     ');
+
         sleep(5);
         if ($this->exts->exists('div.ant-modal-wrap[role="dialog"] .ant-modal-footer button[class*="Primary"]')) {
             $this->exts->moveToElementAndClick('div.ant-modal-wrap[role="dialog"] .ant-modal-footer button[class*="Primary"]');
             sleep(2);
         }
-        if ($this->exts->exists('div[class*="InfoPopup__Content"] div[class*="InfoPopup__CloseButton"')) {
+        if ($this->exts->exists('div[class*="InfoPopup__Content"] div[class*="InfoPopup__CloseButton"]')) {
             $this->exts->moveToElementAndClick('div[class*="InfoPopup__Content"] div[class*="InfoPopup__CloseButton"]');
             sleep(2);
         }
@@ -1144,12 +1153,12 @@ class PortalScriptCDP
                 if ($tag_found) {
                     // remove any unexpected popup
                     $removed_gui_blocked = $this->exts->executeSafeScript('
-                    var blocked_guis = document.querySelectorAll(\'#refiner-widget-wrapper[style*="display: block"], div[style*=" z-index: 999999"]\');
-                    for (var index = 0; index < blocked_guis.length; index++) {
-                        blocked_guis[index].remove();
-                    }
-                    return blocked_guis.length > 0;		
-                ');
+                var blocked_guis = document.querySelectorAll(\'#refiner-widget-wrapper[style*="display: block"], div[style*=" z-index: 999999"]\');
+                for (var index = 0; index < blocked_guis.length; index++) {
+                    blocked_guis[index].remove();
+                }
+                return blocked_guis.length > 0;		
+            ');
                     $this->exts->log('removed_gui_blocked:' . $removed_gui_blocked);
                     $this->exts->click_element('body', null, 1, 1);
                     sleep(1);
@@ -1296,9 +1305,9 @@ class PortalScriptCDP
                         sleep(1);
                         // If It don't have next row, try to scroll down with a height of 2 row, then it will load more row.
                         $this->exts->executeSafeScript('
-                        var scrollBar = document.querySelector("#caya-folderScreen-table");
-                        scrollBar.scrollTop = scrollBar.scrollTop + 2*46;
-                    ');
+                    var scrollBar = document.querySelector("#caya-folderScreen-table");
+                    scrollBar.scrollTop = scrollBar.scrollTop + 2*46;
+                ');
                         sleep(3);
                         $current_row = $this->relocated_row($current_text, '#caya-folderScreen-table [data-test-id="virtuoso-item-list"] > div', "#caya-folderScreen-table");
                         $next_row = $this->exts->getElement('./following-sibling::div', $current_row, 'xpath');
@@ -1307,18 +1316,20 @@ class PortalScriptCDP
             }
         }
     }
-    function download_archive_document()
+
+    private function download_archive_document()
     {
         sleep(15);
         $this->exts->capture('archive-page');
         $this->exts->log('postal_tags:' . $this->portal_tags);
         $this->exts->executeSafeScript('
-        var blocked_guis = document.querySelectorAll(\'#refiner-widget-wrapper[style*="display: block"], div[style*=" z-index: 999999"], div[class*="SupportCard"] \');
+    var blocked_guis = document.querySelectorAll(\'#refiner-widget-wrapper[style*="display: block"], div[style*=" z-index: 999999"], div[class*="SupportCard"] \');
         for (var index = 0; index < blocked_guis.length; index++) {
             blocked_guis[index].remove();
         }
         return blocked_guis.length > 0;
     ');
+
         sleep(5);
         if ($this->exts->exists('div.ant-modal-wrap[role="dialog"] .ant-modal-footer button[class*="Primary"]')) {
             $this->exts->moveToElementAndClick('div.ant-modal-wrap[role="dialog"] .ant-modal-footer button[class*="Primary"]');
@@ -1368,12 +1379,12 @@ class PortalScriptCDP
                 if ($tag_found) {
                     // remove any unexpected popup
                     $removed_gui_blocked = $this->exts->executeSafeScript('
-                    var blocked_guis = document.querySelectorAll(\'#refiner-widget-wrapper[style*="display: block"], div[style*=" z-index: 999999"]\');
-                    for (var index = 0; index < blocked_guis.length; index++) {
-                        blocked_guis[index].remove();
-                    }
-                    return blocked_guis.length > 0;		
-                ');
+                var blocked_guis = document.querySelectorAll(\'#refiner-widget-wrapper[style*="display: block"], div[style*=" z-index: 999999"]\');
+                for (var index = 0; index < blocked_guis.length; index++) {
+                    blocked_guis[index].remove();
+                }
+                return blocked_guis.length > 0;		
+            ');
                     $this->exts->log('removed_gui_blocked:' . $removed_gui_blocked);
                     $this->exts->click_element('body', null, 1, 1);
                     sleep(1);
@@ -1433,9 +1444,9 @@ class PortalScriptCDP
                         $current_text = $current_row->getText();
                         // If It doesn't have next row, try to scroll down with a height of 2 row, then it will load more row.
                         $this->exts->executeSafeScript('
-                        var scrollBar = document.querySelector("#caya-archivescreen-table");
-                        scrollBar.scrollTop = scrollBar.scrollTop + 2*45;
-                    ');
+                    var scrollBar = document.querySelector("#caya-archivescreen-table");
+                    scrollBar.scrollTop = scrollBar.scrollTop + 2*45;
+                ');
                         sleep(13);
                         $current_row = $this->relocated_row($current_text, '#caya-archivescreen-table [data-test-id="virtuoso-item-list"] > div', "#caya-archivescreen-table");
                         $next_row = $this->exts->getElement('./following-sibling::div', $current_row, 'xpath');
@@ -1447,7 +1458,8 @@ class PortalScriptCDP
             }
         }
     }
-    function download_archive_by_searching_tags()
+
+    private function download_archive_by_searching_tags()
     {
         sleep(15);
         $this->exts->capture('archive-page');
@@ -1518,12 +1530,12 @@ class PortalScriptCDP
                 if ($tag_found) {
                     // remove any unexpected popup
                     $removed_gui_blocked = $this->exts->executeSafeScript('
-                    var blocked_guis = document.querySelectorAll(\'#refiner-widget-wrapper[style*="display: block"], div[style*=" z-index: 999999"], div[class*="SupportCard"]\');
-                    for (var index = 0; index < blocked_guis.length; index++) {
-                        blocked_guis[index].remove();
-                    }
-                    return blocked_guis.length > 0;		
-                ');
+                var blocked_guis = document.querySelectorAll(\'#refiner-widget-wrapper[style*="display: block"], div[style*=" z-index: 999999"], div[class*="SupportCard"]\');
+                for (var index = 0; index < blocked_guis.length; index++) {
+                    blocked_guis[index].remove();
+                }
+                return blocked_guis.length > 0;		
+            ');
                     $this->exts->log('removed_gui_blocked:' . $removed_gui_blocked);
                     $this->exts->click_element('body', null, 1, 1);
                     sleep(1);
@@ -1614,9 +1626,9 @@ class PortalScriptCDP
                         $current_text = $current_row->getText();
                         // If It doesn't have next row, try to scroll down with a height of 2 row, then it will load more row.
                         $this->exts->executeSafeScript('
-                        var scrollBar = document.querySelector("#caya-searchScreen-table");
-                        scrollBar.scrollTop = scrollBar.scrollTop + 2*45;
-                    ');
+                    var scrollBar = document.querySelector("#caya-searchScreen-table");
+                    scrollBar.scrollTop = scrollBar.scrollTop + 2*45;
+                ');
                         sleep(3);
                         $current_row = $this->relocated_row($current_text, '#caya-searchScreen-table [data-test-id="virtuoso-item-list"] > div', "#caya-searchScreen-table");
                         $next_row = $this->exts->getElement('./following-sibling::div', $current_row, 'xpath');
@@ -1628,26 +1640,29 @@ class PortalScriptCDP
             }
         }
     }
-    function processBilling()
+
+    private function processBilling()
     {
         $this->exts->capture('subscription-billing');
         try {
-            $this->exts->moveToElementAndClick('[data-testid="settings-subscription-plan-button-manage"]'); // Click Manager Subcription
-            sleep(20);
+            $this->exts->waitTillPresent('[data-testid="settings-subscription-plan-button-manage"]', 10);
+            $subscription_button = $this->exts->querySelector('[data-testid="settings-subscription-plan-button-manage"]');
+            $this->exts->execute_javascript("arguments[0].click();", [$subscription_button]);
+            sleep(10);
 
-            if ($this->exts->exists("iframe#cb-frame")) {
-                $this->switchToFrame("iframe#cb-frame");
+            if ($this->exts->exists('iframe#cb-frame[style*="visibility: visible;"]')) {
+                $this->switchToFrame('iframe#cb-frame[style*="visibility: visible;"]');
                 sleep(10);
 
                 if (!$this->exts->exists('div[data-cb-id="portal_billing_history"]')) {
-                    sleep(45);
+                    sleep(10);
                 }
                 if ($this->exts->exists('div[data-cb-id="portal_billing_history"]')) {
                     $this->exts->moveToElementAndClick('div[data-cb-id="portal_billing_history"]');
-                    sleep(15);
+                    sleep(10);
 
                     if (!$this->exts->exists('div.cb-history__list div.cb-invoice')) {
-                        sleep(45);
+                        sleep(10);
                     }
 
                     if ($this->exts->exists('div.cb-history__list div.cb-invoice')) {
@@ -1685,9 +1700,9 @@ class PortalScriptCDP
                                     $this->exts->new_invoice($invoice_name, $parsed_date, $invoice_amount, $filename);
                                 } else {
                                     $this->exts->executeSafeScript("
-                                    var rows = document.querySelectorAll('div.cb-history__list div.cb-invoice');
-                                    rows[arguments[0]].querySelector('.cb-invoice__link').click();
-                                ", array($key));
+                                var rows = document.querySelectorAll('div.cb-history__list div.cb-invoice');
+                                rows[arguments[0]].querySelector('.cb-invoice__link').click();
+                            ", array($key));
 
                                     // Wait for completion of file download
                                     $this->exts->wait_and_check_download("pdf");
@@ -1715,5 +1730,5 @@ exec("docker rm -f selenium-node-111");
 exec("docker run -d --shm-size 2g -p 5902:5900 -p 9990:9999 -e TZ=Europe/Berlin -e SE_NODE_SESSION_TIMEOUT=86400 -e LANG=de -e GRID_TIMEOUT=0 -e GRID_BROWSER_TIMEOUT=0 -e SCREEN_WIDTH=1920 -e SCREEN_HEIGHT=1080 --name selenium-node-111 -v /var/www/remote-chrome/downloads:/home/seluser/Downloads/111 remote-chrome:v1");
 
 $browserSelected = 'chrome';
-$portal = new PortalScriptCDP($browserSelected, 'test_remote_chrome', '111', 'office@sayaq-adventures-muenchen.com', 'Sayaq#2022');
+$portal = new PortalScriptCDP("optimized-chrome-v2", 'SumUp', '2673317', 'c2luamFAcGlwcGFtaW50LmRl', 'cGlwcGFNaW50');
 $portal->run();
