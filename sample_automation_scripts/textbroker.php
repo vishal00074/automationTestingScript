@@ -1,4 +1,4 @@
-<?php // uncommented loadCookiesFromFile and clearCookies handle empty invoices case 
+<?php // uncommented loadCookiesFromFile and clearCookies handle empty invoices case  updated invoiceName selector
 
 /**
  * Chrome Remote via Chrome devtool protocol script, for specific process/portal
@@ -313,9 +313,9 @@ class PortalScriptCDP
             $rows = count($invoice_frame->querySelectorAll('table#dataTable_invoices-table > tbody > tr'));
             for ($i = 0; $i < $rows; $i++) {
                 $row = $invoice_frame->getElements('table#dataTable_invoices-table > tbody > tr')[$i];
-                $invoiceName = trim($invoice_frame->extract('td:nth-child(1)', $row));
+                $invoiceName = trim($invoice_frame->extract('td:nth-child(2)', $row));
                 $invoiceFileName = !empty($invoiceName) ? $invoiceName . '.pdf': '';
-                $invoiceDate = trim(explode(', ', $invoice_frame->extract('td:nth-child(2)', $row))[0]);
+                $invoiceDate = trim(explode(', ', $invoice_frame->extract('td:nth-child(3)', $row))[0]);
                 $invoiceAmount = trim(preg_replace('/[^\d\.\,]/', '', $invoice_frame->extract('td:nth-child(4)', $row))) . ' EUR';
                 $parsed_date = $this->exts->parse_date($invoiceDate, 'd.m.Y', 'Y-m-d');
 
@@ -403,10 +403,8 @@ class PortalScriptCDP
                         $this->exts->log('Click download button by javascript');
                         $this->exts->execute_javascript("arguments[0].click()", [$row]);
                     }
-                    sleep(2);
+                    sleep(4);
                     $this->exts->moveToElementAndClick('form[action*="/downloadInvoicePDF"] button[type="submit"]');
-                    sleep(5);
-                    $this->exts->moveToElementAndClick('button#open-button');
                     sleep(5);
                     $this->exts->wait_and_check_download('pdf');
                     $downloaded_file = $this->exts->find_saved_file('pdf', $invoiceFileName);
@@ -446,5 +444,6 @@ class PortalScriptCDP
     }
 }
 
-$portal = new PortalScriptCDP("optimized-chrome-v2", 'LR', '2673461', 'aW5mb0Bway1rb2VuaWcuZGU=', 'S2F0cmluMTgxMDM2');
+
+$portal = new PortalScriptCDP("optimized-chrome-v2", 'TextBroker', '2673351', 'bWF0aGlhcy5rb3N1YkBrZW5zaW5ndG9uLWludGVybmF0aW9uYWwuY29t', 'S29zdTYsLi0=');
 $portal->run();
