@@ -1,41 +1,35 @@
-<?php // 
+<?php // replaced waitTillPresent to custom js waitFor function to handle client read time out issue 
+// updated go to invoice page selector replace general selector with xapth change click_by_xdotool to movetoelementandtye for download button 
 /**
  * Chrome Remote via Chrome devtool protocol script, for specific process/portal
  *
- * @package	uwa
+ * @package uwa
  *
- * @copyright	GetMyInvoices
+ * @copyright   GetMyInvoices
  */
 
-define('KERNEL_ROOT', '/var/www/vhosts/worker/httpdocs/src/');
+define('KERNEL_ROOT', '/var/www/remote-chrome/utils/');
 
-$gmi_selenium_core = realpath(KERNEL_ROOT . 'modules/cust_gmi_worker/includes/GmiChromeManager.php');
-require_once($gmi_selenium_core);
-
+$gmi_browser_core = realpath('/var/www/remote-chrome/utils/GmiChromeManager.php');
+require_once($gmi_browser_core);
 class PortalScriptCDP
 {
 
-    private    $exts;
-    public    $setupSuccess = false;
+    private $exts;
+    public $setupSuccess = false;
     private $chrome_manage;
-    private    $username;
-    private    $password;
-    public $support_restart = true;
-    public $portal_domain = '';
+    private $username;
+    private $password;
 
     public function __construct($mode, $portal_name, $process_uid, $username, $password)
     {
-
-        $this->username = base64_decode($username);
-        $this->password = base64_decode($password);
+        $this->username = $username;
+        $this->password = $password;
 
         $this->exts = new GmiChromeManager();
-        $this->exts->screen_capture_location = '/var/www/vhosts/worker/httpdocs/fs/cdo/process/2/2673482/screens/';
-        $this->exts->init($mode, $portal_name, $process_uid, $this->username, $this->password);
+        $this->exts->screen_capture_location = '/var/www/remote-chrome/screens/';
+        $this->exts->init($mode, $portal_name, $process_uid, $username, $password);
         $this->setupSuccess = true;
-        if (!empty($this->exts->config_array['portal_domain'])) {
-            $this->portal_domain = $this->exts->config_array['portal_domain'];
-        }
     }
 
     /**
@@ -44,31 +38,26 @@ class PortalScriptCDP
     public function run()
     {
         if ($this->setupSuccess) {
-            file_put_contents($this->exts->screen_capture_location . '.script_execution_started', time());
             try {
-                // load cookies from file for desktop app
-                if (!empty($this->exts->config_array["without_password"])) {
-                    $this->exts->loadCookiesFromFile();
-                }
                 // Start portal script execution
                 $this->initPortal(0);
-
-                $this->exts->dump_session_files();
             } catch (\Exception $exception) {
-                $this->exts->log('Selenium Exception: ' . $exception->getMessage());
+                $this->exts->log('Exception: ' . $exception->getMessage());
                 $this->exts->capture("error");
                 var_dump($exception);
             }
 
+
             $this->exts->log('Execution completed');
 
             $this->exts->process_completed();
+            $this->exts->dump_session_files();
         } else {
             echo 'Script execution failed.. ' . "\n";
         }
     }
 
-    // Server-Portal-ID: 62962 - Last modified: 07.08.2025 14:01:20 UTC - User: 1
+    // Server-Portal-ID: 62962 - Last modified: 01.09.2025 14:09:51 UTC - User: 1
 
     public $baseUrl = 'https://beraterwelt.fondsfinanz.de/#Dashboard';
     public $loginUrl = 'https://beraterwelt.fondsfinanz.de/#Dashboard';
@@ -78,7 +67,8 @@ class PortalScriptCDP
     public $check_login_failed_selector = 'div.field-error-message';
     public $check_login_success_selector = 'div.customers-initials';
     public $isNoInvoice = true;
-
+    public $restrictPages = 3;
+    public $totalInvoices = 0;
     /**
 
      * Entry Method thats called for a portal
@@ -88,9 +78,12 @@ class PortalScriptCDP
      */
     private function initPortal($count)
     {
+        $this->restrictPages = isset($this->exts->config_array["restrictPages"]) ? (int) @$this->exts->config_array["restrictPages"] : 3;
         $this->exts->log('Begin initPortal ' . $count);
         $this->exts->loadCookiesFromFile();
+        sleep(3);
         $this->exts->openUrl($this->loginUrl);
+        sleep(5);
         if (!$this->checkLogin()) {
             $this->exts->log('NOT logged via cookie');
             $this->exts->clearCookies();
@@ -118,8 +111,8 @@ class PortalScriptCDP
                 $this->exts->click_element('button#cookie-consent-submit-all-button');
             }
             // Open invoices page
-            if ($this->exts->exists('#mat-expansion-panel-header-1')) {
-                $this->exts->click_element('#mat-expansion-panel-header-1');
+            if ($this->exts->queryXpath(".//mat-expansion-panel-header[.//div[normalize-space(text())='Verwaltung']]") != null) {
+                $this->exts->click_element(".//mat-expansion-panel-header[.//div[normalize-space(text())='Verwaltung']]");
                 sleep(10);
                 $this->exts->click_element("//a[.//span[contains(@class, 'list-item-label') and contains(text(), 'Abrechnung')]]");
             }
@@ -163,9 +156,18 @@ class PortalScriptCDP
                 sleep(2);
 
                 $this->exts->capture("1-login-page-filled");
-                sleep(5);
+
+                $this->waitFor($this->submit_login_selector, 10);
                 if ($this->exts->exists($this->submit_login_selector)) {
-                    $this->exts->click_by_xdotool($this->submit_login_selector);
+                    // $this->exts->click_element($this->submit_login_selector);
+                    $this->exts->execute_javascript("arguments[0].click();", [$this->exts->querySelector($this->submit_login_selector)]);
+                    sleep(5);
+                }
+
+                $this->waitFor($this->check_login_failed_selector, 20);
+                if (stripos(strtolower($this->exts->extract($this->check_login_failed_selector)), 'passwor') !== false) {
+                    $this->exts->log("Wrong credential !!!!");
+                    $this->exts->loginFailure(1);
                 }
             }
         } catch (\Exception $exception) {
@@ -207,6 +209,34 @@ class PortalScriptCDP
         return $isLoggedIn;
     }
 
+    private function extract_zip_save_pdf($zipfile)
+    {
+        $zip = new \ZipArchive;
+        $res = $zip->open($zipfile);
+        if ($res === TRUE) {
+            for ($i = 0; $i < $zip->numFiles; $i++) {
+                if ($this->restrictPages != 0 && $this->totalInvoices >= 100) {
+                    return;
+                };
+                $zipPdfFile = $zip->statIndex($i);
+                $fileName = basename($zipPdfFile['name']);
+                $fileInfo = pathinfo($fileName);
+                if ($fileInfo['extension'] === 'pdf') {
+                    $this->isNoInvoice = false;
+                    $zip->extractTo($this->exts->config_array['download_folder'], array(basename($zipPdfFile['name'])));
+                    $saved_file = $this->exts->config_array['download_folder'] . basename($zipPdfFile['name']);
+                    $this->exts->new_invoice($fileInfo['filename'], "", "", $saved_file);
+                    sleep(1);
+                    $this->totalInvoices++;
+                }
+            }
+            $zip->close();
+            unlink($zipfile);
+        } else {
+            $this->exts->log(__FUNCTION__ . '::File extraction failed');
+        }
+    }
+
     private function processInvoices($paging_count = 1)
     {
         sleep(30);
@@ -217,7 +247,7 @@ class PortalScriptCDP
         $this->exts->execute_javascript("arguments[0].click();", [$this->exts->querySelector($selectAll)]);
         $downloadBtn = 'app-table-checked-row button';
         sleep(5);
-        $this->exts->click_by_xdotool($downloadBtn);
+        $this->exts->moveToElementAndClick($downloadBtn);
         sleep(5);
         $this->exts->wait_and_check_download('zip');
 
@@ -256,31 +286,11 @@ class PortalScriptCDP
             $this->processInvoices($paging_count);
         }
     }
-
-    private function extract_zip_save_pdf($zipfile)
-    {
-        $zip = new \ZipArchive;
-        $res = $zip->open($zipfile);
-        if ($res === TRUE) {
-            for ($i = 0; $i < $zip->numFiles; $i++) {
-                $zipPdfFile = $zip->statIndex($i);
-                $fileName = basename($zipPdfFile['name']);
-                $fileInfo = pathinfo($fileName);
-                if ($fileInfo['extension'] === 'pdf') {
-                    $this->isNoInvoice = false;
-                    $zip->extractTo($this->exts->config_array['download_folder'], array(basename($zipPdfFile['name'])));
-                    $saved_file = $this->exts->config_array['download_folder'] . basename($zipPdfFile['name']);
-                    $this->exts->new_invoice($fileInfo['filename'], "", "", $saved_file);
-                    sleep(1);
-                }
-            }
-            $zip->close();
-            unlink($zipfile);
-        } else {
-            $this->exts->log(__FUNCTION__ . '::File extraction failed');
-        }
-    }
 }
 
-$portal = new PortalScriptCDP("optimized-chrome-v2", 'Immowelt Kundenportal', '2673482', 'aW5mb0B0b20taW1tb2JpbGllbi5jb20=', 'UXQlb3FrV2VAKExSYjI=');
+exec("docker rm -f selenium-node-111");
+exec("docker run -d --shm-size 2g -p 5902:5900 -p 9990:9999 -e TZ=Europe/Berlin -e SE_NODE_SESSION_TIMEOUT=86400 -e LANG=de -e GRID_TIMEOUT=0 -e GRID_BROWSER_TIMEOUT=0 -e SCREEN_WIDTH=1920 -e SCREEN_HEIGHT=1080 --name selenium-node-111 -v /var/www/remote-chrome/downloads:/home/seluser/Downloads/111 remote-chrome:v1");
+
+$browserSelected = 'chrome';
+$portal = new PortalScriptCDP("optimized-chrome-v2", 'Fondsfinanz', '2673521', 'TUFLOTQ2NTI=', 'RTNiOHIxciE=');
 $portal->run();

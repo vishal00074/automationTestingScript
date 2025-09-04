@@ -6,7 +6,8 @@ public $submit_login_selector = 'button.submit-button';
 public $check_login_failed_selector = 'div.field-error-message';
 public $check_login_success_selector = 'div.customers-initials';
 public $isNoInvoice = true;
-
+public $restrictPages = 3;
+public $totalInvoices = 0;
 /**
 
     * Entry Method thats called for a portal
@@ -16,9 +17,12 @@ public $isNoInvoice = true;
     */
 private function initPortal($count)
 {
+    $this->restrictPages = isset($this->exts->config_array["restrictPages"]) ? (int) @$this->exts->config_array["restrictPages"] : 3;
     $this->exts->log('Begin initPortal ' . $count);
     $this->exts->loadCookiesFromFile();
+    sleep(3);
     $this->exts->openUrl($this->loginUrl);
+    sleep(5);
     if (!$this->checkLogin()) {
         $this->exts->log('NOT logged via cookie');
         $this->exts->clearCookies();
@@ -79,9 +83,18 @@ private function fillForm($count)
             sleep(2);
 
             $this->exts->capture("1-login-page-filled");
-            sleep(5);
+
+            $this->waitFor($this->submit_login_selector, 10);
             if ($this->exts->exists($this->submit_login_selector)) {
-                $this->exts->click_by_xdotool($this->submit_login_selector);
+                // $this->exts->click_element($this->submit_login_selector);
+                $this->exts->execute_javascript("arguments[0].click();", [$this->exts->querySelector($this->submit_login_selector)]);
+                sleep(5);
+            }
+
+            $this->waitFor($this->check_login_failed_selector, 20);
+            if (stripos(strtolower($this->exts->extract($this->check_login_failed_selector)), 'passwor') !== false) {
+                $this->exts->log("Wrong credential !!!!");
+                $this->exts->loginFailure(1);
             }
         }
     } catch (\Exception $exception) {
@@ -122,3 +135,4 @@ private function checkLogin()
     }
     return $isLoggedIn;
 }
+
