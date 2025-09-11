@@ -1,4 +1,5 @@
-<?php // 
+<?php // replaced waitTIllPresent to custom js waitForSelectors
+// added condition to download limited invoices based on restrict page conditon
 /**
  * Chrome Remote via Chrome devtool protocol script, for specific process/portal
  *
@@ -70,7 +71,8 @@ class PortalScriptCDP
     public $check_login_failed_selector = 'p.error';
     public $check_login_success_selector = 'div[class="entries-table panel-body"] > div, a.dashboard';
 
-    // public $isNoInvoice = true;
+    public $isNoInvoice = true;
+    public $restrictPages = 3;
 
     /**
      * Entry Method thats called for a portal
@@ -79,6 +81,7 @@ class PortalScriptCDP
     private function initPortal($count)
     {
         $this->exts->log('Begin initPortal ' . $count);
+        $this->restrictPages = isset($this->exts->config_array["restrictPages"]) ? (int)@$this->exts->config_array["restrictPages"] : 3;
         $this->exts->openUrl($this->baseUrl);
         sleep(2);
         $this->exts->loadCookiesFromFile();
@@ -140,7 +143,7 @@ class PortalScriptCDP
     {
         $this->exts->log("Begin fillForm " . $count);
 
-        $this->exts->waitTillPresent($this->username_selector);
+        $this->waitForSelectors($this->username_selector, 3, 5);
         if ($this->exts->querySelector($this->username_selector) != null) {
 
             $this->exts->capture("1-pre-login");
@@ -178,7 +181,7 @@ class PortalScriptCDP
         $isLoggedIn = false;
         try {
             sleep(5);
-            $this->exts->waitTillPresent($this->check_login_success_selector, 20);
+            $this->waitForSelectors($this->check_login_success_selector, 4, 5);
             if ($this->exts->querySelector($this->check_login_success_selector) != null) {
                 $this->exts->log(">>>>>>>>>>>>>>>Login successful!!!!");
                 $isLoggedIn = true;
@@ -202,6 +205,7 @@ class PortalScriptCDP
         }
     }
 
+    public $totalInvoices = 0;
     private function downloadInvoices()
     {
         $this->exts->log(__FUNCTION__);
@@ -232,10 +236,16 @@ class PortalScriptCDP
 
         $this->exts->log('Invoices found: ' . count($invoices));
         foreach ($invoices as $invoice) {
+
+            if ($this->restrictPages != 0 && $this->totalInvoices >= 50) {
+                return;
+            }
+
+
             $this->exts->openUrl($invoice['invoiceUrl']);
             sleep(5);
             $downloadBtn = 'a[href*="pay.stripe.com/invoice/"]';
-            $this->exts->waitTillPresent($downloadBtn);
+            $this->waitForSelectors($downloadBtn, 3, 5);
 
             $this->exts->log('--------------------------');
             $this->exts->log('invoiceDate: ' . $invoice['invoiceDate']);
@@ -257,6 +267,7 @@ class PortalScriptCDP
             if (trim($downloaded_file) != '' && file_exists($downloaded_file)) {
                 $this->exts->new_invoice($invoice['invoiceName'], $invoice['invoiceDate'], $invoice['invoiceAmount'], $invoiceFileName);
                 sleep(1);
+                $this->totalInvoices++;
             } else {
                 $this->exts->log(__FUNCTION__ . '::No download ' . $invoiceFileName);
             }
